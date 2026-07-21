@@ -25,3 +25,12 @@ All authored hardware comes from one foundry. Screen x-y is the assembly plane,
 the y-z plane at 60° above the top-of-screen horizon: L=(0, −½, √3/2). Bronze
 palette, specular law, cylindrical stock, stamped facets, black recesses, and
 machined rim gauges are shared parts, never widget-local approximations.
+
+This is a fixed-camera 3D interface, not shaded 2D illustration. Every visible
+three-dimensional part must originate as coherent geometry in the common x-y-z
+space, with physically meaningful surface normals. The foundry owns projection,
+visibility, material response, and shadows; a widget may not counterfeit volume
+with hand-painted gradients, arbitrary tapers, or disconnected highlight lines.
+When camera, light, material, topology, and bounded degrees of freedom are fixed,
+bake that geometry into 2D vector poses at build time. Runtime owns dynamics and
+pose selection, not redundant 3D evaluation.

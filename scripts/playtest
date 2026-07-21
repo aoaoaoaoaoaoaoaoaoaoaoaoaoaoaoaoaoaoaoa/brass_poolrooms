@@ -6,6 +6,7 @@ out=${2:?usage: scripts/playtest GALLERY OUTPUT_DIR}
 case "$gallery" in
     slider_gallery) ;;
     date_spool_gallery) ;;
+    checkbox_gallery) ;;
     *) printf 'unknown gallery: %s\n' "$gallery" >&2; exit 2 ;;
 esac
 
@@ -63,6 +64,20 @@ case "$gallery" in
         ;;
     date_spool_gallery)
         xdotool mousemove --window "$window" 185 190 click 4 click 4
+        ;;
+    checkbox_gallery)
+        xdotool mousemove --window "$window" 47 145 mousedown 1
+        sleep 0.50
+        import -window "$window" "$out/pressed.png"
+        xdotool mouseup 1
+        sleep 0.04
+        import -window "$window" "$out/recoil-40ms.png"
+        sleep 0.06
+        import -window "$window" "$out/recoil-100ms.png"
+        sleep 0.10
+        import -window "$window" "$out/wake-200ms.png"
+        sleep 0.15
+        import -window "$window" "$out/wake-350ms.png"
         ;;
 esac
 sleep 0.5

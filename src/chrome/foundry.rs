@@ -4,22 +4,19 @@
 //! top-of-screen horizon, so L=(0, -½, √3/2). Every authored metal part is cut
 //! from these responses rather than carrying a private imitation.
 
+use std::sync::Arc;
+
 use egui::{Color32, Pos2, Rect, Stroke};
+
+mod law;
+
+use law::*;
 
 pub(crate) const ABYSS: Color32 = Color32::from_rgb(3, 3, 4);
 pub(crate) const CONTROL_STOCK_DIAMETER: f32 = 14.0;
 pub(crate) const RIM_RADIUS: f32 = 1.0;
 pub(crate) const RIM_WIDTH: f32 = 1.0;
 
-const BRONZE_SHADOW: [f32; 3] = [34.0, 28.0, 19.0];
-const BRONZE_BODY: [f32; 3] = [104.0, 86.0, 58.0];
-const BRONZE_GLINT: [f32; 3] = [196.0, 170.0, 124.0];
-
-const LIGHT_Y: f32 = -0.5;
-const LIGHT_Z: f32 = 0.866_025_4;
-const HALF_Y: f32 = -0.258_819_04;
-const HALF_Z: f32 = 0.965_925_8;
-const METAL_SHINE: f32 = 14.0;
 const STAMP_GAUGE: f32 = 1.0;
 
 #[derive(Clone, Copy)]
@@ -40,14 +37,8 @@ pub(crate) fn yz_lumen(ny: f32, nz: f32, shine: f32) -> (f32, f32) {
 /// The foundry's oxidized-bronze ramp. `tone` is illumination, not a new
 /// material choice: shadow, body, and polished glint are fixed alloy swatches.
 pub(crate) fn bronze(tone: f32) -> Color32 {
-    let tone = tone.clamp(0.0, 1.0);
-    let (lo, hi, t) = if tone < 0.6 {
-        (BRONZE_SHADOW, BRONZE_BODY, tone / 0.6)
-    } else {
-        (BRONZE_BODY, BRONZE_GLINT, (tone - 0.6) / 0.4)
-    };
-    let channel = |i: usize| (lo[i] + (hi[i] - lo[i]) * t).round() as u8;
-    Color32::from_rgb(channel(0), channel(1), channel(2))
+    let [r, g, b] = bronze_rgb(tone);
+    Color32::from_rgb(r, g, b)
 }
 
 /// Bronze cut on a lathe, evaluated under the foundry illuminant. `ny` and
@@ -55,6 +46,13 @@ pub(crate) fn bronze(tone: f32) -> Color32 {
 pub(crate) fn turned_bronze(ny: f32, nz: f32) -> Color32 {
     let (diffuse, specular) = yz_lumen(ny, nz, METAL_SHINE);
     bronze(0.16 + 0.5 * diffuse + 0.8 * specular)
+}
+
+/// Replay an already projected and illuminated 2D foundry artifact.
+pub(crate) fn paint_compiled(painter: &egui::Painter, clip: Rect, mesh: &Arc<egui::Mesh>) {
+    let _shape = painter
+        .with_clip_rect(clip)
+        .add(egui::Shape::mesh(mesh.clone()));
 }
 
 /// Orthographic cylindrical stock with a strictly untapered silhouette. A

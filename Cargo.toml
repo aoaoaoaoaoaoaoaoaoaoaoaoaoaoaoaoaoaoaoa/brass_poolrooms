@@ -10,7 +10,7 @@ repository = "https://github.com/aoaoaoaoaoaoaoaoaoaoaoaoaoaoaoaoaoaoaoa/dwemer_
 homepage = "https://github.com/aoaoaoaoaoaoaoaoaoaoaoaoaoaoaoaoaoaoaoa/dwemer_poolrooms"
 keywords = ["egui", "wgpu", "gui", "shader"]
 categories = ["gui", "graphics", "rendering"]
-include = ["src/**", "examples/**", "assets/**", "LICENSE*", "README.md"]
+include = ["src/**", "build/**", "build.rs", "examples/**", "assets/**", "LICENSE*", "README.md"]
 
 [package.metadata.docs.rs]
 all-features = true
@@ -25,6 +25,10 @@ required-features = ["water"]
 
 [[example]]
 name = "date_spool_gallery"
+required-features = ["water"]
+
+[[example]]
+name = "checkbox_gallery"
 required-features = ["water"]
 
 [workspace]

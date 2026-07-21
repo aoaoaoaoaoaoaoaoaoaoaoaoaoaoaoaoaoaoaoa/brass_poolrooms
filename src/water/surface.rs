@@ -24,6 +24,8 @@ const FORCE_EPSILON: f32 = 0.015;
 /// Logical-point² of unit-depth swept volume that produces one canonical impulse.
 const RAIL_AREA_PER_IMPULSE: f32 = 2_000.0;
 const RAIL_IMPULSE_CEIL: f32 = 1.60;
+/// Logical-point³ of swept plunger volume that produces one canonical impulse.
+const CHECKBOX_VOLUME_PER_IMPULSE: f32 = 4_500.0;
 static NEXT_SURFACE_ID: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -578,6 +580,15 @@ impl Surface {
             self.poke(wake.rect, Poke::slide(impulse, wake.travel.signum()));
         }
     }
+    /// Couple a checkbox plunger's signed swept volume into this water world.
+    /// Rising metal expels water; a descending plunger draws it into the recess.
+    pub fn checkbox(&mut self, checkbox: &crate::chrome::CheckboxResponse) {
+        let Some(wake) = checkbox.wake() else {
+            return;
+        };
+        let impulse = wake.swept_volume() / CHECKBOX_VOLUME_PER_IMPULSE * wake.travel().signum();
+        self.poke(wake.rect(), Poke::basin(impulse));
+    }
     /// Couple a date transport's tape and lever displacement into this water world.
     pub fn date_spool(&mut self, spool: &crate::chrome::DateSpoolResponse) {
         for wake in spool.wakes() {
@@ -991,6 +1002,67 @@ mod tests {
         assert_eq!(sweep.shape, engine::SplashShape::Slide);
         assert_eq!(sweep.travel, -1.0);
         assert!((sweep.amp - 0.5).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn checkbox_displacement_is_signed_and_frame_rate_invariant() {
+        for hz in [30.0, 60.0] {
+            let dt = 1.0 / hz;
+            let ctx = egui::Context::default();
+            let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(64.0, 42.0));
+            let mut checked = false;
+            let mut surface = Surface::new(Wetness::Wet);
+            let input = |events| egui::RawInput {
+                screen_rect: Some(screen),
+                predicted_dt: dt,
+                events,
+                ..egui::RawInput::default()
+            };
+            let _prime = ctx.run_ui(input(Vec::new()), |ui| {
+                let _checkbox = crate::chrome::Checkbox::without_text(&mut checked).show(ui);
+            });
+            {
+                let mut drive = |events| {
+                    let _frame = ctx.run_ui(input(events), |ui| {
+                        let checkbox = crate::chrome::Checkbox::without_text(&mut checked).show(ui);
+                        surface.checkbox(&checkbox);
+                    });
+                };
+                drive(vec![
+                    egui::Event::PointerMoved(screen.center()),
+                    egui::Event::PointerButton {
+                        pos: screen.center(),
+                        button: egui::PointerButton::Primary,
+                        pressed: true,
+                        modifiers: egui::Modifiers::NONE,
+                    },
+                ]);
+                for _ in 1..(0.15 / dt).ceil() as usize {
+                    drive(Vec::new());
+                }
+                drive(vec![egui::Event::PointerButton {
+                    pos: screen.center(),
+                    button: egui::PointerButton::Primary,
+                    pressed: false,
+                    modifiers: egui::Modifiers::NONE,
+                }]);
+                for _ in 1..(0.30 / dt).ceil() as usize {
+                    drive(Vec::new());
+                }
+            }
+            assert!(checked);
+            assert!(
+                surface
+                    .plunges
+                    .iter()
+                    .all(|plunge| plunge.shape == engine::SplashShape::Basin)
+            );
+            let signed_impulse = surface.plunges.iter().map(|plunge| plunge.amp).sum::<f32>();
+            assert!(
+                (-4.70..-4.25).contains(&signed_impulse),
+                "{hz} Hz toggle injected {signed_impulse} canonical impulse"
+            );
+        }
     }
 
     #[test]

@@ -1,0 +1,744 @@
+use std::{
+    collections::HashMap,
+    f32::consts::{FRAC_PI_2, TAU},
+    fs::File,
+    io::{self, BufWriter, Write},
+    ops::{Add, Div, Mul, Sub},
+    path::Path,
+};
+
+use crate::foundry_law::{EYE_Z, HALF_Y, HALF_Z, LIGHT_Y, LIGHT_Z, METAL_SHINE, bronze_rgb};
+
+const POSE_COUNT: usize = 32;
+const TOP_HALF: f32 = 10.7;
+const DISH_HALF: f32 = 8.1;
+const BODY_HALF: f32 = 11.4;
+const BEVEL_DEPTH: f32 = 0.8;
+const BOWL_DEPTH: f32 = 1.35;
+const LATCH_UP: f32 = 3.65;
+const LATCH_STROKE: f32 = 31.05;
+const PRESS_OVERTRAVEL: f32 = 6.30;
+const LATCH_DOWN: f32 = LATCH_UP - LATCH_STROKE;
+const POSE_MIN: f32 = LATCH_DOWN - PRESS_OVERTRAVEL;
+const POSE_MAX: f32 = 4.22;
+/// The shaft continues beyond the deepest rendered pose; its endpoint is
+/// deliberately outside the aperture's visible volume.
+const BODY_ROOT: f32 = POSE_MIN - BEVEL_DEPTH - 2.4;
+
+const GUARD_HALF: f32 = 16.8;
+const GUARD_BASE: f32 = 0.72;
+const GUARD_RISE: f32 = 6.30;
+const WIRE_RADIUS: f32 = 0.645;
+const WIRE_LAYER: f32 = 0.66;
+const FRAME_RADIUS: f32 = 0.72;
+const WELD_RADIUS: f32 = 0.72;
+const WIRE_STATIONS: [f32; 4] = [-10.5, -3.5, 3.5, 10.5];
+const CURVE_STEPS: usize = 16;
+const TUBE_SIDES: usize = 8;
+
+#[derive(Clone, Copy, Debug, Default)]
+struct V3 {
+    x: f32,
+    y: f32,
+    z: f32,
+}
+
+impl V3 {
+    const ZERO: Self = Self::new(0.0, 0.0, 0.0);
+
+    const fn new(x: f32, y: f32, z: f32) -> Self {
+        Self { x, y, z }
+    }
+
+    fn dot(self, rhs: Self) -> f32 {
+        self.x * rhs.x + self.y * rhs.y + self.z * rhs.z
+    }
+
+    fn cross(self, rhs: Self) -> Self {
+        Self::new(
+            self.y * rhs.z - self.z * rhs.y,
+            self.z * rhs.x - self.x * rhs.z,
+            self.x * rhs.y - self.y * rhs.x,
+        )
+    }
+
+    fn length(self) -> f32 {
+        self.dot(self).sqrt()
+    }
+
+    fn normalized(self) -> Self {
+        self / self.length().max(f32::EPSILON)
+    }
+}
+
+impl Add for V3 {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self::new(self.x + rhs.x, self.y + rhs.y, self.z + rhs.z)
+    }
+}
+
+impl Sub for V3 {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self::new(self.x - rhs.x, self.y - rhs.y, self.z - rhs.z)
+    }
+}
+
+impl Mul<f32> for V3 {
+    type Output = Self;
+
+    fn mul(self, rhs: f32) -> Self::Output {
+        Self::new(self.x * rhs, self.y * rhs, self.z * rhs)
+    }
+}
+
+impl Div<f32> for V3 {
+    type Output = Self;
+
+    fn div(self, rhs: f32) -> Self::Output {
+        Self::new(self.x / rhs, self.y / rhs, self.z / rhs)
+    }
+}
+
+#[derive(Clone, Copy)]
+struct Vertex {
+    position: V3,
+    normal: V3,
+}
+
+impl Vertex {
+    fn new(position: V3, normal: V3) -> Self {
+        Self { position, normal }
+    }
+}
+
+#[derive(Default)]
+struct Model {
+    triangles: Vec<[Vertex; 3]>,
+}
+
+impl Model {
+    fn triangle(&mut self, a: Vertex, b: Vertex, c: Vertex) {
+        self.triangles.push([a, b, c]);
+    }
+
+    fn quad(&mut self, vertices: [Vertex; 4]) {
+        let [a, b, c, d] = vertices;
+        self.triangle(a, b, c);
+        self.triangle(a, c, d);
+    }
+
+    fn append(&mut self, mut rhs: Self) {
+        self.triangles.append(&mut rhs.triangles);
+    }
+}
+
+#[derive(Clone, Copy)]
+struct Pixel {
+    position: [f32; 2],
+    color: [u8; 4],
+}
+
+#[derive(Default)]
+struct Compiled {
+    vertices: Vec<Pixel>,
+    indices: Vec<u32>,
+    intern: HashMap<([u32; 2], [u8; 4]), u32>,
+}
+
+impl Compiled {
+    fn vertex(&mut self, pixel: Pixel) -> u32 {
+        let key = (
+            [pixel.position[0].to_bits(), pixel.position[1].to_bits()],
+            pixel.color,
+        );
+        if let Some(index) = self.intern.get(&key) {
+            return *index;
+        }
+        let index = self.vertices.len() as u32;
+        self.vertices.push(pixel);
+        let _prior = self.intern.insert(key, index);
+        index
+    }
+
+    fn triangle(&mut self, pixels: [Pixel; 3]) {
+        let indices = pixels.map(|pixel| self.vertex(pixel));
+        self.indices.extend(indices);
+    }
+}
+
+pub(crate) fn bake(path: &Path) -> io::Result<()> {
+    verify_geometry();
+    let guard = guard();
+    let guard_mesh = compile_bronze(&guard, 0.96);
+    let guard_floor_shadow = compile_shadow(&guard, 0.0, 46);
+    let guard_crown_shadow = compile_shadow_source(&guard, POSE_MAX, 18);
+    let poses = (0..POSE_COUNT)
+        .map(|index| {
+            let elevation = pose_elevation(index);
+            let depth = ((elevation - LATCH_DOWN) / (LATCH_UP - LATCH_DOWN)).clamp(0.0, 1.0);
+            let button = plunger(elevation);
+            (
+                elevation,
+                compile_bronze(&button, 0.76 + 0.24 * depth),
+                compile_shadow(&button, 0.0, 82),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    let mut out = BufWriter::new(File::create(path)?);
+    writeln!(
+        out,
+        "// @generated by build/checkbox_atlas.rs; do not edit."
+    )?;
+    writeln!(out, "pub(super) const POSE_COUNT: usize = {POSE_COUNT};")?;
+    writeln!(
+        out,
+        "pub(super) const POSE_MIN: f32 = {};",
+        scalar(POSE_MIN)
+    )?;
+    writeln!(
+        out,
+        "pub(super) const POSE_MAX: f32 = {};",
+        scalar(POSE_MAX)
+    )?;
+    writeln!(
+        out,
+        "pub(super) const LATCH_DOWN: f32 = {};",
+        scalar(LATCH_DOWN)
+    )?;
+    writeln!(
+        out,
+        "pub(super) const LATCH_UP: f32 = {};",
+        scalar(LATCH_UP)
+    )?;
+    writeln!(
+        out,
+        "pub(super) const BODY_HALF: f32 = {};",
+        scalar(BODY_HALF)
+    )?;
+    writeln!(
+        out,
+        "pub(super) const SHADOW_EYE_Z: f32 = {};",
+        scalar(EYE_Z)
+    )?;
+    writeln!(
+        out,
+        "pub(super) const SHADOW_SLOPE: f32 = {};",
+        scalar(-LIGHT_Y / LIGHT_Z)
+    )?;
+    emit_mesh(&mut out, "GUARD", &guard_mesh)?;
+    emit_mesh(&mut out, "GUARD_FLOOR_SHADOW", &guard_floor_shadow)?;
+    emit_shadow(&mut out, "GUARD_CROWN_SHADOW", &guard_crown_shadow)?;
+    for (index, (_, button, shadow)) in poses.iter().enumerate() {
+        emit_mesh(&mut out, &format!("BUTTON_{index:02}"), button)?;
+        emit_mesh(&mut out, &format!("BUTTON_SHADOW_{index:02}"), shadow)?;
+    }
+    writeln!(out, "pub(super) static POSES: [BakedPose; POSE_COUNT] = [")?;
+    for (index, (elevation, _, _)) in poses.iter().enumerate() {
+        writeln!(
+            out,
+            "BakedPose {{ elevation: {}, button: BUTTON_{index:02}, shadow: BUTTON_SHADOW_{index:02} }},",
+            scalar(*elevation)
+        )?;
+    }
+    writeln!(out, "];")?;
+    Ok(())
+}
+
+fn emit_mesh(out: &mut impl Write, name: &str, mesh: &Compiled) -> io::Result<()> {
+    writeln!(out, "static {name}_VERTICES: &[BakedVertex] = &[")?;
+    for vertex in &mesh.vertices {
+        let [x, y] = vertex.position;
+        let [r, g, b, a] = vertex.color;
+        writeln!(
+            out,
+            "BakedVertex {{ position: [{}, {}], color: [{r}, {g}, {b}, {a}] }},",
+            scalar(x),
+            scalar(y)
+        )?;
+    }
+    writeln!(out, "];")?;
+    writeln!(out, "static {name}_INDICES: &[u32] = &[")?;
+    for chunk in mesh.indices.chunks(24) {
+        for index in chunk {
+            write!(out, "{index},")?;
+        }
+        writeln!(out)?;
+    }
+    writeln!(out, "];")?;
+    writeln!(
+        out,
+        "pub(super) static {name}: BakedMesh = BakedMesh {{ vertices: {name}_VERTICES, indices: {name}_INDICES }};"
+    )
+}
+
+/// Emit the exact IEEE-754 payload rather than a lossy decimal approximation.
+/// Grouped hexadecimal also keeps generated code clear of numeric-literal
+/// heuristics in downstream lint configurations.
+fn scalar(value: f32) -> String {
+    let bits = value.to_bits();
+    format!("f32::from_bits(0x{:04x}_{:04x})", bits >> 16, bits & 0xffff)
+}
+
+fn emit_shadow(out: &mut impl Write, name: &str, shadow: &Compiled) -> io::Result<()> {
+    emit_mesh(out, name, shadow)?;
+    writeln!(
+        out,
+        "pub(super) static {name}_SOURCE: BakedShadow = BakedShadow {{ mesh: {name} }};"
+    )
+}
+
+fn pose_elevation(index: usize) -> f32 {
+    match index {
+        0 => POSE_MIN,
+        i if i + 1 == POSE_COUNT => POSE_MAX,
+        _ => lerp(POSE_MIN, POSE_MAX, index as f32 / (POSE_COUNT - 1) as f32),
+    }
+}
+
+fn project(point: V3) -> [f32; 2] {
+    let scale = EYE_Z / (EYE_Z - point.z).max(1.0);
+    [point.x * scale, point.y * scale]
+}
+
+fn view(point: V3) -> V3 {
+    (V3::new(0.0, 0.0, EYE_Z) - point).normalized()
+}
+
+fn visible(triangle: &[Vertex; 3]) -> bool {
+    let center = triangle
+        .iter()
+        .fold(V3::ZERO, |sum, vertex| sum + vertex.position)
+        / 3.0;
+    let normal = triangle
+        .iter()
+        .fold(V3::ZERO, |sum, vertex| sum + vertex.normal)
+        .normalized();
+    normal.dot(view(center)) > 0.0
+}
+
+fn depth(triangle: &[Vertex; 3]) -> f32 {
+    triangle.iter().map(|vertex| vertex.position.z).sum::<f32>() / 3.0
+}
+
+fn lit(vertex: Vertex, exposure: f32) -> [u8; 4] {
+    let light = V3::new(0.0, LIGHT_Y, LIGHT_Z);
+    let normal = vertex.normal.normalized();
+    let diffuse = normal.dot(light).max(0.0);
+    let half = (light + view(vertex.position)).normalized();
+    let specular = normal.dot(half).max(0.0).powf(METAL_SHINE);
+    let rgb = bronze_rgb(0.16 + 0.5 * diffuse + 0.8 * specular);
+    let channel = |value: u8| (f32::from(value) * exposure).round().clamp(0.0, 255.0) as u8;
+    [channel(rgb[0]), channel(rgb[1]), channel(rgb[2]), 255]
+}
+
+fn compile_bronze(model: &Model, exposure: f32) -> Compiled {
+    let mut facets = model
+        .triangles
+        .iter()
+        .filter(|triangle| visible(triangle))
+        .collect::<Vec<_>>();
+    facets.sort_by(|a, b| depth(a).total_cmp(&depth(b)));
+    let mut compiled = Compiled::default();
+    for triangle in facets {
+        compiled.triangle(triangle.map(|vertex| Pixel {
+            position: project(vertex.position),
+            color: lit(vertex, exposure),
+        }));
+    }
+    compiled
+}
+
+fn compile_shadow(model: &Model, receiver_z: f32, alpha: u8) -> Compiled {
+    let light = V3::new(0.0, LIGHT_Y, LIGHT_Z);
+    let mut compiled = Compiled::default();
+    for triangle in &model.triangles {
+        let normal = triangle
+            .iter()
+            .fold(V3::ZERO, |sum, vertex| sum + vertex.normal)
+            .normalized();
+        if normal.dot(light) <= 0.0
+            || triangle
+                .iter()
+                .any(|vertex| vertex.position.z <= receiver_z)
+        {
+            continue;
+        }
+        compiled.triangle(triangle.map(|vertex| {
+            let distance = (vertex.position.z - receiver_z) / LIGHT_Z;
+            Pixel {
+                position: project(vertex.position - light * distance),
+                color: [0, 0, 0, alpha],
+            }
+        }));
+    }
+    compiled
+}
+
+/// Receiver-independent directional shadow coordinates. A runtime receiver at
+/// z=r applies s=eye/(eye-r), then (x, y+kz) ↦ s·(x, y+kz-kr).
+fn compile_shadow_source(model: &Model, receiver_ceiling: f32, alpha: u8) -> Compiled {
+    let light = V3::new(0.0, LIGHT_Y, LIGHT_Z);
+    let slope = -LIGHT_Y / LIGHT_Z;
+    let mut compiled = Compiled::default();
+    for triangle in &model.triangles {
+        let normal = triangle
+            .iter()
+            .fold(V3::ZERO, |sum, vertex| sum + vertex.normal)
+            .normalized();
+        if normal.dot(light) <= 0.0
+            || triangle
+                .iter()
+                .any(|vertex| vertex.position.z <= receiver_ceiling)
+        {
+            continue;
+        }
+        compiled.triangle(triangle.map(|vertex| Pixel {
+            position: [
+                vertex.position.x,
+                vertex.position.y + slope * vertex.position.z,
+            ],
+            color: [0, 0, 0, alpha],
+        }));
+    }
+    compiled
+}
+
+fn plunger(elevation: f32) -> Model {
+    let mut model = Model::default();
+    dish(&mut model, elevation);
+    crown(&mut model, elevation);
+    bevel(&mut model, elevation);
+    skirt(&mut model, elevation);
+    model
+}
+
+fn dish(model: &mut Model, elevation: f32) {
+    const CELLS: usize = 8;
+    let sample = |x: usize, y: usize| {
+        let u = x as f32 / CELLS as f32 * 2.0 - 1.0;
+        let v = y as f32 / CELLS as f32 * 2.0 - 1.0;
+        let u4 = u.powi(4);
+        let v4 = v.powi(4);
+        let z = elevation - BOWL_DEPTH * (1.0 - u4) * (1.0 - v4);
+        let dz_dx = 4.0 * BOWL_DEPTH * u.powi(3) * (1.0 - v4) / DISH_HALF;
+        let dz_dy = 4.0 * BOWL_DEPTH * v.powi(3) * (1.0 - u4) / DISH_HALF;
+        Vertex::new(
+            V3::new(u * DISH_HALF, v * DISH_HALF, z),
+            V3::new(-dz_dx, -dz_dy, 1.0).normalized(),
+        )
+    };
+    for y in 0..CELLS {
+        for x in 0..CELLS {
+            model.quad([
+                sample(x, y),
+                sample(x + 1, y),
+                sample(x + 1, y + 1),
+                sample(x, y + 1),
+            ]);
+        }
+    }
+}
+
+fn crown(model: &mut Model, elevation: f32) {
+    let z = V3::new(0.0, 0.0, 1.0);
+    let v = |x, y| Vertex::new(V3::new(x, y, elevation), z);
+    let h = TOP_HALF;
+    let d = DISH_HALF;
+    model.quad([v(-h, -h), v(h, -h), v(d, -d), v(-d, -d)]);
+    model.quad([v(h, -h), v(h, h), v(d, d), v(d, -d)]);
+    model.quad([v(h, h), v(-h, h), v(-d, d), v(d, d)]);
+    model.quad([v(-h, h), v(-h, -h), v(-d, -d), v(-d, d)]);
+}
+
+fn bevel(model: &mut Model, elevation: f32) {
+    let h = TOP_HALF;
+    let b = BODY_HALF;
+    let floor = elevation - BEVEL_DEPTH;
+    let face = |positions: [V3; 4], normal: V3, model: &mut Model| {
+        model.quad(positions.map(|position| Vertex::new(position, normal.normalized())));
+    };
+    face(
+        [
+            V3::new(-h, -h, elevation),
+            V3::new(h, -h, elevation),
+            V3::new(b, -b, floor),
+            V3::new(-b, -b, floor),
+        ],
+        V3::new(0.0, -BEVEL_DEPTH, b - h),
+        model,
+    );
+    face(
+        [
+            V3::new(h, -h, elevation),
+            V3::new(h, h, elevation),
+            V3::new(b, b, floor),
+            V3::new(b, -b, floor),
+        ],
+        V3::new(BEVEL_DEPTH, 0.0, b - h),
+        model,
+    );
+    face(
+        [
+            V3::new(h, h, elevation),
+            V3::new(-h, h, elevation),
+            V3::new(-b, b, floor),
+            V3::new(b, b, floor),
+        ],
+        V3::new(0.0, BEVEL_DEPTH, b - h),
+        model,
+    );
+    face(
+        [
+            V3::new(-h, h, elevation),
+            V3::new(-h, -h, elevation),
+            V3::new(-b, -b, floor),
+            V3::new(-b, b, floor),
+        ],
+        V3::new(-BEVEL_DEPTH, 0.0, b - h),
+        model,
+    );
+}
+
+fn skirt(model: &mut Model, elevation: f32) {
+    let top = elevation - BEVEL_DEPTH;
+    let h = BODY_HALF;
+    let face = |positions: [V3; 4], normal: V3, model: &mut Model| {
+        model.quad(positions.map(|position| Vertex::new(position, normal)));
+    };
+    face(
+        [
+            V3::new(-h, -h, top),
+            V3::new(h, -h, top),
+            V3::new(h, -h, BODY_ROOT),
+            V3::new(-h, -h, BODY_ROOT),
+        ],
+        V3::new(0.0, -1.0, 0.0),
+        model,
+    );
+    face(
+        [
+            V3::new(h, -h, top),
+            V3::new(h, h, top),
+            V3::new(h, h, BODY_ROOT),
+            V3::new(h, -h, BODY_ROOT),
+        ],
+        V3::new(1.0, 0.0, 0.0),
+        model,
+    );
+    face(
+        [
+            V3::new(h, h, top),
+            V3::new(-h, h, top),
+            V3::new(-h, h, BODY_ROOT),
+            V3::new(h, h, BODY_ROOT),
+        ],
+        V3::new(0.0, 1.0, 0.0),
+        model,
+    );
+    face(
+        [
+            V3::new(-h, h, top),
+            V3::new(-h, -h, top),
+            V3::new(-h, -h, BODY_ROOT),
+            V3::new(-h, h, BODY_ROOT),
+        ],
+        V3::new(-1.0, 0.0, 0.0),
+        model,
+    );
+}
+
+fn guard() -> Model {
+    let mut model = Model::default();
+    for x in WIRE_STATIONS {
+        let points = (0..=CURVE_STEPS)
+            .map(|step| {
+                let y = lerp(-GUARD_HALF, GUARD_HALF, step as f32 / CURVE_STEPS as f32);
+                guard_wire_point(x, y, WIRE_LAYER)
+            })
+            .collect::<Vec<_>>();
+        model.append(tube(&points, V3::new(1.0, 0.0, 0.0), WIRE_RADIUS, false));
+    }
+    for y in WIRE_STATIONS {
+        let points = (0..=CURVE_STEPS)
+            .map(|step| {
+                let x = lerp(-GUARD_HALF, GUARD_HALF, step as f32 / CURVE_STEPS as f32);
+                guard_wire_point(x, y, -WIRE_LAYER)
+            })
+            .collect::<Vec<_>>();
+        model.append(tube(&points, V3::new(0.0, 1.0, 0.0), WIRE_RADIUS, false));
+    }
+    for x in WIRE_STATIONS {
+        for y in WIRE_STATIONS {
+            model.append(sphere(guard_surface(x, y).0, WELD_RADIUS));
+        }
+    }
+    model.append(tube(
+        &guard_frame(),
+        V3::new(0.0, 0.0, 1.0),
+        FRAME_RADIUS,
+        true,
+    ));
+    model
+}
+
+fn guard_surface(x: f32, y: f32) -> (V3, V3) {
+    let ax = x.abs();
+    let ay = y.abs();
+    let r = ax.max(ay) / GUARD_HALF;
+    let z = GUARD_BASE + GUARD_RISE * (1.0 - r.clamp(0.0, 1.0).powi(4));
+    let slope = -4.0 * GUARD_RISE * r.powi(3) / GUARD_HALF;
+    let (dz_dx, dz_dy) = if ax >= ay {
+        (slope * x.signum(), 0.0)
+    } else {
+        (0.0, slope * y.signum())
+    };
+    (V3::new(x, y, z), V3::new(-dz_dx, -dz_dy, 1.0).normalized())
+}
+
+fn guard_wire_point(x: f32, y: f32, layer: f32) -> V3 {
+    let (surface, normal) = guard_surface(x, y);
+    let edge = (x.abs().max(y.abs()) / GUARD_HALF).clamp(0.0, 1.0);
+    surface + normal * layer * (1.0 - edge.powi(8))
+}
+
+fn guard_frame() -> Vec<V3> {
+    const SAMPLES: usize = 40;
+    const POWER: f32 = 6.0;
+    (0..SAMPLES)
+        .map(|sample| {
+            let theta = sample as f32 / SAMPLES as f32 * TAU;
+            let (sin, cos) = theta.sin_cos();
+            V3::new(
+                GUARD_HALF * cos.signum() * cos.abs().powf(2.0 / POWER),
+                GUARD_HALF * sin.signum() * sin.abs().powf(2.0 / POWER),
+                GUARD_BASE + FRAME_RADIUS,
+            )
+        })
+        .collect()
+}
+
+fn tube(points: &[V3], seed: V3, radius: f32, closed: bool) -> Model {
+    assert!(
+        points.len() >= 2,
+        "a physical wire requires at least two stations"
+    );
+    let n = points.len();
+    let tangents = (0..n)
+        .map(|i| {
+            let prior = if i == 0 {
+                if closed { points[n - 1] } else { points[0] }
+            } else {
+                points[i - 1]
+            };
+            let next = if i + 1 == n {
+                if closed { points[0] } else { points[n - 1] }
+            } else {
+                points[i + 1]
+            };
+            (next - prior).normalized()
+        })
+        .collect::<Vec<_>>();
+    let mut axes = Vec::with_capacity(n);
+    let mut axis = (seed - tangents[0] * seed.dot(tangents[0])).normalized();
+    for tangent in &tangents {
+        let transported = axis - *tangent * axis.dot(*tangent);
+        axis = if transported.length() > 0.01 {
+            transported.normalized()
+        } else {
+            (seed - *tangent * seed.dot(*tangent)).normalized()
+        };
+        axes.push(axis);
+    }
+
+    let rings = points
+        .iter()
+        .zip(&tangents)
+        .zip(&axes)
+        .map(|((point, tangent), axis)| {
+            let wing = tangent.cross(*axis).normalized();
+            (0..TUBE_SIDES)
+                .map(|side| {
+                    let theta = side as f32 / TUBE_SIDES as f32 * TAU;
+                    let normal = *axis * theta.cos() + wing * theta.sin();
+                    Vertex::new(*point + normal * radius, normal)
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+
+    let mut model = Model::default();
+    let spans = if closed { n } else { n - 1 };
+    for i in 0..spans {
+        let next = (i + 1) % n;
+        for side in 0..TUBE_SIDES {
+            let around = (side + 1) % TUBE_SIDES;
+            model.quad([
+                rings[i][side],
+                rings[next][side],
+                rings[next][around],
+                rings[i][around],
+            ]);
+        }
+    }
+    model
+}
+
+fn sphere(center: V3, radius: f32) -> Model {
+    const LATITUDES: usize = 5;
+    const LONGITUDES: usize = 8;
+    let vertex = |latitude: usize, longitude: usize| {
+        let phi = -FRAC_PI_2 + latitude as f32 / LATITUDES as f32 * FRAC_PI_2 * 2.0;
+        let theta = longitude as f32 / LONGITUDES as f32 * TAU;
+        let normal = V3::new(phi.cos() * theta.cos(), phi.cos() * theta.sin(), phi.sin());
+        Vertex::new(center + normal * radius, normal)
+    };
+    let mut model = Model::default();
+    for latitude in 0..LATITUDES {
+        for longitude in 0..LONGITUDES {
+            let around = (longitude + 1) % LONGITUDES;
+            model.quad([
+                vertex(latitude, longitude),
+                vertex(latitude, around),
+                vertex(latitude + 1, around),
+                vertex(latitude + 1, longitude),
+            ]);
+        }
+    }
+    model
+}
+
+fn verify_geometry() {
+    assert!((HALF_Y * HALF_Y + HALF_Z * HALF_Z - 1.0).abs() < 1e-6);
+    let fixed_half = V3::new(0.0, LIGHT_Y, LIGHT_Z) + V3::new(0.0, 0.0, 1.0);
+    let fixed_half = fixed_half.normalized();
+    assert!((fixed_half.y - HALF_Y).abs() < 1e-6);
+    assert!((fixed_half.z - HALF_Z).abs() < 1e-6);
+    for y in -10..=10 {
+        for x in -10..=10 {
+            let (surface, _) = guard_surface(x as f32, y as f32);
+            assert!(
+                surface.z - WIRE_LAYER - WIRE_RADIUS > POSE_MAX,
+                "guard collides with crown at ({x}, {y})"
+            );
+        }
+    }
+    for x in WIRE_STATIONS {
+        for y in WIRE_STATIONS {
+            let upper = guard_wire_point(x, y, WIRE_LAYER);
+            let lower = guard_wire_point(x, y, -WIRE_LAYER);
+            let edge = x.abs().max(y.abs()) / GUARD_HALF;
+            let separation = 2.0 * WIRE_LAYER * (1.0 - edge.powi(8));
+            assert!(((upper - lower).length() - separation).abs() < 1e-5);
+            assert!((upper - lower).length() <= 2.0 * WELD_RADIUS);
+        }
+    }
+}
+
+fn lerp(lo: f32, hi: f32, t: f32) -> f32 {
+    lo + (hi - lo) * t
+}

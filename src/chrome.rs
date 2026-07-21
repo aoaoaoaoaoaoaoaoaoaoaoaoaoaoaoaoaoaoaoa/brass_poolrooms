@@ -3,21 +3,23 @@
 //! Call [`install`] once for each `egui::Context` before constructing the UI.
 //! It installs the embedded typefaces, palette, spacing, and widget visuals.
 //!
-//! [`Rail`] and [`DateSpool`] are the crafted mechanisms. They return richer
-//! response types that expose ordinary interaction state and the volume their
-//! moving solids displaced. Applications using the optional `water` feature
-//! pass those responses to `water::Surface::rail` or
-//! `water::Surface::date_spool` during the same UI pass.
+//! [`Rail`], [`DateSpool`], and [`Checkbox`] are the crafted mechanisms. They
+//! return richer response types that expose ordinary interaction state and the
+//! volume their moving solids displaced. Applications using the optional
+//! `water` feature pass those responses to the corresponding methods on
+//! `water::Surface` during the same UI pass.
 
 use std::f32::consts::TAU;
 use std::sync::Arc;
 
 use egui::{Color32, FontData, FontDefinitions, FontFamily, RichText, Sense, Stroke, Vec2};
 
+mod checkbox;
 mod date_spool;
 mod foundry;
 mod rail;
 
+pub use checkbox::{Checkbox, CheckboxResponse, CheckboxWake};
 pub use date_spool::{DateSpool, DateSpoolResponse, DateWake, GregorianDay, take_date_spool_wheel};
 pub use rail::{Rail, RailResponse, RailWake, rail_u16, rail_u16_sized};
 

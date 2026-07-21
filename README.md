@@ -4,14 +4,16 @@ Skeuomorphic controls and living water for egui.
 
 Poolrooms supplies embedded typography, machined bronze chrome, mechanically
 constrained controls, and a persistent GPU water surface that reacts to UI
-motion. Its custom controls are currently the linkage-driven [`Rail`] and
-tape-transport [`DateSpool`]. Both use the same material and lighting model.
+motion. Its custom controls are the linkage-driven [`Rail`], tape-transport
+[`DateSpool`], and spring-latched [`Checkbox`]. All are machined in one fixed
+projection, material, and lighting model.
 
 ## Try It
 
 ```sh
 cargo run --example slider_gallery
 cargo run --example date_spool_gallery
+cargo run --example checkbox_gallery
 ```
 
 ## Use It
@@ -57,3 +59,4 @@ The default `water` feature contains the simulator and compositor.
 
 [`Rail`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.Rail.html
 [`DateSpool`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.DateSpool.html
+[`Checkbox`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.Checkbox.html
