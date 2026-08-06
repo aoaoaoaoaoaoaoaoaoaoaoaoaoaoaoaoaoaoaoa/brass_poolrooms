@@ -74,9 +74,10 @@ pub const HOT: Color32 = Color32::from_rgb(235, 197, 151);
 
 /// Install the Poolrooms fonts, palette, spacing, and control visuals.
 ///
-/// This replaces the context's global egui visuals and font definitions. Call
-/// it once after creating a context, and again only if another subsystem later
-/// replaces those definitions.
+/// This replaces both egui theme slots and the context's font definitions, so
+/// a later operating-system or browser theme notification cannot substitute
+/// stock light chrome. Call it once after creating a context, and again only
+/// if another subsystem later replaces those definitions.
 pub fn install(ctx: &egui::Context) {
     install_fonts(ctx);
     let mut visuals = egui::Visuals::dark();
@@ -112,15 +113,14 @@ pub fn install(ctx: &egui::Context) {
     ] {
         widget.corner_radius = egui::CornerRadius::same(1);
     }
-    ctx.set_visuals(visuals);
-
-    let mut style = (*ctx.global_style()).clone();
-    style.spacing.item_spacing = Vec2::splat(6.0);
-    style.spacing.button_padding = Vec2::new(7.0, 3.0);
-    style.spacing.window_margin = egui::Margin::symmetric(8, 8);
-    style.spacing.menu_margin = egui::Margin::symmetric(8, 8);
-    style.spacing.indent = 12.0;
-    ctx.set_global_style(style);
+    ctx.all_styles_mut(|style| {
+        style.visuals = visuals.clone();
+        style.spacing.item_spacing = Vec2::splat(6.0);
+        style.spacing.button_padding = Vec2::new(7.0, 3.0);
+        style.spacing.window_margin = egui::Margin::symmetric(8, 8);
+        style.spacing.menu_margin = egui::Margin::symmetric(8, 8);
+        style.spacing.indent = 12.0;
+    });
 }
 
 fn install_fonts(ctx: &egui::Context) {
@@ -489,4 +489,22 @@ pub fn muted(text: impl Into<String>) -> RichText {
 
 pub fn note(ui: &mut egui::Ui, text: impl Into<String>) -> egui::Response {
     ui.add(egui::Label::new(muted(text)).wrap())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn installed_chrome_survives_system_theme_changes() {
+        let ctx = egui::Context::default();
+        install(&ctx);
+
+        for theme in [egui::Theme::Dark, egui::Theme::Light] {
+            let style = ctx.style_of(theme);
+            assert_eq!(style.visuals.panel_fill, PAGE);
+            assert_eq!(style.visuals.widgets.inactive.fg_stroke.color, TEXT);
+            assert_eq!(style.spacing.item_spacing, Vec2::splat(6.0));
+        }
+    }
 }

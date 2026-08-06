@@ -121,7 +121,7 @@ is deliberately a hardware WebGPU workload.
 
 ```toml
 [dependencies]
-dwemer_poolrooms = "0.8.0"
+dwemer_poolrooms = "0.8.1"
 ```
 
 Import egui through the crate to keep its public geometry types aligned with
@@ -137,7 +137,7 @@ chrome::install(&ctx);
 For chrome without GPU water:
 
 ```toml
-dwemer_poolrooms = { version = "0.8.0", default-features = false }
+dwemer_poolrooms = { version = "0.8.1", default-features = false }
 ```
 
 ## Water

@@ -22,11 +22,13 @@ const STAMP_GAUGE: f32 = 1.0;
 const PLAQUE_RISE: f32 = 2.0;
 const PLAQUE_BEVEL_RUN: f32 = PLAQUE_RISE;
 const PLAQUE_TEXT_PAD_X: f32 = 6.0;
-const PLAQUE_ETCH_DEPTH: f32 = 0.58;
-/// Radial allowance of the identification pantograph's cutter beyond the
-/// nominal glyph outline. This is geometric emboldening: every relief layer
-/// receives the same symmetric dilation before its light-derived offset.
-const PLAQUE_ETCH_SHOULDER: f32 = 0.18;
+const PLAQUE_ETCH_DEPTH: f32 = 0.72;
+const PLAQUE_ETCH_BEVEL_RUN: f32 = 0.20;
+/// Radial allowance cut into the soot-black floor beyond the nominal glyph.
+/// It preserves a black core after antialiasing without widening the exposed
+/// bronze wall.
+const PLAQUE_ETCH_FLOOR_SHOULDER: f32 = 0.16;
+const _: () = assert!(PLAQUE_ETCH_DEPTH / PLAQUE_ETCH_BEVEL_RUN > 3.0);
 const COUPLING_TIE_DIAMETER: f32 = 1.55;
 const COUPLING_TIE_BURIAL: f32 = 0.7;
 
@@ -62,8 +64,8 @@ pub(crate) fn turned_bronze(ny: f32, nz: f32) -> Color32 {
 /// Freshly exposed tool-cut bronze under the foundry illuminant.
 ///
 /// The stronger diffuse and specular charge is an exposure compression for
-/// subpixel V-bit walls: it preserves their alloy hue and directional light
-/// while keeping a narrow cut legible against darkened stock.
+/// subpixel cut walls: it preserves their alloy hue and directional light while
+/// keeping a narrow incision legible against darkened stock.
 fn fresh_cut_bronze(ny: f32, nz: f32) -> Color32 {
     let (diffuse, specular) = yz_lumen(ny, nz, METAL_SHINE);
     bronze(0.24 + 0.68 * diffuse + specular)
@@ -84,12 +86,12 @@ pub(crate) fn darkened_bronze(position: [f32; 3], normal: [f32; 3]) -> Color32 {
     Color32::from_rgb(r, g, b)
 }
 
-/// Cut a dynamic glyph mask with the same 45° V-bit used by baked monoglyphs.
-/// The two relief layers are not decorative highlights: they are the dark
-/// rough floor and the key-facing wall separated by the groove's projected
-/// depth under the common illuminant. A symmetric cutter allowance broadens
-/// both layers together without counterfeit boldface lighting.
-pub(crate) fn v_bit_etch(
+/// Engrave a dynamic plaque glyph with a steep, flat-bottomed cutter.
+///
+/// The exposed key-facing wall advances only by the cutter's narrow bevel run;
+/// the soot-black floor then occludes its center. Unlike a broad V-bit, this
+/// preserves a decisive black letterfield at small UI gauges.
+fn plaque_engraving(
     painter: &egui::Painter,
     clip: Rect,
     pos: Pos2,
@@ -98,33 +100,28 @@ pub(crate) fn v_bit_etch(
     depth: f32,
 ) {
     let incision = painter.with_clip_rect(clip);
-    let light_fall = depth * (-LIGHT_Y / LIGHT_Z) * perspective_scale(surface_z);
-    let shoulders = [
-        Vec2::new(-PLAQUE_ETCH_SHOULDER, 0.0),
-        Vec2::new(0.0, -PLAQUE_ETCH_SHOULDER),
+    let wall_run = PLAQUE_ETCH_BEVEL_RUN * perspective_scale(surface_z);
+    let normalizer = depth.hypot(PLAQUE_ETCH_BEVEL_RUN);
+    incision.galley_with_override_text_color(
+        pos + Vec2::new(0.0, wall_run),
+        galley.clone(),
+        fresh_cut_bronze(-depth / normalizer, PLAQUE_ETCH_BEVEL_RUN / normalizer),
+    );
+    for shoulder in [
+        Vec2::new(-PLAQUE_ETCH_FLOOR_SHOULDER, 0.0),
+        Vec2::new(0.0, -PLAQUE_ETCH_FLOOR_SHOULDER),
         Vec2::ZERO,
-        Vec2::new(0.0, PLAQUE_ETCH_SHOULDER),
-        Vec2::new(PLAQUE_ETCH_SHOULDER, 0.0),
-    ];
-    for shoulder in shoulders {
-        incision.galley_with_override_text_color(
-            pos + shoulder + Vec2::new(0.0, light_fall),
-            galley.clone(),
-            turned_bronze(-FRAC_1_SQRT_2, FRAC_1_SQRT_2),
-        );
-    }
-    for shoulder in shoulders {
-        incision.galley_with_override_text_color(
-            pos + shoulder - Vec2::new(0.0, light_fall * 0.20),
-            galley.clone(),
-            bronze(0.07),
-        );
+        Vec2::new(0.0, PLAQUE_ETCH_FLOOR_SHOULDER),
+        Vec2::new(PLAQUE_ETCH_FLOOR_SHOULDER, 0.0),
+    ] {
+        incision.galley_with_override_text_color(pos + shoulder, galley.clone(), Color32::BLACK);
     }
 }
 
 /// A freshly exposed V-cut whose key-facing wall is the dominant glyph face.
 ///
-/// Identification plaques retain a soot-dark floor through [`v_bit_etch`].
+/// Identification plaques use a steeper, soot-black cut through
+/// [`plaque_engraving`].
 /// Action glyphs reverse the visible-wall ordering: the same recessed floor
 /// remains along the up-screen lip, while the illuminated bronze wall occupies
 /// most of the cut. Both passes still derive from the groove depth and fixed
@@ -255,7 +252,7 @@ impl Plaque {
             Stroke::new(0.7_f32, bronze(0.10)),
             egui::StrokeKind::Inside,
         );
-        v_bit_etch(
+        plaque_engraving(
             painter,
             crown,
             crown.center() - self.galley.size() * 0.5,
