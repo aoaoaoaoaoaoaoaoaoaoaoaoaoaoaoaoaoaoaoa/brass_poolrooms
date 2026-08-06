@@ -5,22 +5,123 @@ Skeuomorphic controls and living water for egui.
 Poolrooms supplies embedded typography, machined bronze chrome, mechanically
 constrained controls, and a persistent GPU water surface that reacts to UI
 motion. Its custom controls are the linkage-driven [`Rail`], tape-transport
-[`DateSpool`], and spring-latched [`Checkbox`]. All are machined in one fixed
-projection, material, and lighting model.
+[`DateSpool`], spring-latched [`Checkbox`], and momentary square [`Monoglyph`].
+The corner-mounted [`CornerClose`] uses that same plunger stock with a fixed,
+deeply recessed X. [`DragHandle`] supplies fixed friction pads and rigid or
+folding bails for reorder gestures. [`NumberInput`] couples an exact scalar
+register to a scalloped thumbwheel. All are machined in one fixed projection,
+material, and lighting model.
+
+## Scope
+
+Poolrooms is the independently usable low-level physical GUI substrate. It
+owns how controls and surfaces are embodied: geometry, material, constrained
+motion, intrinsic interaction, and displaced water. Buttons, rollers, sliders,
+tiles, frames, and similar physical things belong here.
+
+Logical application assemblies do not. Managers, menu models, storage
+interactions, product layouts, and other application-scale state machines
+belong to their application kit, such as Eternalist Apps. Eternalist may
+compose Poolrooms; Poolrooms never depends on Eternalist. Its public API and
+WebGPU gallery remain usable by applications with entirely different visual
+composition.
+
+## Component Index
+
+| Mechanism | Contract | Water hook |
+| --- | --- | --- |
+| [`Rail`] | Bounded linear transport with explicit total and admissible spans, detents, and optional wheel input | `Surface::rail` |
+| [`DateSpool`] | One-to-three Gregorian tape reels with explicit width and a reel-derived rigid minimum | `Surface::date_spool` |
+| [`Checkbox`] | Three-gauge latching plunger with an optional side-selectable etched plaque and a state-transparent fixed-stock guard | `Surface::checkbox` |
+| [`Monoglyph`] | Momentary square plunger carrying exactly one etched Unicode scalar | `Surface::monoglyph` |
+| [`CornerClose`] | Momentary close plunger centered on a pane corner, with a build-time modelled and self-shadowed X trench | `Surface::corner_close` |
+| [`DragHandle`] | Rigid half-width friction pad, rigid square bail, or sprung folding bail on a riveted crosshatched plate | `Surface::drag_handle` |
+| [`NumberInput`] | Bounded integer or floating register with an explicit quantum, precision, exact-entry override, two wheel planes, and sprung limit refusal | `Surface::number_input` |
+
+These seven types are the complete inventory of foundry-owned controls: their
+geometry, dynamics, material response, and displaced-water contract live here.
+The other `chrome` exports are shared typography, layout, and interaction
+plumbing rather than standalone mechanisms. [`widget_gallery`](examples/widget_gallery.rs)
+is the living visual contract: it keeps one legible exemplar of every material
+variant and interaction without multiplying equivalent Cartesian combinations.
+
+[`MechanismSize`] gives compatible `Checkbox`, `Monoglyph`, and `DragHandle`
+casings three named gauges: 20-point `Small`, 24-point `Medium`, and 32-point
+`Large`. The point count is the nominal casing and interaction height, not a
+transparent layout envelope. Monoglyphs and bails are square; friction pads are
+half-width. Checkbox guards retain one wire gauge while their lattices step
+from 2×2 through 3×3 to 4×4, and their full protective envelopes are allocated
+explicitly. Each admitted gauge is independently projected and illuminated at
+build time.
+[`Coupled::horizontal`] places any two coupling-capable foundry responses at the
+canonical six-point gap and runs the standard twin bronze ties behind both
+casings. [`Coupled::horizontal_with_gap`] accepts a [`CouplingGap`] when dense
+tool strips need shorter, still-physical ties; `CouplingGap::MINIMUM` is two
+points and `CouplingGap::TIGHT` is three.
+
+`NumberInput::new(&mut value, min..=max, quantum, precision)` leaves every
+scalar policy with the caller. The bound primitive type selects integer or
+floating semantics; integer registers require zero decimal places. Scrolling
+one ordinary wheel detent advances one quantum, high-resolution motion retains
+its magnitude, and double-clicking the register admits exact text entry.
 
 ## Try It
 
 ```sh
+cargo run --example widget_gallery
 cargo run --example slider_gallery
 cargo run --example date_spool_gallery
 cargo run --example checkbox_gallery
+cargo run --example corner_close_gallery
+cargo run --example drag_handle_gallery
+cargo run --example number_input_gallery
 ```
+
+The combined gallery is also the browser contract:
+
+```sh
+scripts/web-gallery serve
+```
+
+Open `http://127.0.0.1:4173`. `scripts/web-gallery build` emits the deployable
+static directory under Cargo's target directory. The ordinary repository check
+builds and binds this exact release-mode Wasm example, so native-only drift
+fails the gate. The server also uses that optimized artifact; debug Wasm is not
+representative enough to serve.
+
+Pass a port as `scripts/web-gallery serve 8080` or through `PORT=8080`. If that
+port is occupied, the server binds an available ephemeral port and prints its
+actual URL instead of dying.
+
+For a persistent, fixed address, install the repository-aware systemd user
+service:
+
+```sh
+scripts/gallery-service install        # http://127.0.0.1:4173
+scripts/gallery-service install 8080   # choose another fixed port
+```
+
+The installer builds once, adds one integration artifact at
+`$XDG_CONFIG_HOME/systemd/user/dwemer-poolrooms-gallery.service` (falling back
+to `~/.config/systemd/user`), and enables it for the user session; the bundle
+remains rebuildable Cargo target output. The server reads that output in place:
+every later `scripts/web-gallery build` or `./check.py check` is visible on the
+next browser refresh without restarting the service. Unlike the interactive
+server, a fixed-port collision fails loudly instead of silently changing the
+URL. Inspect or remove it with `scripts/gallery-service status` and
+`scripts/gallery-service uninstall`.
+
+Linux Chromium may require graphics acceleration plus both
+`chrome://flags/#enable-unsafe-webgpu` and `chrome://flags/#enable-vulkan`; relaunch
+the browser after changing either flag. The page checks for an actual adapter
+before starting and refuses CPU renderers such as `SwiftShader`: the living water
+is deliberately a hardware WebGPU workload.
 
 ## Use It
 
 ```toml
 [dependencies]
-dwemer_poolrooms = "0.3.1"
+dwemer_poolrooms = "0.8.0"
 ```
 
 Import egui through the crate to keep its public geometry types aligned with
@@ -36,7 +137,7 @@ chrome::install(&ctx);
 For chrome without GPU water:
 
 ```toml
-dwemer_poolrooms = { version = "0.3.1", default-features = false }
+dwemer_poolrooms = { version = "0.8.0", default-features = false }
 ```
 
 ## Water
@@ -60,3 +161,11 @@ The default `water` feature contains the simulator and compositor.
 [`Rail`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.Rail.html
 [`DateSpool`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.DateSpool.html
 [`Checkbox`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.Checkbox.html
+[`Monoglyph`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.Monoglyph.html
+[`CornerClose`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.CornerClose.html
+[`DragHandle`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.DragHandle.html
+[`NumberInput`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.NumberInput.html
+[`MechanismSize`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/enum.MechanismSize.html
+[`CouplingGap`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.CouplingGap.html
+[`Coupled::horizontal`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.Coupled.html#method.horizontal
+[`Coupled::horizontal_with_gap`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.Coupled.html#method.horizontal_with_gap

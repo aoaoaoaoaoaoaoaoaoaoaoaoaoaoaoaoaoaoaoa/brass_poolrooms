@@ -17,6 +17,7 @@ use egui::{Color32, CursorIcon, Key, Modifiers, Pos2, Rect, Sense, Stroke, Vec2,
 use super::{
     HOT,
     foundry::{self, StockAxis, bronze},
+    wheel,
 };
 
 const H: f32 = 38.0;
@@ -24,7 +25,21 @@ const SLOT_H: f32 = 11.0;
 const HANDLE_DIAMETER: f32 = foundry::CONTROL_STOCK_DIAMETER;
 const HANDLE_H: f32 = 28.0;
 const CLEARANCE: f32 = 1.5;
+const GATE_KNURL_PITCH: f32 = 9.0;
+const GATE_KNURL_WIDTH: f32 = 1.4;
+const GATE_KNURL_RISE: f32 = 0.28;
+const _: () = {
+    assert!(GATE_KNURL_WIDTH >= 1.0);
+    assert!(GATE_KNURL_PITCH >= 4.0 * GATE_KNURL_WIDTH);
+};
 const DEFAULT_DETENTS: NonZeroU16 = NonZeroU16::MIN.saturating_add(10);
+
+#[derive(Clone, Copy, Default)]
+enum WheelPolicy {
+    #[default]
+    Pass,
+    Detents,
+}
 
 /// A bronze linear control with distinct measuring and admissible spans.
 ///
@@ -34,8 +49,9 @@ const DEFAULT_DETENTS: NonZeroU16 = NonZeroU16::MIN.saturating_add(10);
 /// stop plates instead of disappearing.
 ///
 /// The control supports pointer dragging, clicks, the left/right arrow keys,
-/// and Home/End while focused. Its response dereferences to `egui::Response`
-/// and also carries the solids' displaced-water wakes.
+/// and Home/End while focused. [`Rail::wheel`] additionally enables hovered
+/// wheel/trackpad motion. Its response dereferences to `egui::Response` and
+/// also carries the solids' displaced-water wakes.
 ///
 /// # Example
 ///
@@ -46,6 +62,7 @@ const DEFAULT_DETENTS: NonZeroU16 = NonZeroU16::MIN.saturating_add(10);
 ///     let rail = Rail::new(value, 0..=10)
 ///         .allowed(0..=ceiling)
 ///         .detents(11)
+///         .wheel()
 ///         .width(320.0)
 ///         .show(ui);
 ///
@@ -59,6 +76,7 @@ pub struct Rail<'a, N: Numeric> {
     total: RangeInclusive<N>,
     allowed: RangeInclusive<N>,
     detents: NonZeroU16,
+    wheel: WheelPolicy,
     width: Option<f32>,
 }
 
@@ -83,6 +101,7 @@ impl<'a, N: Numeric> Rail<'a, N> {
             total,
             allowed,
             detents,
+            wheel: WheelPolicy::default(),
             width: None,
         }
     }
@@ -105,6 +124,18 @@ impl<'a, N: Numeric> Rail<'a, N> {
     pub fn detents(mut self, count: u16) -> Self {
         assert!(count >= 2, "a rail requires at least two detents");
         self.detents = NonZeroU16::new(count).unwrap_or(NonZeroU16::MIN);
+        self
+    }
+
+    /// Enable unmodified vertical wheel and trackpad gestures while hovered.
+    ///
+    /// Each mouse-wheel notch advances one station on the immutable total
+    /// scale; fine trackpad travel is accumulated across frames. This is
+    /// opt-in so a rail embedded in a scrolling surface passes wheel motion
+    /// through by default. Use [`super::take_control_wheel`] when an enclosing
+    /// scroll surface must observe that the rail claimed a gesture.
+    pub fn wheel(mut self) -> Self {
+        self.wheel = WheelPolicy::Detents;
         self
     }
 
@@ -133,6 +164,7 @@ impl<'a, N: Numeric> Rail<'a, N> {
             total,
             allowed,
             detents,
+            wheel: wheel_policy,
             width,
         } = self;
         let total = Span::refine(total);
@@ -163,6 +195,14 @@ impl<'a, N: Numeric> Rail<'a, N> {
                 *value = N::from_f64(if N::INTEGRAL { next.round() } else { next });
             }
         }
+        if matches!(wheel_policy, WheelPolicy::Detents) && ui.is_enabled() && response.hovered() {
+            let steps = wheel::notches(ui, response.id);
+            if steps != 0 {
+                response.request_focus();
+                let next = allowed.clamp(total.advance(value.to_f64(), steps, detents));
+                *value = N::from_f64(if N::INTEGRAL { next.round() } else { next });
+            }
+        }
         if response.has_focus() {
             let key = ui.input_mut(|input| {
                 let home = input.consume_key(Modifiers::NONE, Key::Home);
@@ -175,11 +215,7 @@ impl<'a, N: Numeric> Rail<'a, N> {
                 (true, _, _) => Some(allowed.lo),
                 (_, true, _) => Some(allowed.hi),
                 (_, _, 0) => None,
-                (_, _, steps) => Some(allowed.clamp(
-                    value.to_f64()
-                        + f64::from(steps) * total.width()
-                            / f64::from(detents.get().saturating_sub(1)),
-                )),
+                (_, _, steps) => Some(allowed.clamp(total.advance(value.to_f64(), steps, detents))),
             };
             if let Some(next) = next {
                 *value = N::from_f64(if N::INTEGRAL { next.round() } else { next });
@@ -312,6 +348,10 @@ impl Span {
         let n = f64::from(detents.get().saturating_sub(1));
         let station = (f64::from(t) * n).round() / n;
         self.lo + station * self.width()
+    }
+
+    fn advance(self, value: f64, steps: i32, detents: NonZeroU16) -> f64 {
+        value + f64::from(steps) * self.width() / f64::from(detents.get().saturating_sub(1))
     }
 }
 
@@ -636,24 +676,27 @@ fn paint_gate(painter: &egui::Painter, anatomy: Anatomy, boundary: f32, left: bo
         Stroke::new(0.8_f32, bronze(0.26)),
     );
     let hatch = painter.with_clip_rect(plate.shrink(0.5));
-    let pitch = 6.0;
     let mut x = plate.left() - plate.height();
     while x <= plate.right() + plate.height() {
-        let _slash = hatch.line_segment(
+        foundry::triangular_ridge(
+            &hatch,
             [
                 Pos2::new(x, plate.bottom()),
                 Pos2::new(x + plate.height(), plate.top()),
             ],
-            Stroke::new(0.75_f32, bronze(0.48).gamma_multiply(0.68)),
+            GATE_KNURL_WIDTH,
+            GATE_KNURL_RISE,
         );
-        let _backslash = hatch.line_segment(
+        foundry::triangular_ridge(
+            &hatch,
             [
                 Pos2::new(x, plate.top()),
                 Pos2::new(x + plate.height(), plate.bottom()),
             ],
-            Stroke::new(0.55_f32, Color32::from_black_alpha(105)),
+            GATE_KNURL_WIDTH,
+            GATE_KNURL_RISE,
         );
-        x += pitch;
+        x += GATE_KNURL_PITCH;
     }
     let x = if left { plate.right() } else { plate.left() };
     let voidward = if left { 1.0 } else { -1.0 };
@@ -778,5 +821,71 @@ mod tests {
         }
         assert_eq!(value, 9);
         assert!(swept > 3_000.0, "carriage swept only {swept} px²");
+    }
+
+    #[test]
+    fn wheel_is_opt_in_banked_and_stopped_by_the_allowed_span() {
+        let ctx = egui::Context::default();
+        let mut value = 4_u16;
+        let screen = Rect::from_min_size(Pos2::ZERO, Vec2::new(320.0, H));
+        let input = |unit, y| egui::RawInput {
+            screen_rect: Some(screen),
+            events: vec![
+                egui::Event::PointerMoved(screen.center()),
+                egui::Event::MouseWheel {
+                    unit,
+                    delta: Vec2::new(0.0, y),
+                    phase: egui::TouchPhase::Move,
+                    modifiers: Modifiers::NONE,
+                },
+            ],
+            ..egui::RawInput::default()
+        };
+
+        let _pass = ctx.run_ui(input(egui::MouseWheelUnit::Line, 1.0), |ui| {
+            let _rail = Rail::new(&mut value, 0..=10)
+                .detents(11)
+                .width(320.0)
+                .show(ui);
+        });
+        assert_eq!(value, 4, "wheel motion must pass through by default");
+        assert!(!crate::chrome::take_control_wheel(&ctx));
+
+        let mut swept = 0.0;
+        for points in [25.0, 25.0] {
+            let _frame = ctx.run_ui(input(egui::MouseWheelUnit::Point, points), |ui| {
+                let rail = Rail::new(&mut value, 0..=10)
+                    .detents(11)
+                    .wheel()
+                    .width(320.0)
+                    .show(ui);
+                swept += rail.wakes().map(RailWake::swept_area).sum::<f32>();
+            });
+            assert!(crate::chrome::take_control_wheel(&ctx));
+        }
+        assert_eq!(value, 5, "two half-notches must bank into one detent");
+        assert!(swept > 0.0, "wheel travel must displace water");
+
+        let _blocked = ctx.run_ui(input(egui::MouseWheelUnit::Line, 1.0), |ui| {
+            let _rail = Rail::new(&mut value, 0..=10)
+                .allowed(0..=5)
+                .detents(11)
+                .wheel()
+                .width(320.0)
+                .show(ui);
+        });
+        assert_eq!(value, 5, "the wheel cannot penetrate a dynamic blocker");
+        assert!(crate::chrome::take_control_wheel(&ctx));
+
+        let _retreat = ctx.run_ui(input(egui::MouseWheelUnit::Line, -1.0), |ui| {
+            let _rail = Rail::new(&mut value, 0..=10)
+                .allowed(0..=5)
+                .detents(11)
+                .wheel()
+                .width(320.0)
+                .show(ui);
+        });
+        assert_eq!(value, 4);
+        assert!(crate::chrome::take_control_wheel(&ctx));
     }
 }

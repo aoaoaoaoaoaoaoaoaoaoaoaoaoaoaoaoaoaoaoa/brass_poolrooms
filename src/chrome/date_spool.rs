@@ -1,5 +1,5 @@
 //! Date bounds as an austere analog tape-transport — a dreamlike, submerged
-//! poolroom fitting. Three black recesses are sunk into a dim tiled faceplate;
+//! poolroom fitting. One to three black recesses are sunk into a dim tiled faceplate;
 //! down in each runs a strip of near-black magnetic tape that lies flat across
 //! a reading head and vanishes over a conveyor roller at either end (a
 //! cassette/conveyor profile, seen through a perspective eye), the labels
@@ -13,16 +13,21 @@
 
 #![deny(missing_docs)]
 
-use std::{hash::Hash, ops::RangeInclusive};
+use std::{
+    hash::Hash,
+    ops::{BitOr, BitOrAssign, Deref, RangeInclusive},
+};
 
 use super::{
     self as chrome,
     foundry::{self, StockAxis, bronze},
+    wheel,
 };
 
-const WHEEL_CLAIM: &str = "date-spool-wheel-claim";
 const H: f32 = 104.0;
 const RECESS_TILES: f32 = 4.0; // each recess is this many tiles wide
+const MIN_RECESS_TILES: f32 = 2.0;
+const OUTER_TILES: f32 = 2.0;
 
 // --- The tape path, as a 3D scene --------------------------------------------
 // Not a circular dial: a cassette ribbon seen edge-on. The middle of the strip
@@ -76,10 +81,9 @@ const COMMIT: f32 = 0.5; // roll past this and a new label has reached the head
 const WALL_STRETCH: f32 = 0.62; // how far the tape gives past a hard stop (pitches)
 const WALL_KICK: f32 = 7.0; // recoil velocity slammed back off the stop
 const HAZARD_GAP: f32 = 0.72; // blank tape (pitches) between last year and hatch
-// Arm/clear: a snappy spring-tensioned lever — tens of ms, with a little bounce
-// on the up-swing; the down-swing just slams to the floor of the void.
-const LIFT_K: f32 = 1100.0; // stiffness (ω≈33 rad/s, ~0.15s — fast but legible)
-const LIFT_C: f32 = 28.0; // damping (ζ≈0.42 → a small overshoot up)
+// Thread/unthread: the cassette rises from or recedes into its socket along z.
+const LIFT_K: f32 = 1100.0;
+const LIFT_C: f32 = 28.0;
 
 const MONTHS: [&str; 12] = [
     "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC",
@@ -100,22 +104,112 @@ pub trait GregorianDay: Copy + Eq {
     fn from_ymd(year: i32, month: u32, day: u32) -> Self;
 }
 
-/// Water displacement emitted by one moving part of a [`DateSpool`].
-#[derive(Clone, Copy, Debug)]
-pub enum DateWake {
-    /// A spun reel: its window, and the signed screen-y its tape head travels
-    /// (so the water can be shoved off that edge).
-    Tape(egui::Rect, f32),
-    /// Armed (+1, rollers rise → water pushed out) or cleared (−1, rollers sink
-    /// into the void → water sucked in).
-    Lever(egui::Rect, f32),
+/// A nonempty selection of date reels, always installed in year-month-day order.
+///
+/// The primitive constants compose with `|`; combined constants cover the
+/// usual banks directly.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct DateReels(u8);
+
+impl DateReels {
+    const YEAR_BIT: u8 = 1 << 0;
+    const MONTH_BIT: u8 = 1 << 1;
+    const DAY_BIT: u8 = 1 << 2;
+
+    /// A year reel with hard stops at the transport's configured year span.
+    pub const YEAR: Self = Self(Self::YEAR_BIT);
+    /// A circular month reel.
+    pub const MONTH: Self = Self(Self::MONTH_BIT);
+    /// A circular day reel whose modulus follows the current month and year.
+    pub const DAY: Self = Self(Self::DAY_BIT);
+    /// Year and month reels.
+    pub const YEAR_MONTH: Self = Self(Self::YEAR_BIT | Self::MONTH_BIT);
+    /// Year and day reels.
+    pub const YEAR_DAY: Self = Self(Self::YEAR_BIT | Self::DAY_BIT);
+    /// Month and day reels, retaining the bound date's hidden year as context.
+    pub const MONTH_DAY: Self = Self(Self::MONTH_BIT | Self::DAY_BIT);
+    /// The complete year-month-day transport.
+    pub const ALL: Self = Self(Self::YEAR_BIT | Self::MONTH_BIT | Self::DAY_BIT);
+
+    /// Whether this bank contains every reel in `other`.
+    pub const fn contains(self, other: Self) -> bool {
+        self.0 & other.0 == other.0
+    }
+
+    /// Number of physical reel apertures in this bank.
+    pub const fn reel_count(self) -> usize {
+        self.0.count_ones() as usize
+    }
+
+    /// Rigid minimum faceplate width in logical egui points.
+    ///
+    /// Every reel retains a two-tile aperture, adjacent reels retain a one-tile
+    /// gutter, and the bank retains one full tile of casing at either end.
+    pub const fn minimum_width(self) -> f32 {
+        (self.reel_count() as f32 * MIN_RECESS_TILES + (self.reel_count() - 1) as f32 + OUTER_TILES)
+            * TILE
+    }
+
+    fn contains_reel(self, reel: Reel) -> bool {
+        self.0 & reel.bit() != 0
+    }
+
+    fn iter(self) -> impl Iterator<Item = Reel> {
+        Reel::ALL
+            .into_iter()
+            .filter(move |reel| self.contains_reel(*reel))
+    }
 }
 
-/// A three-reel date transport with a spring-loaded arm/clear lever.
+impl Default for DateReels {
+    fn default() -> Self {
+        Self::ALL
+    }
+}
+
+impl BitOr for DateReels {
+    type Output = Self;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Self(self.0 | rhs.0)
+    }
+}
+
+impl BitOrAssign for DateReels {
+    fn bitor_assign(&mut self, rhs: Self) {
+        self.0 |= rhs.0;
+    }
+}
+
+/// Signed screen-y travel emitted by one moving tape reel.
+#[derive(Clone, Copy, Debug)]
+pub struct DateWake {
+    rect: egui::Rect,
+    travel: f32,
+}
+
+impl DateWake {
+    fn new(rect: egui::Rect, travel: f32) -> Self {
+        Self { rect, travel }
+    }
+
+    /// Reel aperture that displaced the water.
+    pub fn rect(self) -> egui::Rect {
+        self.rect
+    }
+
+    /// Signed screen-y travel of the tape head.
+    pub fn travel(self) -> f32 {
+        self.travel
+    }
+}
+
+/// A rigid bank of one to three Gregorian tape reels.
 ///
-/// `None` is a disarmed transport. Pressing its action lever arms it with the
-/// supplied fallback date; pressing again clears it. The month and day reels
-/// wrap, while the year reel recoils from the configured hard stops.
+/// The month and day reels wrap, while the year reel recoils from the
+/// configured hard stops. [`DateSpool`] owns no optional value or toggle:
+/// applications compose that policy outside the mechanism and project it onto
+/// the transport with [`DateSpool::loaded`].
 ///
 /// Reels accept pointer drags and vertical wheel/trackpad motion. The `id`
 /// passed to [`DateSpool::show`] must remain stable and unique because it owns
@@ -124,7 +218,7 @@ pub enum DateWake {
 /// # Example
 ///
 /// ```
-/// use dwemer_poolrooms::{chrome::{DateSpool, GregorianDay}, egui};
+/// use dwemer_poolrooms::{chrome::{DateReels, DateSpool, GregorianDay}, egui};
 ///
 /// # #[derive(Clone, Copy, Eq, PartialEq)]
 /// # struct Day(i32, u32, u32);
@@ -132,40 +226,86 @@ pub enum DateWake {
 /// #     fn ymd(self) -> (i32, u32, u32) { (self.0, self.1, self.2) }
 /// #     fn from_ymd(y: i32, m: u32, d: u32) -> Self { Self(y, m, d) }
 /// # }
-/// fn controls(ui: &mut egui::Ui, value: &mut Option<Day>) {
-///     let spool = DateSpool::new(value, Day(2026, 7, 20), 2005..=2027)
+/// fn controls(ui: &mut egui::Ui, value: &mut Day) {
+///     let spool = DateSpool::new(value, 2005..=2027)
+///         .reels(DateReels::MONTH_DAY)
+///         .width(180.0)
 ///         .label("DATE")
 ///         .show(ui, "departure-date");
 ///
 ///     if spool.changed() {
-///         // `value` was armed, cleared, or moved to another civil date.
+///         // A visible reel moved to another civil date.
 ///     }
 /// }
 /// ```
+///
+/// An application that owns an `Option<D>` decides whether the date exists,
+/// composes its own toggle, and passes that state to [`DateSpool::loaded`].
+/// The transport animates the cassette but never synthesizes or clears values.
 pub struct DateSpool<'a, D: GregorianDay> {
-    value: &'a mut Option<D>,
-    arm: D,
+    value: &'a mut D,
     years: RangeInclusive<i32>,
     label: Option<&'a str>,
+    reels: DateReels,
+    width: Option<f32>,
+    loaded: bool,
 }
 
 impl<'a, D: GregorianDay> DateSpool<'a, D> {
     /// Construct a date transport.
     ///
-    /// `arm` is the date installed when a dormant transport is armed. `years`
-    /// is the inclusive hard-stop range of the year reel.
-    pub fn new(value: &'a mut Option<D>, arm: D, years: RangeInclusive<i32>) -> Self {
+    /// `years` is the inclusive hard-stop range of the year reel. The complete
+    /// three-reel bank is installed unless [`DateSpool::reels`] narrows it.
+    pub fn new(value: &'a mut D, years: RangeInclusive<i32>) -> Self {
         Self {
             value,
-            arm,
             years,
             label: None,
+            reels: DateReels::ALL,
+            width: None,
+            loaded: true,
         }
     }
 
     /// Add a caption above the transport.
     pub fn label(mut self, label: &'a str) -> Self {
         self.label = Some(label);
+        self
+    }
+
+    /// Install exactly this nonempty bank of reels.
+    pub fn reels(mut self, reels: DateReels) -> Self {
+        self.reels = reels;
+        self
+    }
+
+    /// Project whether the caller currently has a date onto the mechanism.
+    ///
+    /// A loaded transport is interactive and carries printed tape across its
+    /// reading heads. An unloaded transport rejects reel input and springs its
+    /// cassette backward into the socket until the apertures are empty. This
+    /// controls physical presentation only; `value` remains untouched.
+    pub const fn loaded(mut self, loaded: bool) -> Self {
+        self.loaded = loaded;
+        self
+    }
+
+    /// Request a faceplate width in logical egui points.
+    ///
+    /// The allocation is capped by the available UI width and floored at
+    /// [`DateReels::minimum_width`]. If the parent is narrower than that rigid
+    /// envelope, the transport truthfully claims its minimum rather than
+    /// deforming its apertures, gutters, or casing.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `width` is non-finite or non-positive.
+    pub fn width(mut self, width: f32) -> Self {
+        assert!(
+            width.is_finite() && width > 0.0,
+            "date-spool width must be finite and positive"
+        );
+        self.width = Some(width);
         self
     }
 
@@ -177,26 +317,48 @@ impl<'a, D: GregorianDay> DateSpool<'a, D> {
     ///
     /// Panics if the year range is descending.
     pub fn show(self, ui: &mut egui::Ui, id: impl Hash) -> DateSpoolResponse {
-        date_spool(ui, id, self.label, self.value, self.arm, self.years)
+        date_spool(
+            ui,
+            id,
+            self.label,
+            self.value,
+            self.years,
+            self.reels,
+            self.width,
+            self.loaded,
+        )
     }
 }
 
 #[must_use = "the response carries change state and displaced-water wakes"]
 /// Value-change state and displaced-water geometry from one [`DateSpool`] frame.
 pub struct DateSpoolResponse {
-    changed: bool,
+    response: egui::Response,
     wakes: [Option<DateWake>; 2],
 }
 
 impl DateSpoolResponse {
     /// Whether the bound date changed during this UI pass.
     pub fn changed(&self) -> bool {
-        self.changed
+        self.response.changed()
     }
 
-    /// Iterate over tape and lever motion emitted during this UI pass.
+    /// Iterate over tape motion emitted during this UI pass.
     pub fn wakes(&self) -> impl Iterator<Item = DateWake> + '_ {
         self.wakes.iter().copied().flatten()
+    }
+
+    /// Discard the water wakes and return the ordinary egui response.
+    pub fn into_response(self) -> egui::Response {
+        self.response
+    }
+}
+
+impl Deref for DateSpoolResponse {
+    type Target = egui::Response;
+
+    fn deref(&self) -> &Self::Target {
+        &self.response
     }
 }
 
@@ -210,6 +372,22 @@ enum Reel {
 
 impl Reel {
     const ALL: [Reel; 3] = [Reel::Year, Reel::Month, Reel::Day];
+
+    const fn bit(self) -> u8 {
+        match self {
+            Self::Year => DateReels::YEAR_BIT,
+            Self::Month => DateReels::MONTH_BIT,
+            Self::Day => DateReels::DAY_BIT,
+        }
+    }
+
+    const fn index(self) -> usize {
+        match self {
+            Self::Year => 0,
+            Self::Month => 1,
+            Self::Day => 2,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -236,14 +414,12 @@ impl YearSpan {
 
 /// One reel's living state: the visual roll offset (in label pitches) of the
 /// committed value away from the head, and the spring velocity carrying it
-/// home. `notch` banks fractional wheel travel between frames; `turns`
-/// accumulates committed steps so the rollers can spin in lockstep with the
-/// tape (visual tape position = `turns - roll`).
+/// home. `turns` accumulates committed steps so the rollers can spin in
+/// lockstep with the tape (visual tape position = `turns - roll`).
 #[derive(Clone, Copy, Debug, Default)]
 struct Drum {
     roll: f32,
     vel: f32,
-    notch: f32,
     turns: f32,
 }
 
@@ -268,83 +444,75 @@ fn date_spool<D: GregorianDay>(
     ui: &mut egui::Ui,
     id: impl Hash,
     label: Option<&str>,
-    value: &mut Option<D>,
-    arm: D,
+    value: &mut D,
     years: RangeInclusive<i32>,
+    reels: DateReels,
+    width: Option<f32>,
+    loaded: bool,
 ) -> DateSpoolResponse {
     let years = YearSpan::refine(years);
     let id = ui.make_persistent_id(id);
     let before = *value;
-    let mut pulse = None;
-    let mut couple = None;
-    if let Some(label) = label {
-        let _label = ui.label(chrome::muted(label));
+    let mut turn = ui
+        .vertical(|ui| {
+            if let Some(label) = label {
+                let _label = ui.label(chrome::muted(label));
+            }
+            let available = ui.available_width();
+            let width = width
+                .unwrap_or(available)
+                .min(available)
+                .max(reels.minimum_width());
+            chronometer(ui, id, value, years, reels, width, loaded)
+        })
+        .inner;
+    if *value != before {
+        turn.response.mark_changed();
     }
-    let _row = ui.horizontal(|ui| {
-        let width = (ui.available_width() - 28.0).max(158.0);
-        let turn = chronometer(ui, id, value, arm, years, width);
-        pulse = turn.pulse;
-        couple = turn.couple;
-        let icon = if value.is_some() { "×" } else { "+" };
-        let hint = if value.is_some() {
-            "clear date bound"
-        } else {
-            "arm date transport"
-        };
-        let action = chrome::icon_still(ui, icon).on_hover_text(hint);
-        if action.clicked() {
-            let arming = value.is_none();
-            *value = arming.then_some(arm);
-            pulse = Some(DateWake::Lever(
-                action.rect,
-                if arming { 1.0 } else { -1.0 },
-            ));
-        }
-    });
     DateSpoolResponse {
-        changed: *value != before,
-        wakes: [pulse, couple],
+        response: turn.response,
+        wakes: turn.wakes,
     }
 }
 
-#[derive(Clone, Copy, Debug)]
 struct Turn {
-    pulse: Option<DateWake>,
-    couple: Option<DateWake>,
+    response: egui::Response,
+    wakes: [Option<DateWake>; 2],
 }
 
-/// Take the per-frame flag indicating that a date reel consumed wheel motion.
+/// Take the shared flag indicating that crafted chrome consumed wheel motion.
 ///
-/// This destructive read is useful when the transport sits inside an enclosing
-/// scroll surface that must cancel its own response to the same wheel gesture.
-/// A second call before another reel consumes motion returns `false`.
+/// This date-spool-specific spelling remains for source compatibility; prefer
+/// [`super::take_control_wheel`] for new code. It observes wheel-enabled rails
+/// and date reels alike. A second call before another control consumes motion
+/// returns `false`.
 pub fn take_date_spool_wheel(ctx: &egui::Context) -> bool {
-    ctx.data_mut(|data| {
-        data.remove_temp::<bool>(egui::Id::new(WHEEL_CLAIM))
-            .unwrap_or(false)
-    })
+    wheel::take_control_wheel(ctx)
 }
 
 fn chronometer<D: GregorianDay>(
     ui: &mut egui::Ui,
     id: egui::Id,
-    value: &mut Option<D>,
-    arm: D,
+    value: &mut D,
     years: YearSpan,
+    visible: DateReels,
     width: f32,
+    loaded: bool,
 ) -> Turn {
-    let (rect, response) = ui.allocate_exact_size(
-        egui::vec2(width.min(ui.available_width()), H),
-        egui::Sense::click_and_drag(),
-    );
-    let active = value.is_some();
-    let mut parts: Parts = value.unwrap_or(arm).ymd().into();
-    parts.year = parts.year.clamp(years.lo, years.hi);
-    parts.clamp_day();
-    if active {
-        *value = Some(D::from_ymd(parts.year, parts.month, parts.day));
+    let operable = loaded && ui.is_enabled();
+    let sense = if operable {
+        egui::Sense::click_and_drag()
+    } else {
+        egui::Sense::hover()
+    };
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(width, H), sense);
+    let mut parts: Parts = value.ymd().into();
+    if visible.contains(DateReels::YEAR) {
+        parts.year = parts.year.clamp(years.lo, years.hi);
     }
-    let reels = reel_rects(rect);
+    parts.clamp_day();
+    *value = D::from_ymd(parts.year, parts.month, parts.day);
+    let reels = ReelLayout::new(rect, visible);
     let dt = ui
         .input(|input| input.stable_dt)
         .clamp(1.0 / 240.0, 1.0 / 30.0);
@@ -352,42 +520,46 @@ fn chronometer<D: GregorianDay>(
     let mut pulse = None;
     let mut couple = None;
 
-    if active {
-        let hovered = ui
-            .ctx()
-            .pointer_latest_pos()
-            .and_then(|pos| reel_at(pos, reels));
-        let drag = pump_drag(ui, id, &response, hovered);
-        // Apply at most one source of intent this frame: a held drag wins. The
-        // pulse direction is the screen-y the tape head travels — the gesture
-        // direction — so the water gets shoved off that side. A day reel clamped
-        // by the turn rides along as `couple`, carrying its own shove.
-        if let Some((reel, slip)) = drag {
-            let (_, day) = turn_reel(ui, id, &mut parts, reel, Slip::Drag(slip), years);
-            pulse = Some(DateWake::Tape(reel_window(reels, reel), slip.signum()));
-            couple = day.map(|dir| DateWake::Tape(reel_window(reels, Reel::Day), dir));
-        } else if let Some(reel) = hovered.filter(|_| response.hovered()) {
-            let steps = wheel_steps(ui, id, reel);
-            // Own every scrap of scroll over a reel — not only the notch frame
-            // but egui's whole smoothing tail — so the panel under us never
-            // drifts and no stray delta bounces the date back.
-            swallow_scroll(ui);
-            if steps != 0 {
-                let (_, day) = turn_reel(ui, id, &mut parts, reel, Slip::Notch(steps), years);
-                pulse = Some(DateWake::Tape(
-                    reel_window(reels, reel),
-                    -(steps.signum() as f32),
-                ));
-                couple = day.map(|dir| DateWake::Tape(reel_window(reels, Reel::Day), dir));
-            }
+    let hovered = operable
+        .then(|| ui.ctx().pointer_latest_pos().and_then(|pos| reels.at(pos)))
+        .flatten();
+    let drag = operable
+        .then(|| pump_drag(ui, id, &response, hovered, reels))
+        .flatten();
+    // Apply at most one source of intent this frame: a held drag wins. The
+    // pulse direction is the screen-y the tape head travels — the gesture
+    // direction — so the water gets shoved off that side. A visible day reel
+    // clamped by the turn rides along as `couple`, carrying its own shove.
+    if let Some((reel, slip)) = drag {
+        if slip.abs() > 1e-4 {
+            let (_, day) = turn_reel(ui, id, &mut parts, reel, Slip::Drag(slip), years, visible);
+            pulse = Some(DateWake::new(reels.required(reel), slip.signum()));
+            couple = day.map(|dir| DateWake::new(reels.required(Reel::Day), dir));
         }
-        *value = Some(D::from_ymd(parts.year, parts.month, parts.day));
+    } else if let Some(reel) = hovered.filter(|_| response.hovered()) {
+        // Own every scrap of scroll over a reel — not only the notch frame but
+        // egui's whole smoothing tail — so the panel under us never drifts and
+        // no stray delta bounces the date back.
+        let steps = wheel::notches(ui, id.with((reel as u8, "wheel")));
+        if steps != 0 {
+            let (_, day) = turn_reel(ui, id, &mut parts, reel, Slip::Notch(steps), years, visible);
+            pulse = Some(DateWake::new(
+                reels.required(reel),
+                -(steps.signum() as f32),
+            ));
+            couple = day.map(|dir| DateWake::new(reels.required(Reel::Day), dir));
+        }
     }
+    *value = D::from_ymd(parts.year, parts.month, parts.day);
 
-    // Relax every reel that is not being actively dragged this frame.
-    let held = drag_capture(ui, id);
+    // Hidden drums cannot retain a ghost transient if a caller changes banks.
+    let held = loaded.then(|| drag_capture(ui, id)).flatten();
     let mut moving = false;
     for reel in Reel::ALL {
+        if !visible.contains_reel(reel) {
+            with_drum(ui, id, reel, |drum| *drum = Drum::default());
+            continue;
+        }
         if held == Some(reel) {
             continue;
         }
@@ -398,11 +570,13 @@ fn chronometer<D: GregorianDay>(
         ui.ctx().request_repaint();
     }
 
-    // Arm/clear elevation: 1 = rollers up and threaded, 0 = sunk into the void.
-    let lift = lift_spring(ui, id, active, dt);
-    paint(ui, id, rect, reels, active, lift, parts, years);
+    let lift = cassette_lift(ui, id, loaded, dt);
+    paint(ui, id, rect, reels, parts, years, lift, loaded);
 
-    Turn { pulse, couple }
+    Turn {
+        response,
+        wakes: [pulse, couple],
+    }
 }
 
 enum Slip {
@@ -420,6 +594,7 @@ fn turn_reel(
     reel: Reel,
     slip: Slip,
     years: YearSpan,
+    visible: DateReels,
 ) -> (bool, Option<f32>) {
     let before = *parts;
     let day_before = parts.day;
@@ -447,14 +622,15 @@ fn turn_reel(
     // rolls the day reel down to its new value (banking turns for its rollers, so
     // it spins too) instead of teleporting. The returned sign is the screen-y its
     // head travels, for the water it shoves.
-    let couple = (reel != Reel::Day && parts.day != day_before).then(|| {
-        let delta = parts.day as f32 - day_before as f32;
-        with_drum(ui, id, Reel::Day, |day| {
-            day.roll += delta;
-            day.turns += delta;
+    let couple = (reel != Reel::Day && parts.day != day_before && visible.contains_reel(Reel::Day))
+        .then(|| {
+            let delta = parts.day as f32 - day_before as f32;
+            with_drum(ui, id, Reel::Day, |day| {
+                day.roll += delta;
+                day.turns += delta;
+            });
+            -delta.signum()
         });
-        -delta.signum()
-    });
     (*parts != before, couple)
 }
 
@@ -496,61 +672,6 @@ fn stretch_bounds(reel: Reel, parts: Parts, years: YearSpan) -> (f32, f32) {
 
 // --- Input plumbing ----------------------------------------------------------
 
-/// Drains this frame's wheel travel for `reel` into integer detents, banking
-/// the fraction across frames. Returns the signed step count (0 if sub-detent).
-fn wheel_steps(ui: &egui::Ui, id: egui::Id, reel: Reel) -> i32 {
-    let Some(delta) = wheel_delta(ui) else {
-        return 0;
-    };
-    with_drum(ui, id, reel, |drum| {
-        if drum.notch != 0.0 && drum.notch.signum() != delta.signum() {
-            drum.notch = 0.0;
-        }
-        drum.notch += delta;
-        let steps = drum.notch.trunc();
-        drum.notch -= steps;
-        (steps as i32).clamp(-8, 8)
-    })
-}
-
-/// Wheel travel this frame, in detents. A frame's worth of line/page wheeling
-/// is one deliberate detent however many events claim it — that absorbs the
-/// press/release doubling some stacks emit — while a trackpad's finer point
-/// stream is metered continuously.
-fn wheel_delta(ui: &egui::Ui) -> Option<f32> {
-    let (line, point) = ui.input(|input| {
-        let mut line = 0.0_f32;
-        let mut point = 0.0_f32;
-        for event in &input.events {
-            if let egui::Event::MouseWheel {
-                unit,
-                delta,
-                modifiers,
-                ..
-            } = event
-                && !modifiers.ctrl
-                && !modifiers.command
-                && !modifiers.alt
-            {
-                match unit {
-                    egui::MouseWheelUnit::Line | egui::MouseWheelUnit::Page => line += delta.y,
-                    egui::MouseWheelUnit::Point => point += delta.y,
-                }
-            }
-        }
-        (line, point)
-    });
-    // Beware `(0.0).signum() == 1.0`: an idle frame must read as zero, not a
-    // phantom up-detent, or the reel drifts whenever the pointer rests on it.
-    let line = if line.abs() > 1e-4 {
-        line.signum()
-    } else {
-        0.0
-    };
-    let detents = line + point / 50.0;
-    (detents.abs() > 1e-4).then_some(detents)
-}
-
 /// Continuous drag of a captured reel: returns the reel and the roll slip (in
 /// pitches) to fold in this frame. The capture survives until the drag ends.
 fn pump_drag(
@@ -558,15 +679,19 @@ fn pump_drag(
     id: egui::Id,
     response: &egui::Response,
     hovered: Option<Reel>,
+    reels: ReelLayout,
 ) -> Option<(Reel, f32)> {
     let key = id.with("drag");
+    let stopped =
+        response.drag_stopped() || (!response.dragged() && !response.is_pointer_button_down_on());
+    let dragged = response.dragged();
+    let travel = response.drag_delta().y;
     ui.ctx().data_mut(|data| {
-        if response.drag_stopped() || (!response.dragged() && !response.is_pointer_button_down_on())
-        {
+        if stopped {
             let _ = data.remove_temp::<Reel>(key);
             return None;
         }
-        if !response.dragged() {
+        if !dragged {
             return None;
         }
         // The reel the drag first grabbed stays captured until the button lifts,
@@ -577,8 +702,8 @@ fn pump_drag(
         };
         let _ = data.insert_temp(key, reel);
         // Drag travels in pixels; one pitch is one center-spaced label.
-        let pitch = Spool::new(reel_window(reel_rects(response.rect), reel)).pitch();
-        let slip = response.drag_delta().y / pitch.max(1.0);
+        let pitch = Spool::new(reels.required(reel)).pitch();
+        let slip = travel / pitch.max(1.0);
         Some((reel, slip))
     })
 }
@@ -595,39 +720,6 @@ fn with_drum<R>(ui: &egui::Ui, id: egui::Id, reel: Reel, edit: impl FnOnce(&mut 
         let _ = data.insert_temp(key, drum);
         out
     })
-}
-
-/// Eat all vertical scroll over a reel for this frame: the raw wheel events and
-/// egui's smoothed remainder alike. Only claims (and wakes the panel to undo
-/// its scroll) when there is actually scroll to eat, so a merely-resting
-/// pointer costs nothing.
-fn swallow_scroll(ui: &egui::Ui) {
-    let scrolling = ui.input(|input| {
-        input.smooth_scroll_delta.y != 0.0
-            || input.events.iter().any(|event| {
-                matches!(
-                    event,
-                    egui::Event::MouseWheel { modifiers, .. }
-                        if !modifiers.ctrl && !modifiers.command && !modifiers.alt
-                )
-            })
-    });
-    if !scrolling {
-        return;
-    }
-    ui.ctx().input_mut(|input| {
-        input.events.retain(|event| {
-            !matches!(
-                event,
-                egui::Event::MouseWheel { modifiers, .. }
-                    if !modifiers.ctrl && !modifiers.command && !modifiers.alt
-            )
-        });
-        input.smooth_scroll_delta.y = 0.0;
-    });
-    ui.ctx().data_mut(|data| {
-        let _ = data.insert_temp(egui::Id::new(WHEEL_CLAIM), true);
-    });
 }
 
 // --- The tape path -----------------------------------------------------------
@@ -731,56 +823,55 @@ fn ink_shade(beta: f32, base: egui::Color32) -> egui::Color32 {
 
 // --- Painting: one austere brass control, blue tape sunk into it -------------
 
-/// A snappy lever spring driving the arm/clear elevation: it rises to 1 with a
-/// small bounce on the up-swing, and sinks to 0 and stops at the floor of the
-/// void (no bounce down — there's a wall there).
-fn lift_spring(ui: &egui::Ui, id: egui::Id, active: bool, dt: f32) -> f32 {
-    #[derive(Clone, Copy)]
-    struct Lift {
-        pos: f32,
-        vel: f32,
-    }
-    let key = id.with("lift");
-    let (pos, moving) = ui.ctx().data_mut(|data| {
-        let mut st = data.get_temp::<Lift>(key).unwrap_or(Lift {
-            pos: f32::from(active),
-            vel: 0.0,
-        });
-        let target = f32::from(active);
-        st.vel += (-LIFT_K * (st.pos - target) - LIFT_C * st.vel) * dt;
-        st.pos += st.vel * dt;
-        if st.pos < 0.0 {
-            st.pos = 0.0;
-            st.vel = st.vel.max(0.0);
-        }
-        let moving = (st.pos - target).abs() > 1e-3 || st.vel.abs() > 1e-3;
-        let _old = data.insert_temp(key, st);
-        (st.pos, moving)
-    });
-    if moving {
-        ui.ctx().request_repaint();
-    }
-    pos
-}
-
 fn paint(
     ui: &egui::Ui,
     id: egui::Id,
     rect: egui::Rect,
-    reels: [(Reel, egui::Rect); 3],
-    active: bool,
-    lift: f32,
+    reels: ReelLayout,
     parts: Parts,
     years: YearSpan,
+    lift: f32,
+    loaded: bool,
 ) {
     let painter = ui.painter();
     facia(painter, rect);
-    for (reel, window) in reels {
+    for (reel, window) in reels.iter() {
         let (roll, turns) = with_drum(ui, id, reel, |drum| (drum.roll, drum.turns));
         draw_reel(
-            painter, window, reel, parts, years, roll, turns, lift, active,
+            painter, window, reel, parts, years, roll, turns, lift, loaded,
         );
     }
+}
+
+/// A stiff z-axis spring threading or withdrawing the cassette bank.
+fn cassette_lift(ui: &egui::Ui, id: egui::Id, loaded: bool, dt: f32) -> f32 {
+    #[derive(Clone, Copy)]
+    struct Lift {
+        position: f32,
+        velocity: f32,
+    }
+
+    let key = id.with("cassette-lift");
+    let (position, moving) = ui.ctx().data_mut(|data| {
+        let target = f32::from(loaded);
+        let mut lift = data.get_temp::<Lift>(key).unwrap_or(Lift {
+            position: target,
+            velocity: 0.0,
+        });
+        lift.velocity += (-LIFT_K * (lift.position - target) - LIFT_C * lift.velocity) * dt;
+        lift.position += lift.velocity * dt;
+        if lift.position < 0.0 {
+            lift.position = 0.0;
+            lift.velocity = lift.velocity.max(0.0);
+        }
+        let moving = (lift.position - target).abs() > 1e-3 || lift.velocity.abs() > 1e-3;
+        let _old = data.insert_temp(key, lift);
+        (lift.position, moving)
+    });
+    if moving {
+        ui.ctx().request_repaint();
+    }
+    position
 }
 
 /// The faceplate: the dim poolroom tilework the reels are sunk into — baseline
@@ -824,10 +915,6 @@ fn tile_hash(cx: i32, cy: i32) -> (f32, f32) {
     (n, m)
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "a reel carries its full per-frame render state"
-)]
 fn draw_reel(
     painter: &egui::Painter,
     window: egui::Rect,
@@ -837,27 +924,22 @@ fn draw_reel(
     roll: f32,
     turns: f32,
     lift: f32,
-    active: bool,
+    loaded: bool,
 ) {
-    foundry::socket_bed(painter, window); // the recess (an abyss) is always there
-
+    foundry::socket_bed(painter, window);
     if lift > 0.02 {
-        // Arm/clear recedes the transport in z, not down the wall: it shrinks
-        // back toward the recess depth, rising the same way out toward the eye.
-        // At rest it fills the recess (capped at 1, so the lever spring's
-        // overshoot can't spill past the lip); cleared, it withdraws to a third.
+        // The transport recedes in z, preserving every rigid proportion rather
+        // than sliding down-screen or dissolving as generic disabled chrome.
         let scale = (0.2 + 0.8 * lift).min(1.0);
         let content = egui::Rect::from_center_size(window.center(), window.size() * scale);
         let spool = Spool::new(content);
-        let gain = if active { 1.0 } else { 0.5 };
         let tape_w = (window.width() - 12.0) * scale;
-
         let clip = painter.with_clip_rect(window);
+        let gain = if loaded { 1.0 } else { 0.5 };
         let _tape = clip.add(tape_mesh(spool, tape_w, gain));
         tape_edges(&clip, spool, tape_w, gain);
 
-        // Labels only while the bound holds a value; a clearing reel sinks dark.
-        if active {
+        if loaded {
             let cull = spool.rim() + spool.pitch();
             let (mut top_stop, mut bot_stop) = (None, None);
             for lane in -6..=6 {
@@ -867,9 +949,11 @@ fn draw_reel(
                 }
                 match label(reel, parts, years, lane) {
                     Some(text) => print_label(&clip, spool, tape_w, t, &text),
-                    // Remember the stop nearest the head on each side; the hazard
-                    // then fills one band from there to the curl, not a chip a lane.
-                    None if t < 0.0 => top_stop = Some(top_stop.map_or(lane, |l: i32| l.max(lane))),
+                    // Remember the stop nearest the head on each side; the
+                    // hazard occupies one continuous band to the curl.
+                    None if t < 0.0 => {
+                        top_stop = Some(top_stop.map_or(lane, |l: i32| l.max(lane)));
+                    }
                     None => bot_stop = Some(bot_stop.map_or(lane, |l: i32| l.min(lane))),
                 }
             }
@@ -882,29 +966,19 @@ fn draw_reel(
         }
 
         // The roller grips the tape with no slip, so its surface tracks the
-        // ribbon's travel — `roll - turns`, not its negative — or the drum spins
-        // backward against the tape it is supposedly carrying.
+        // ribbon's travel — `roll - turns`, not its negative.
         let phase = (roll - turns) * ROLL_GAIN;
         roller(&clip, spool, content, window, true, phase);
         roller(&clip, spool, content, window, false, phase);
 
-        // Hold the dark back until the transport has visibly receded, so the
-        // last third of the withdrawal swallows it rather than winking it out.
+        // The last third of withdrawal falls behind the socket darkness.
         let veil = (((0.4 - lift) / 0.4).clamp(0.0, 1.0) * 255.0) as u8;
         if veil > 0 {
-            let _veil = clip.add(egui::Shape::rect_filled(
-                window,
-                0.0,
-                egui::Color32::from_black_alpha(veil),
-            ));
+            let _veil = clip.rect_filled(window, 0.0, egui::Color32::from_black_alpha(veil));
         }
     }
 
-    // The index is welded to the frame, not the transport: it keeps its station
-    // on the wall while the rollers rise out of / recede into the void behind it.
-    index_arrow(painter, window, active);
-
-    // The thin recess border, always crisp on top.
+    index_arrow(painter, window, loaded);
     foundry::socket_rim(painter, window);
 }
 
@@ -986,13 +1060,13 @@ fn roller(
 /// The reading head: a bronze index arrow hanging over the black recess at the
 /// centre line, pointing in at the value. Its broad base is welded to the right
 /// recess wall — anchored to the housing, not floating in the void.
-fn index_arrow(painter: &egui::Painter, window: egui::Rect, active: bool) {
+fn index_arrow(painter: &egui::Painter, window: egui::Rect, loaded: bool) {
     let cy = window.center().y;
     let base_h = 5.4;
     let tip_h = base_h * 0.2; // a snub, sawed-off nose — tip ≈ 0.2× the base
     let base_x = window.right();
     let tip_x = window.right() - 9.0;
-    let lit = if active { 0.0 } else { -0.2 };
+    let lit = if loaded { 0.0 } else { -0.2 };
     // a foot welding the base into the recess wall.
     let _foot = painter.rect_filled(
         egui::Rect::from_min_max(
@@ -1198,44 +1272,55 @@ fn hazard(
 
 // --- Geometry helpers --------------------------------------------------------
 
-fn reel_rects(rect: egui::Rect) -> [(Reel, egui::Rect); 3] {
-    // Three *identical* tall recesses, each RECESS_TILES wide with a one-tile
-    // gutter between, sat flush on the tile grid and filling the framed height —
-    // no padding tiles above or below, so the transport reads big. The recess
-    // narrows only to fit a cramped panel.
-    let frame = 3.0;
-    let inner = rect.shrink(frame);
-    let fit = ((inner.width() / TILE - 2.0) / 3.0).floor();
-    let tiles = fit.clamp(2.0, RECESS_TILES);
-    let recess_w = tiles * TILE;
-    let gap = TILE;
-    let span = 3.0 * recess_w + 2.0 * gap;
-    let raw = inner.left() + (inner.width() - span) * 0.5;
-    let x0 = rect.left() + ((raw - rect.left()) / TILE).round() * TILE;
-    let mk = |i: f32| {
-        egui::Rect::from_min_size(
-            egui::pos2(x0 + i * (recess_w + gap), inner.top()),
-            egui::vec2(recess_w, inner.height()),
-        )
-    };
-    [
-        (Reel::Year, mk(0.0)),
-        (Reel::Month, mk(1.0)),
-        (Reel::Day, mk(2.0)),
-    ]
+#[derive(Clone, Copy, Debug)]
+struct ReelLayout {
+    visible: DateReels,
+    windows: [egui::Rect; 3],
 }
 
-fn reel_window(reels: [(Reel, egui::Rect); 3], needle: Reel) -> egui::Rect {
-    reels
-        .into_iter()
-        .find_map(|(reel, slot)| (reel == needle).then_some(slot))
-        .unwrap_or(egui::Rect::NOTHING)
-}
+impl ReelLayout {
+    fn new(rect: egui::Rect, visible: DateReels) -> Self {
+        let count = visible.reel_count() as f32;
+        let gutters = count - 1.0;
+        let fitting_tiles = ((rect.width() / TILE - OUTER_TILES - gutters) / count).floor();
+        let aperture_tiles = fitting_tiles.clamp(MIN_RECESS_TILES, RECESS_TILES);
+        let aperture_width = aperture_tiles * TILE;
+        let span = count * aperture_width + gutters * TILE;
+        let free_tiles = (rect.width() - span) / TILE;
+        let left_tiles = (free_tiles * 0.5 + 1e-4).floor().max(1.0);
+        let mut cursor = rect.left() + left_tiles * TILE;
+        let inner = rect.shrink(3.0);
+        let mut windows = [egui::Rect::NOTHING; 3];
 
-fn reel_at(pos: egui::Pos2, reels: [(Reel, egui::Rect); 3]) -> Option<Reel> {
-    reels
-        .into_iter()
-        .find_map(|(reel, rect)| rect.expand(3.0).contains(pos).then_some(reel))
+        for reel in visible.iter() {
+            windows[reel.index()] = egui::Rect::from_min_size(
+                egui::pos2(cursor, inner.top()),
+                egui::vec2(aperture_width, inner.height()),
+            );
+            cursor += aperture_width + TILE;
+        }
+
+        Self { visible, windows }
+    }
+
+    fn iter(self) -> impl Iterator<Item = (Reel, egui::Rect)> {
+        self.visible
+            .iter()
+            .map(move |reel| (reel, self.windows[reel.index()]))
+    }
+
+    fn required(self, reel: Reel) -> egui::Rect {
+        assert!(
+            self.visible.contains_reel(reel),
+            "a wake cannot originate from an absent date reel"
+        );
+        self.windows[reel.index()]
+    }
+
+    fn at(self, pos: egui::Pos2) -> Option<Reel> {
+        self.iter()
+            .find_map(|(reel, rect)| rect.expand(3.0).contains(pos).then_some(reel))
+    }
 }
 
 // --- Value mapping -----------------------------------------------------------
@@ -1319,6 +1404,315 @@ mod tests {
 
     const YEARS: YearSpan = YearSpan { lo: 2005, hi: 2026 };
 
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    struct Day(i32, u32, u32);
+
+    impl GregorianDay for Day {
+        fn ymd(self) -> (i32, u32, u32) {
+            (self.0, self.1, self.2)
+        }
+
+        fn from_ymd(year: i32, month: u32, day: u32) -> Self {
+            Self(year, month, day)
+        }
+    }
+
+    #[test]
+    fn reel_banks_compose_without_reordering_the_foundry() {
+        assert_eq!(DateReels::YEAR | DateReels::MONTH, DateReels::YEAR_MONTH);
+        assert_eq!(DateReels::MONTH | DateReels::DAY, DateReels::MONTH_DAY);
+        assert_eq!(
+            DateReels::MONTH_DAY.iter().collect::<Vec<_>>(),
+            [Reel::Month, Reel::Day]
+        );
+    }
+
+    #[test]
+    fn reel_count_determines_the_rigid_tile_floor() {
+        for (bank, tiles) in [
+            (DateReels::YEAR, 4.0),
+            (DateReels::YEAR_MONTH, 7.0),
+            (DateReels::ALL, 10.0),
+        ] {
+            assert!((bank.minimum_width() - tiles * TILE).abs() < 1e-4);
+        }
+    }
+
+    #[test]
+    fn minimum_bank_keeps_two_tile_apertures_and_one_tile_casing() {
+        let width = DateReels::MONTH_DAY.minimum_width();
+        let face = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(width, H));
+        let layout = ReelLayout::new(face, DateReels::MONTH_DAY);
+        let month = layout.required(Reel::Month);
+        let day = layout.required(Reel::Day);
+
+        assert!(!layout.visible.contains_reel(Reel::Year));
+        assert!((month.left() - face.left() - TILE).abs() < 1e-4);
+        assert!((month.width() - MIN_RECESS_TILES * TILE).abs() < 1e-4);
+        assert!((day.left() - month.right() - TILE).abs() < 1e-4);
+        assert!((face.right() - day.right() - TILE).abs() < 1e-4);
+    }
+
+    #[test]
+    fn requested_width_cannot_crush_a_reel_bank() {
+        let ctx = egui::Context::default();
+        let mut day = Day(2026, 7, 20);
+        let mut allocated = 0.0;
+        let _frame = ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(40.0, H),
+                )),
+                ..egui::RawInput::default()
+            },
+            |ui| {
+                let spool = DateSpool::new(&mut day, 2005..=2027)
+                    .reels(DateReels::YEAR)
+                    .width(1.0)
+                    .show(ui, "minimum-width");
+                allocated = spool.rect.width();
+            },
+        );
+
+        let minimum = DateReels::YEAR.minimum_width();
+        assert!(
+            allocated + 1e-4 >= minimum,
+            "allocated {allocated} points below the rigid {minimum}-point minimum"
+        );
+    }
+
+    #[test]
+    fn caption_and_faceplate_remain_one_vertical_prefab_in_horizontal_layout() {
+        let ctx = egui::Context::default();
+        let mut first = Day(2026, 7, 20);
+        let mut second = first;
+        let mut row_top = 0.0;
+        let mut faces = [egui::Rect::NOTHING; 2];
+        let _frame = ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(260.0, 180.0),
+                )),
+                ..egui::RawInput::default()
+            },
+            |ui| {
+                row_top = ui.available_rect_before_wrap().top();
+                let _row = ui.horizontal_top(|ui| {
+                    faces[0] = DateSpool::new(&mut first, 2005..=2027)
+                        .label("YEAR")
+                        .reels(DateReels::YEAR)
+                        .width(DateReels::YEAR.minimum_width())
+                        .show(ui, "first")
+                        .rect;
+                    faces[1] = DateSpool::new(&mut second, 2005..=2027)
+                        .label("MONTH")
+                        .reels(DateReels::MONTH)
+                        .width(DateReels::MONTH.minimum_width())
+                        .show(ui, "second")
+                        .rect;
+                });
+            },
+        );
+
+        assert!(faces.iter().all(|face| face.top() > row_top));
+        assert!((faces[0].top() - faces[1].top()).abs() < 1e-4);
+    }
+
+    #[test]
+    fn stationary_drag_displaces_no_phantom_water() {
+        let ctx = egui::Context::default();
+        let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(160.0, H));
+        let input = |events| egui::RawInput {
+            screen_rect: Some(screen),
+            events,
+            ..egui::RawInput::default()
+        };
+        let mut day = Day(2026, 7, 20);
+        let mut show = |events| {
+            let mut wakes = 0;
+            let mut face = egui::Rect::NOTHING;
+            let _frame = ctx.run_ui(input(events), |ui| {
+                let spool = DateSpool::new(&mut day, 2005..=2027)
+                    .reels(DateReels::YEAR)
+                    .width(160.0)
+                    .show(ui, "stationary-drag");
+                face = spool.rect;
+                wakes = spool.wakes().count();
+            });
+            (wakes, face)
+        };
+
+        let (_, face) = show(Vec::new());
+        let origin = ReelLayout::new(face, DateReels::YEAR)
+            .required(Reel::Year)
+            .center();
+        let _press = show(vec![
+            egui::Event::PointerMoved(origin),
+            egui::Event::PointerButton {
+                pos: origin,
+                button: egui::PointerButton::Primary,
+                pressed: true,
+                modifiers: egui::Modifiers::NONE,
+            },
+        ]);
+        let (dragged, _) = show(vec![egui::Event::PointerMoved(
+            origin + egui::vec2(0.0, 20.0),
+        )]);
+        let (stationary, _) = show(Vec::new());
+        let _release = show(vec![egui::Event::PointerButton {
+            pos: origin + egui::vec2(0.0, 20.0),
+            button: egui::PointerButton::Primary,
+            pressed: false,
+            modifiers: egui::Modifiers::NONE,
+        }]);
+
+        assert_eq!(dragged, 1, "the driven frame must prove reel capture");
+        assert_eq!(stationary, 0);
+    }
+
+    #[test]
+    fn egui_enabled_scope_owns_external_date_spool_lockout() {
+        let ctx = egui::Context::default();
+        let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(160.0, H));
+        let mut day = Day(2026, 7, 20);
+        let mut face = egui::Rect::NOTHING;
+        let _prime = ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(screen),
+                ..egui::RawInput::default()
+            },
+            |ui| {
+                face = DateSpool::new(&mut day, 2005..=2027)
+                    .reels(DateReels::YEAR)
+                    .width(160.0)
+                    .show(ui, "external-lockout")
+                    .rect;
+            },
+        );
+        let pointer = ReelLayout::new(face, DateReels::YEAR)
+            .required(Reel::Year)
+            .center();
+        let before = day;
+
+        let _disabled = ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(screen),
+                events: vec![
+                    egui::Event::PointerMoved(pointer),
+                    egui::Event::MouseWheel {
+                        unit: egui::MouseWheelUnit::Line,
+                        delta: egui::vec2(0.0, 1.0),
+                        phase: egui::TouchPhase::Move,
+                        modifiers: egui::Modifiers::NONE,
+                    },
+                ],
+                ..egui::RawInput::default()
+            },
+            |ui| {
+                let _scope = ui.add_enabled_ui(false, |ui| {
+                    DateSpool::new(&mut day, 2005..=2027)
+                        .reels(DateReels::YEAR)
+                        .width(160.0)
+                        .show(ui, "external-lockout")
+                });
+            },
+        );
+
+        assert_eq!(day, before);
+        assert!(!chrome::take_control_wheel(&ctx));
+    }
+
+    #[test]
+    fn unloaded_transport_rejects_input_without_muting_its_housing() {
+        let ctx = egui::Context::default();
+        let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(160.0, H));
+        let mut day = Day(2026, 7, 20);
+        let mut face = egui::Rect::NOTHING;
+        let _prime = ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(screen),
+                ..egui::RawInput::default()
+            },
+            |ui| {
+                face = DateSpool::new(&mut day, 2005..=2027)
+                    .reels(DateReels::YEAR)
+                    .width(160.0)
+                    .loaded(false)
+                    .show(ui, "unloaded")
+                    .rect;
+            },
+        );
+        let pointer = ReelLayout::new(face, DateReels::YEAR)
+            .required(Reel::Year)
+            .center();
+        let before = day;
+
+        let _wheel = ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(screen),
+                events: vec![
+                    egui::Event::PointerMoved(pointer),
+                    egui::Event::MouseWheel {
+                        unit: egui::MouseWheelUnit::Line,
+                        delta: egui::vec2(0.0, 1.0),
+                        phase: egui::TouchPhase::Move,
+                        modifiers: egui::Modifiers::NONE,
+                    },
+                ],
+                ..egui::RawInput::default()
+            },
+            |ui| {
+                let _spool = DateSpool::new(&mut day, 2005..=2027)
+                    .reels(DateReels::YEAR)
+                    .width(160.0)
+                    .loaded(false)
+                    .show(ui, "unloaded");
+            },
+        );
+
+        assert_eq!(day, before);
+        assert!(!chrome::take_control_wheel(&ctx));
+    }
+
+    #[test]
+    fn cassette_withdrawal_is_sprung_instead_of_discontinuous() {
+        fn step(ctx: &egui::Context, key: egui::Id, loaded: bool) -> f32 {
+            let mut lift = 0.0;
+            let _frame = ctx.run_ui(egui::RawInput::default(), |ui| {
+                lift = cassette_lift(ui, key, loaded, 1.0 / 120.0);
+            });
+            lift
+        }
+
+        let ctx = egui::Context::default();
+        let key = egui::Id::new("cassette-withdrawal");
+
+        let mut lift = step(&ctx, key, true);
+        assert_eq!(lift, 1.0);
+        lift = step(&ctx, key, false);
+        assert!(lift > 0.0 && lift < 1.0);
+        for _ in 0..180 {
+            lift = step(&ctx, key, false);
+        }
+        assert!(lift < 0.002);
+    }
+
+    #[test]
+    fn hidden_year_remains_the_month_day_banks_leap_context() {
+        let ctx = egui::Context::default();
+        let mut day = Day(1904, 2, 29);
+        let _frame = ctx.run_ui(egui::RawInput::default(), |ui| {
+            let _spool = DateSpool::new(&mut day, 2005..=2027)
+                .reels(DateReels::MONTH_DAY)
+                .width(DateReels::MONTH_DAY.minimum_width())
+                .show(ui, "hidden-year");
+        });
+
+        assert_eq!(day.ymd(), (1904, 2, 29));
+    }
+
     #[test]
     fn circular_month_clamps_day() {
         let mut parts = Parts {
@@ -1383,7 +1777,6 @@ mod tests {
         let mut drum = Drum {
             roll: 1.0,
             vel: 0.0,
-            notch: 0.0,
             turns: 0.0,
         };
         let mut overshot = false;
@@ -1411,7 +1804,6 @@ mod tests {
         let mut drum = Drum {
             roll: -5.0,
             vel: -3.0,
-            notch: 0.0,
             turns: 0.0,
         };
         let _ = drum.relax(1.0 / 120.0, floor, ceil);

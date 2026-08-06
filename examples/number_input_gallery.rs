@@ -8,12 +8,12 @@ mod support;
 
 use anyhow::Result;
 use dwemer_poolrooms::{chrome, egui, water::Surface};
-use exhibits::Checkboxes;
+use exhibits::Numbers;
 use support::Exhibit;
 
-impl Exhibit for Checkboxes {
-    const TITLE: &'static str = "Poolrooms · checkbox gallery";
-    const SIZE: [f64; 2] = [620.0, 390.0];
+impl Exhibit for Numbers {
+    const TITLE: &'static str = "Poolrooms · numerical-thumbwheel gallery";
+    const SIZE: [f64; 2] = [680.0, 350.0];
 
     fn ui(&mut self, ui: &mut egui::Ui, water: &mut Surface) {
         let _panel = egui::CentralPanel::default()
@@ -23,5 +23,5 @@ impl Exhibit for Checkboxes {
 }
 
 fn main() -> Result<()> {
-    support::run(Checkboxes::default())
+    support::run(Numbers::default())
 }

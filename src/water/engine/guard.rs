@@ -2,8 +2,8 @@ use super::*;
 use std::{
     fmt,
     sync::mpsc::{self, Receiver, TryRecvError},
-    time::{Duration, Instant},
 };
+use web_time::{Duration, Instant};
 
 const PERIOD: Duration = Duration::from_millis(850);
 const HEIGHT_LIMIT: f32 = 96.0;

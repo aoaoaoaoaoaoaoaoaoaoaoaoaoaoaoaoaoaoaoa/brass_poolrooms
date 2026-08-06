@@ -4,8 +4,8 @@ use std::{
         Arc,
         atomic::{AtomicU64, Ordering},
     },
-    time::{Duration, Instant},
 };
+use web_time::{Duration, Instant};
 
 use super::{
     engine,
@@ -25,7 +25,13 @@ const FORCE_EPSILON: f32 = 0.015;
 const RAIL_AREA_PER_IMPULSE: f32 = 2_000.0;
 const RAIL_IMPULSE_CEIL: f32 = 1.60;
 /// Logical-point³ of swept plunger volume that produces one canonical impulse.
-const CHECKBOX_VOLUME_PER_IMPULSE: f32 = 4_500.0;
+const PLUNGER_VOLUME_PER_IMPULSE: f32 = 4_500.0;
+/// Logical-point³ swept by a slender bail that produces one canonical impulse.
+const BAIL_VOLUME_PER_IMPULSE: f32 = 480.0;
+const BAIL_IMPULSE_CEIL: f32 = 1.25;
+/// Tangential point² swept by a thumbwheel that produces one canonical impulse.
+const WHEEL_AREA_PER_IMPULSE: f32 = 140.0;
+const WHEEL_IMPULSE_CEIL: f32 = 1.45;
 static NEXT_SURFACE_ID: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -583,20 +589,66 @@ impl Surface {
     /// Couple a checkbox plunger's signed swept volume into this water world.
     /// Rising metal expels water; a descending plunger draws it into the recess.
     pub fn checkbox(&mut self, checkbox: &crate::chrome::CheckboxResponse) {
-        let Some(wake) = checkbox.wake() else {
+        self.plunger(checkbox.wake());
+    }
+    /// Couple a monoglyph button's plunge and sprung return into this water
+    /// world using the moving crown's signed swept volume.
+    pub fn monoglyph(&mut self, button: &crate::chrome::MonoglyphResponse) {
+        self.plunger(button.wake());
+    }
+    /// Couple a corner-close plunger's downward stroke and sprung return into
+    /// this water world using the moving crown's signed swept volume.
+    pub fn corner_close(&mut self, close: &crate::chrome::CornerCloseResponse) {
+        self.plunger(close.wake());
+    }
+    /// Couple a folding drag handle's angular sweep into this water world.
+    ///
+    /// Lifting the horizontal bar drives water toward the hinge; seating it
+    /// reverses that dipole. Strength follows the round stock's swept volume.
+    /// Rigid bail and vertical-bar responses are lawful no-ops because no
+    /// handle hardware moves relative to its dragged assembly.
+    pub fn drag_handle(&mut self, handle: &crate::chrome::DragHandleResponse) {
+        let Some(wake) = handle.wake() else {
             return;
         };
-        let impulse = wake.swept_volume() / CHECKBOX_VOLUME_PER_IMPULSE * wake.travel().signum();
-        self.poke(wake.rect(), Poke::basin(impulse));
+        let impulse = (wake.swept_volume() / BAIL_VOLUME_PER_IMPULSE).min(BAIL_IMPULSE_CEIL);
+        self.poke(
+            wake.rect(),
+            Poke::drag(impulse, -wake.angular_travel().signum()),
+        );
     }
-    /// Couple a date transport's tape and lever displacement into this water world.
+    /// Couple a date transport's tape displacement into this water world.
     pub fn date_spool(&mut self, spool: &crate::chrome::DateSpoolResponse) {
         for wake in spool.wakes() {
-            match wake {
-                crate::chrome::DateWake::Tape(rect, travel) => self.drag(rect, travel),
-                crate::chrome::DateWake::Lever(rect, sign) => self.lever(rect, sign),
+            self.drag(wake.rect(), wake.travel());
+        }
+    }
+    /// Couple a numerical thumbwheel's tangential surface sweep into the water.
+    ///
+    /// An axisymmetric wheel preserves occupied volume while rotating; its
+    /// scalloped surface instead imparts shear along the visible rolling plane.
+    pub fn number_input(&mut self, input: &crate::chrome::NumberInputResponse) {
+        let Some(wake) = input.wake() else {
+            return;
+        };
+        let impulse = (wake.swept_area() / WHEEL_AREA_PER_IMPULSE).min(WHEEL_IMPULSE_CEIL);
+        let travel = wake.angular_travel().signum();
+        match wake.plane() {
+            crate::chrome::WheelPlane::XZ => {
+                self.poke(wake.rect(), Poke::slide(impulse, travel));
+            }
+            crate::chrome::WheelPlane::YZ => {
+                self.poke(wake.rect(), Poke::drag(impulse, travel));
             }
         }
+    }
+
+    fn plunger(&mut self, wake: Option<crate::chrome::PlungerWake>) {
+        let Some(wake) = wake else {
+            return;
+        };
+        let impulse = wake.swept_volume() / PLUNGER_VOLUME_PER_IMPULSE * wake.travel().signum();
+        self.poke(wake.rect(), Poke::basin(impulse));
     }
     pub fn select(&mut self, rect: egui::Rect) {
         self.poke(rect, Poke::ring(0.45));
@@ -1063,6 +1115,175 @@ mod tests {
                 "{hz} Hz toggle injected {signed_impulse} canonical impulse"
             );
         }
+    }
+
+    #[test]
+    fn monoglyph_plunge_and_return_displace_water_in_opposite_directions() {
+        let ctx = egui::Context::default();
+        let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(80.0, 80.0));
+        let mut surface = Surface::new(Wetness::Wet);
+        let mut center = egui::Pos2::ZERO;
+        let input = |events| egui::RawInput {
+            screen_rect: Some(screen),
+            predicted_dt: 1.0 / 60.0,
+            events,
+            ..egui::RawInput::default()
+        };
+        let _prime = ctx.run_ui(input(Vec::new()), |ui| {
+            center = crate::chrome::Monoglyph::new('+').show(ui).rect.center();
+        });
+        {
+            let mut drive = |events| {
+                let _frame = ctx.run_ui(input(events), |ui| {
+                    let button = crate::chrome::Monoglyph::new('+').show(ui);
+                    surface.monoglyph(&button);
+                });
+            };
+            drive(vec![
+                egui::Event::PointerMoved(center),
+                egui::Event::PointerButton {
+                    pos: center,
+                    button: egui::PointerButton::Primary,
+                    pressed: true,
+                    modifiers: egui::Modifiers::NONE,
+                },
+            ]);
+            for _ in 0..8 {
+                drive(Vec::new());
+            }
+            drive(vec![egui::Event::PointerButton {
+                pos: center,
+                button: egui::PointerButton::Primary,
+                pressed: false,
+                modifiers: egui::Modifiers::NONE,
+            }]);
+            for _ in 0..18 {
+                drive(Vec::new());
+            }
+        }
+
+        assert!(surface.plunges.iter().any(|plunge| plunge.amp < 0.0));
+        assert!(surface.plunges.iter().any(|plunge| plunge.amp > 0.0));
+        let displaced = surface
+            .plunges
+            .iter()
+            .map(|plunge| plunge.amp.abs())
+            .sum::<f32>();
+        assert!(displaced > 1.5, "button displaced only {displaced} impulse");
+    }
+
+    #[test]
+    fn numerical_wheel_shears_water_along_its_rolling_plane() {
+        for (plane, shape) in [
+            (crate::chrome::WheelPlane::XZ, engine::SplashShape::Slide),
+            (crate::chrome::WheelPlane::YZ, engine::SplashShape::Ring),
+        ] {
+            let ctx = egui::Context::default();
+            let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(160.0, 40.0));
+            let mut value = 0_i32;
+            let mut wheel_center = egui::Pos2::ZERO;
+            let mut surface = Surface::new(Wetness::Wet);
+            let _prime = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(screen),
+                    ..egui::RawInput::default()
+                },
+                |ui| {
+                    let response = crate::chrome::NumberInput::new(&mut value, -9..=9, 1, 0)
+                        .wheel_plane(plane)
+                        .show(ui);
+                    wheel_center =
+                        egui::Pos2::new(response.rect.right() - 12.0, response.rect.center().y);
+                },
+            );
+            let _spin = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(screen),
+                    predicted_dt: 1.0 / 60.0,
+                    events: vec![
+                        egui::Event::PointerMoved(wheel_center),
+                        egui::Event::MouseWheel {
+                            unit: egui::MouseWheelUnit::Line,
+                            delta: egui::vec2(0.0, 1.0),
+                            phase: egui::TouchPhase::Move,
+                            modifiers: egui::Modifiers::NONE,
+                        },
+                    ],
+                    ..egui::RawInput::default()
+                },
+                |ui| {
+                    let response = crate::chrome::NumberInput::new(&mut value, -9..=9, 1, 0)
+                        .wheel_plane(plane)
+                        .show(ui);
+                    surface.number_input(&response);
+                },
+            );
+            assert_eq!(value, 1);
+            assert_eq!(surface.plunges.len(), 1);
+            assert_eq!(surface.plunges[0].shape, shape);
+            assert!(surface.plunges[0].amp > 0.0);
+            assert!(surface.plunges[0].travel > 0.0);
+        }
+    }
+
+    #[test]
+    fn bail_lift_and_seating_drive_opposite_vertical_dipoles() {
+        let ctx = egui::Context::default();
+        let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(80.0, 80.0));
+        let mut surface = Surface::new(Wetness::Wet);
+        let mut center = egui::Pos2::ZERO;
+        let input = |events| egui::RawInput {
+            screen_rect: Some(screen),
+            predicted_dt: 1.0 / 60.0,
+            events,
+            ..egui::RawInput::default()
+        };
+        let _prime = ctx.run_ui(input(Vec::new()), |ui| {
+            center = crate::chrome::DragHandle::folding_bail()
+                .show(ui)
+                .rect
+                .center();
+        });
+        {
+            let mut drive = |events| {
+                let _frame = ctx.run_ui(input(events), |ui| {
+                    let handle = crate::chrome::DragHandle::folding_bail().show(ui);
+                    surface.drag_handle(&handle);
+                });
+            };
+            drive(vec![
+                egui::Event::PointerMoved(center),
+                egui::Event::PointerButton {
+                    pos: center,
+                    button: egui::PointerButton::Primary,
+                    pressed: true,
+                    modifiers: egui::Modifiers::NONE,
+                },
+            ]);
+            for _ in 0..10 {
+                drive(Vec::new());
+            }
+            drive(vec![egui::Event::PointerButton {
+                pos: center,
+                button: egui::PointerButton::Primary,
+                pressed: false,
+                modifiers: egui::Modifiers::NONE,
+            }]);
+            for _ in 0..20 {
+                drive(Vec::new());
+            }
+        }
+
+        assert!(surface.plunges.iter().any(|plunge| plunge.travel < 0.0));
+        assert!(surface.plunges.iter().any(|plunge| plunge.travel > 0.0));
+        assert!(
+            surface
+                .plunges
+                .iter()
+                .all(|plunge| plunge.shape == engine::SplashShape::Ring)
+        );
+        let displaced = surface.plunges.iter().map(|plunge| plunge.amp).sum::<f32>();
+        assert!(displaced > 1.0, "bail displaced only {displaced} impulse");
     }
 
     #[test]

@@ -7,9 +7,19 @@ those inversions instead of translating them back into generic approachable code
 Run `./check.py check` after meaningful local edits. Use `./check.py verify`
 when you need a non-mutating CI-style gate.
 
-This crate owns the Dwemer Poolrooms visual language and water physics. Keep
-application concepts out of it: consumers describe geometry and forcing; this
-crate owns simulation, optics, timing, and GPU representation.
+This crate owns the Dwemer Poolrooms low-level visual language and water
+physics. It supplies independently usable physical GUI elements for native or
+WebGPU applications, including applications that do not use Eternalist Apps or
+its left-panel grammar. Keep logical application concepts out of it: consumers
+describe geometry and forcing; this crate owns embodiment, simulation, optics,
+timing, and GPU representation.
+
+The boundary follows the governing invariant rather than the everyday noun.
+Poolrooms owns physical things such as buttons, rollers, sliders, tiles, frames,
+and the actuator of a menu. Eternalist Apps may compose those mechanisms into
+logical managers, menus, storage surfaces, and other application-scale state
+machines. Eternalist may depend on Poolrooms; Poolrooms must never depend on
+Eternalist.
 
 ## Physical chrome
 
@@ -34,3 +44,8 @@ with hand-painted gradients, arbitrary tapers, or disconnected highlight lines.
 When camera, light, material, topology, and bounded degrees of freedom are fixed,
 bake that geometry into 2D vector poses at build time. Runtime owns dynamics and
 pose selection, not redundant 3D evaluation.
+
+Egui owns placement and compositing. A mechanism allocates its entire painted
+and interactive envelope and never trespasses across a sibling allocation.
+Foundry gauges impose explicit rigid minima; only physically lawful spans may
+stretch. Whole-interface zoom, not widget-local deformation, scales the assembly.

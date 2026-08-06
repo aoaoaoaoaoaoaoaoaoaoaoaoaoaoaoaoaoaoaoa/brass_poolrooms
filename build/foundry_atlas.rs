@@ -1,0 +1,2203 @@
+//! Build-time forge for every fixed-camera foundry asset.
+
+use std::{
+    collections::HashMap,
+    f32::consts::{FRAC_PI_2, PI, TAU},
+    fs::File,
+    io::{self, BufWriter, Write},
+    ops::{Add, Div, Mul, Sub},
+    path::Path,
+};
+
+use crate::foundry_law::{
+    DARK_AMBIENT, DARK_BROAD_SHINE, DARK_BROAD_WEIGHT, DARK_DIFFUSE_WEIGHT, DARK_EXPOSURE,
+    DARK_GLINT_SHINE, DARK_GLINT_WEIGHT, DARK_REFLECTION_CELL, DARK_TONE_CEILING, EYE_Z, HALF_Y,
+    HALF_Z, LIGHT_Y, LIGHT_Z, MECHANISM_SIDE_LARGE, MECHANISM_SIDE_MEDIUM, MECHANISM_SIDE_SMALL,
+    MECHANISM_SIDES, MomentaryGauge, bronze_rgb, darkened_bronze_rgb, darkened_metal_tone,
+    darkened_metal_tone_with_key, material_terms, metal_tone, metal_tone_with_key, momentary_gauge,
+};
+
+const POSE_COUNT: usize = 32;
+const TOP_HALF: f32 = 10.7;
+const DISH_HALF: f32 = 8.1;
+const BODY_HALF: f32 = 11.4;
+const BEVEL_DEPTH: f32 = 0.8;
+const BOWL_DEPTH: f32 = 1.35;
+const LATCH_UP: f32 = 3.65;
+const LATCH_STROKE: f32 = 31.05;
+const PRESS_OVERTRAVEL: f32 = 6.30;
+const LATCH_DOWN: f32 = LATCH_UP - LATCH_STROKE;
+const POSE_MIN: f32 = LATCH_DOWN - PRESS_OVERTRAVEL;
+const POSE_MAX: f32 = 4.22;
+/// The shaft continues beyond the deepest rendered pose; its endpoint is
+/// deliberately outside the aperture's visible volume.
+const BODY_ROOT: f32 = POSE_MIN - BEVEL_DEPTH - 2.4;
+
+const MONOGLYPH_POSE_COUNT: usize = 32;
+const MONOGLYPH_BEVEL_DEPTH: f32 = 0.95;
+const MONOGLYPH_REST: f32 = 3.25;
+const MONOGLYPH_PRESS: f32 = -7.15;
+const MONOGLYPH_POSE_MIN: f32 = -7.55;
+const MONOGLYPH_POSE_MAX: f32 = 4.30;
+const MONOGLYPH_BODY_ROOT: f32 = -11.0;
+const CLOSE_CROWN_CELLS: usize = 40;
+const CLOSE_DENT_DEPTH: f32 = 2.95;
+const CLOSE_FLOOR_HALF: f32 = 0.34;
+const CLOSE_MOUTH_HALF: f32 = 1.08;
+const CLOSE_FLOOR_REACH: f32 = 6.55;
+const CLOSE_MOUTH_REACH: f32 = 7.30;
+const _: () = {
+    assert!(MONOGLYPH_POSE_MIN < MONOGLYPH_PRESS);
+    assert!(MONOGLYPH_PRESS < MONOGLYPH_REST);
+    assert!(MONOGLYPH_REST < MONOGLYPH_POSE_MAX);
+    assert!(MONOGLYPH_BODY_ROOT < MONOGLYPH_POSE_MIN - MONOGLYPH_BEVEL_DEPTH);
+};
+
+const BAIL_POSE_COUNT: usize = 24;
+const BAIL_REST: f32 = 0.17;
+const BAIL_LIFT: f32 = 1.02;
+const BAIL_POSE_MIN: f32 = 0.08;
+const BAIL_POSE_MAX: f32 = 1.13;
+const BAIL_HATCH_PITCH: f32 = 5.4;
+const BAIL_HATCH_WIDTH: f32 = 0.42;
+const BAIL_HATCH_RISE: f32 = 0.012;
+const FRICTION_HATCH_PITCH: f32 = 4.4;
+const FRICTION_HATCH_WIDTH: f32 = 1.0;
+const FRICTION_HATCH_RISE: f32 = 0.22;
+const _: () = {
+    assert!(BAIL_POSE_MIN < BAIL_REST);
+    assert!(BAIL_REST < BAIL_LIFT);
+    assert!(BAIL_LIFT < BAIL_POSE_MAX);
+    assert!(FRICTION_HATCH_PITCH >= 4.0);
+    assert!(FRICTION_HATCH_WIDTH >= 1.0);
+};
+
+const GUARD_HALF: f32 = 16.8;
+const GUARD_BASE: f32 = 0.72;
+const GUARD_RISE: f32 = 6.30;
+/// Fixed-stock guards need this additional crown rise as their footprint
+/// contracts: unlike the plunger, their wire and frame radii do not scale.
+const GUARD_STOCK_CLEARANCE_LIFT: f32 = 0.75;
+const WIRE_RADIUS: f32 = 0.645;
+const WIRE_LAYER: f32 = 0.66;
+const FRAME_RADIUS: f32 = 0.72;
+const WELD_RADIUS: f32 = 0.72;
+const SMALL_WIRE_STATIONS: [f32; 2] = [-3.5, 3.5];
+const MEDIUM_WIRE_STATIONS: [f32; 3] = [-7.0, 0.0, 7.0];
+const LARGE_WIRE_STATIONS: [f32; 4] = [-10.5, -3.5, 3.5, 10.5];
+const CURVE_STEPS: usize = 16;
+const TUBE_SIDES: usize = 8;
+
+// --- Reversible numerical thumbwheel ---------------------------------------
+// One oblate foundry blank is cut in canonical XY, with its axle on Z. The two
+// public planes are rigid transforms of this same solid; only after that
+// transform do projection, key visibility, and illumination occur.
+const WHEEL_STATIONS: usize = 12;
+const WHEEL_POSE_COUNT: usize = 9;
+const WHEEL_RADIAL_RINGS: usize = 20;
+const WHEEL_LONGITUDES: usize = 96;
+const WHEEL_RADIUS: f32 = 14.0;
+const WHEEL_HALF_DEPTH: f32 = 5.2;
+const WHEEL_SCALLOP_RADIUS: f32 = 8.75;
+const WHEEL_SCALLOP_VERTEX: f32 = WHEEL_HALF_DEPTH / 3.0;
+const WHEEL_SCALLOP_TANGENT_CURVATURE: f32 = 0.19;
+const WHEEL_SCALLOP_RADIAL_CURVATURE: f32 = 0.34;
+const WHEEL_SOCKET_SIDE: f32 = 24.0;
+const WHEEL_APERTURE_TRAVEL: f32 = 14.0;
+const WHEEL_APERTURE_AXIAL: f32 = 12.0;
+const WHEEL_PITCH: f32 = TAU / WHEEL_STATIONS as f32;
+const _: () = {
+    assert!(WHEEL_STATIONS >= 8);
+    assert!(WHEEL_POSE_COUNT >= 5);
+    assert!(WHEEL_SCALLOP_VERTEX > 0.0);
+    assert!(WHEEL_SCALLOP_VERTEX < WHEEL_HALF_DEPTH);
+    assert!(WHEEL_APERTURE_TRAVEL < WHEEL_RADIUS * 2.0);
+    assert!(WHEEL_APERTURE_AXIAL > WHEEL_HALF_DEPTH * 2.0);
+    assert!(WHEEL_APERTURE_AXIAL <= WHEEL_SOCKET_SIDE - 4.0);
+};
+
+// --- Dark-bronze material study -------------------------------------------
+// Moving down the table transfers charge from the broad oxide bloom into a
+// progressively tighter conductor glint. The last two rows deliberately raise
+// specular gain as the lobe narrows: this is a contrast study, not an
+// energy-neutral roughness proof, and its edges must remain visually decisive
+// under the foundry's fixed incidence. Columns alter only exposure. The
+// production coordinate is proven against the shared law below.
+const MATERIAL_STUDY_PRODUCTION_ROW: usize = 4;
+const MATERIAL_STUDY_PRODUCTION_COLUMN: usize = 3;
+const MATERIAL_STUDY_EXPOSURES: [f32; 5] = [0.72, 0.94, 1.0, DARK_EXPOSURE, 1.4];
+
+#[derive(Clone, Copy)]
+struct StudyReflection {
+    name: &'static str,
+    broad_weight: f32,
+    broad_shine: f32,
+    glint_weight: f32,
+    glint_shine: f32,
+}
+
+const MATERIAL_STUDY_ROWS: [StudyReflection; 5] = [
+    StudyReflection {
+        name: "MATTE",
+        broad_weight: 0.28,
+        broad_shine: 2.5,
+        glint_weight: 0.06,
+        glint_shine: 6.0,
+    },
+    StudyReflection {
+        name: "SATIN",
+        broad_weight: 0.15,
+        broad_shine: 4.0,
+        glint_weight: 0.28,
+        glint_shine: 20.0,
+    },
+    StudyReflection {
+        name: "LEGACY",
+        broad_weight: 0.08,
+        broad_shine: 6.0,
+        glint_weight: 0.48,
+        glint_shine: 48.0,
+    },
+    StudyReflection {
+        name: "SPECULAR",
+        broad_weight: 0.035,
+        broad_shine: 8.0,
+        glint_weight: 0.9,
+        glint_shine: 80.0,
+    },
+    StudyReflection {
+        name: "PRODUCTION",
+        broad_weight: DARK_BROAD_WEIGHT,
+        broad_shine: DARK_BROAD_SHINE,
+        glint_weight: DARK_GLINT_WEIGHT,
+        glint_shine: DARK_GLINT_SHINE,
+    },
+];
+const _: () = {
+    assert!(MATERIAL_STUDY_EXPOSURES[MATERIAL_STUDY_PRODUCTION_COLUMN] == DARK_EXPOSURE);
+    assert!(MATERIAL_STUDY_ROWS[MATERIAL_STUDY_PRODUCTION_ROW].broad_weight == DARK_BROAD_WEIGHT);
+    assert!(MATERIAL_STUDY_ROWS[MATERIAL_STUDY_PRODUCTION_ROW].broad_shine == DARK_BROAD_SHINE);
+    assert!(MATERIAL_STUDY_ROWS[MATERIAL_STUDY_PRODUCTION_ROW].glint_weight == DARK_GLINT_WEIGHT);
+    assert!(MATERIAL_STUDY_ROWS[MATERIAL_STUDY_PRODUCTION_ROW].glint_shine == DARK_GLINT_SHINE);
+};
+
+#[derive(Clone, Copy)]
+struct BailGauge {
+    side: u8,
+    base_half: f32,
+    face_half: f32,
+    plate_rise: f32,
+    hinge_y: f32,
+    hinge_z: f32,
+    span: f32,
+    reach: f32,
+    stock_radius: f32,
+    rivet_offset: f32,
+    rivet_radius: f32,
+}
+
+#[derive(Clone, Copy)]
+struct FrictionGauge {
+    side: u8,
+    width: f32,
+    base_half_x: f32,
+    base_half_y: f32,
+    face_half_x: f32,
+    face_half_y: f32,
+    plate_rise: f32,
+    rivet_x: f32,
+    rivet_y: f32,
+    rivet_radius: f32,
+}
+
+#[derive(Clone, Copy)]
+struct CheckboxGauge {
+    side: u8,
+    control_height: f32,
+    assembly_side: f32,
+    socket_half: f32,
+    top_half: f32,
+    dish_half: f32,
+    body_half: f32,
+    bevel_depth: f32,
+    bowl_depth: f32,
+    latch_up: f32,
+    latch_down: f32,
+    pose_min: f32,
+    pose_max: f32,
+    body_root: f32,
+    guard_half: f32,
+    guard_base: f32,
+    guard_rise: f32,
+    wire_stations: &'static [f32],
+}
+
+fn checkbox_gauge(side: u8) -> CheckboxGauge {
+    let scale = f32::from(side) / f32::from(MECHANISM_SIDE_LARGE);
+    let wire_stations: &'static [f32] = match side {
+        ..=22 => &SMALL_WIRE_STATIONS,
+        23..=28 => &MEDIUM_WIRE_STATIONS,
+        29.. => &LARGE_WIRE_STATIONS,
+    };
+    CheckboxGauge {
+        side,
+        control_height: 42.0 * scale,
+        assembly_side: 38.0 * scale,
+        socket_half: 14.8 * scale,
+        top_half: TOP_HALF * scale,
+        dish_half: DISH_HALF * scale,
+        body_half: BODY_HALF * scale,
+        bevel_depth: BEVEL_DEPTH * scale,
+        bowl_depth: BOWL_DEPTH * scale,
+        latch_up: LATCH_UP * scale,
+        latch_down: LATCH_DOWN * scale,
+        pose_min: POSE_MIN * scale,
+        pose_max: POSE_MAX * scale,
+        body_root: BODY_ROOT * scale,
+        guard_half: GUARD_HALF * scale,
+        // Frame, mesh, and weld stock remain physically identical at every
+        // gauge. Fewer wires, rather than hairline wires, make the compact
+        // guards legible after rasterization.
+        guard_base: GUARD_BASE,
+        guard_rise: GUARD_RISE * scale + GUARD_STOCK_CLEARANCE_LIFT * (1.0 - scale),
+        wire_stations,
+    }
+}
+
+fn bail_gauge(side: u8) -> BailGauge {
+    let s = f32::from(side);
+    let base_half = s * 0.5 - 0.5;
+    let plate_rise = 1.15;
+    let stock_radius = s * 0.045;
+    BailGauge {
+        side,
+        base_half,
+        face_half: base_half - 1.15,
+        plate_rise,
+        hinge_y: -s * 0.15,
+        hinge_z: plate_rise + stock_radius * 0.72,
+        span: s * 0.25,
+        reach: s * 0.29,
+        stock_radius,
+        rivet_offset: base_half - 1.65,
+        rivet_radius: s * 0.031,
+    }
+}
+
+fn friction_gauge(side: u8) -> FrictionGauge {
+    let height = f32::from(side);
+    let width = height * 0.5;
+    let base_half_x = width * 0.5 - 0.5;
+    let base_half_y = height * 0.5 - 0.5;
+    let plate_rise = 1.15;
+    let face_half_x = base_half_x - plate_rise;
+    let face_half_y = base_half_y - plate_rise;
+    let rivet_radius = height * 0.036;
+    FrictionGauge {
+        side,
+        width,
+        base_half_x,
+        base_half_y,
+        face_half_x,
+        face_half_y,
+        plate_rise,
+        rivet_x: face_half_x - rivet_radius - 0.12,
+        rivet_y: face_half_y - rivet_radius - 0.15,
+        rivet_radius,
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct V3 {
+    x: f32,
+    y: f32,
+    z: f32,
+}
+
+impl V3 {
+    const ZERO: Self = Self::new(0.0, 0.0, 0.0);
+
+    const fn new(x: f32, y: f32, z: f32) -> Self {
+        Self { x, y, z }
+    }
+
+    fn dot(self, rhs: Self) -> f32 {
+        self.x * rhs.x + self.y * rhs.y + self.z * rhs.z
+    }
+
+    fn cross(self, rhs: Self) -> Self {
+        Self::new(
+            self.y * rhs.z - self.z * rhs.y,
+            self.z * rhs.x - self.x * rhs.z,
+            self.x * rhs.y - self.y * rhs.x,
+        )
+    }
+
+    fn length(self) -> f32 {
+        self.dot(self).sqrt()
+    }
+
+    fn normalized(self) -> Self {
+        self / self.length().max(f32::EPSILON)
+    }
+
+    fn rotate_z(self, angle: f32) -> Self {
+        let (sin, cos) = angle.sin_cos();
+        Self::new(
+            self.x * cos - self.y * sin,
+            self.x * sin + self.y * cos,
+            self.z,
+        )
+    }
+
+    fn wheel_plane(self, plane: WheelPlane) -> Self {
+        match plane {
+            // Rᵧ(+π/2): the canonical Z axle becomes screen X.
+            WheelPlane::YZ => Self::new(self.z, self.y, -self.x),
+            // Rₓ(−π/2): the canonical Z axle becomes screen Y.
+            WheelPlane::XZ => Self::new(self.x, self.z, -self.y),
+        }
+    }
+}
+
+impl Add for V3 {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self::new(self.x + rhs.x, self.y + rhs.y, self.z + rhs.z)
+    }
+}
+
+impl Sub for V3 {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self::new(self.x - rhs.x, self.y - rhs.y, self.z - rhs.z)
+    }
+}
+
+impl Mul<f32> for V3 {
+    type Output = Self;
+
+    fn mul(self, rhs: f32) -> Self::Output {
+        Self::new(self.x * rhs, self.y * rhs, self.z * rhs)
+    }
+}
+
+impl Div<f32> for V3 {
+    type Output = Self;
+
+    fn div(self, rhs: f32) -> Self::Output {
+        Self::new(self.x / rhs, self.y / rhs, self.z / rhs)
+    }
+}
+
+#[derive(Clone, Copy)]
+struct Vertex {
+    position: V3,
+    normal: V3,
+}
+
+impl Vertex {
+    fn new(position: V3, normal: V3) -> Self {
+        Self { position, normal }
+    }
+}
+
+#[derive(Clone, Default)]
+struct Model {
+    triangles: Vec<[Vertex; 3]>,
+}
+
+impl Model {
+    fn triangle(&mut self, a: Vertex, b: Vertex, c: Vertex) {
+        self.triangles.push([a, b, c]);
+    }
+
+    fn quad(&mut self, vertices: [Vertex; 4]) {
+        let [a, b, c, d] = vertices;
+        self.triangle(a, b, c);
+        self.triangle(a, c, d);
+    }
+
+    fn append(&mut self, mut rhs: Self) {
+        self.triangles.append(&mut rhs.triangles);
+    }
+
+    fn wheel_pose(&self, phase: f32, plane: WheelPlane) -> Self {
+        Self {
+            triangles: self
+                .triangles
+                .iter()
+                .map(|triangle| {
+                    triangle.map(|vertex| {
+                        Vertex::new(
+                            vertex.position.rotate_z(phase).wheel_plane(plane),
+                            vertex.normal.rotate_z(phase).wheel_plane(plane),
+                        )
+                    })
+                })
+                .collect(),
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum WheelPlane {
+    XZ,
+    YZ,
+}
+
+impl WheelPlane {
+    const ALL: [Self; 2] = [Self::XZ, Self::YZ];
+
+    const fn name(self) -> &'static str {
+        match self {
+            Self::XZ => "XZ",
+            Self::YZ => "YZ",
+        }
+    }
+
+    const fn aperture(self) -> [f32; 2] {
+        match self {
+            Self::XZ => [WHEEL_APERTURE_TRAVEL, WHEEL_APERTURE_AXIAL],
+            Self::YZ => [WHEEL_APERTURE_AXIAL, WHEEL_APERTURE_TRAVEL],
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Pixel {
+    position: [f32; 2],
+    color: [u8; 4],
+}
+
+#[derive(Default)]
+struct Compiled {
+    vertices: Vec<Pixel>,
+    indices: Vec<u32>,
+    intern: HashMap<([u32; 2], [u8; 4]), u32>,
+}
+
+impl Compiled {
+    fn vertex(&mut self, pixel: Pixel) -> u32 {
+        let key = (
+            [pixel.position[0].to_bits(), pixel.position[1].to_bits()],
+            pixel.color,
+        );
+        if let Some(index) = self.intern.get(&key) {
+            return *index;
+        }
+        let index = self.vertices.len() as u32;
+        self.vertices.push(pixel);
+        let _prior = self.intern.insert(key, index);
+        index
+    }
+
+    fn triangle(&mut self, pixels: [Pixel; 3]) {
+        let indices = pixels.map(|pixel| self.vertex(pixel));
+        self.indices.extend(indices);
+    }
+}
+
+pub(crate) fn bake(
+    checkbox_path: &Path,
+    monoglyph_path: &Path,
+    corner_close_path: &Path,
+    drag_handle_path: &Path,
+    number_input_path: &Path,
+    material_study_path: &Path,
+) -> io::Result<()> {
+    verify_geometry();
+    bake_checkbox(checkbox_path)?;
+    bake_monoglyph(monoglyph_path)?;
+    bake_momentary(corner_close_path, corner_close_plunger, compile_close_crown)?;
+    bake_drag_handle(drag_handle_path)?;
+    bake_number_input(number_input_path)?;
+    bake_material_study(material_study_path)
+}
+
+fn bake_checkbox(path: &Path) -> io::Result<()> {
+    let mut out = BufWriter::new(File::create(path)?);
+    writeln!(out, "// @generated by build/foundry_atlas.rs; do not edit.")?;
+    writeln!(out, "pub(super) const POSE_COUNT: usize = {POSE_COUNT};")?;
+    let gauge_count = MECHANISM_SIDES.len();
+    writeln!(out, "pub(super) const GAUGE_COUNT: usize = {gauge_count};")?;
+    writeln!(
+        out,
+        "pub(super) const SHADOW_EYE_Z: f32 = {};",
+        scalar(EYE_Z)
+    )?;
+    writeln!(
+        out,
+        "pub(super) const SHADOW_SLOPE: f32 = {};",
+        scalar(-LIGHT_Y / LIGHT_Z)
+    )?;
+
+    for side in MECHANISM_SIDES {
+        let gauge = checkbox_gauge(side);
+        let guard = guard(gauge);
+        let guard_mesh = compile_bronze(&guard, 0.96);
+        let guard_floor_shadow = compile_shadow(&guard, 0.0, 46);
+        let guard_crown_shadow = compile_shadow_source(&guard, gauge.pose_max, 18);
+        emit_mesh(&mut out, &format!("GAUGE_{side}_GUARD"), &guard_mesh)?;
+        emit_mesh(
+            &mut out,
+            &format!("GAUGE_{side}_GUARD_FLOOR_SHADOW"),
+            &guard_floor_shadow,
+        )?;
+        emit_shadow(
+            &mut out,
+            &format!("GAUGE_{side}_GUARD_CROWN_SHADOW"),
+            &guard_crown_shadow,
+        )?;
+
+        let poses = (0..POSE_COUNT)
+            .map(|index| {
+                let elevation = checkbox_pose_elevation(index, gauge);
+                let depth = ((elevation - gauge.latch_down) / (gauge.latch_up - gauge.latch_down))
+                    .clamp(0.0, 1.0);
+                let button = plunger(elevation, gauge);
+                (
+                    elevation,
+                    compile_darkened_bronze(&button, 0.76 + 0.24 * depth),
+                    compile_shadow(&button, 0.0, 82),
+                )
+            })
+            .collect::<Vec<_>>();
+        for (index, (_, button, shadow)) in poses.iter().enumerate() {
+            emit_mesh(&mut out, &format!("GAUGE_{side}_BUTTON_{index:02}"), button)?;
+            emit_mesh(
+                &mut out,
+                &format!("GAUGE_{side}_BUTTON_SHADOW_{index:02}"),
+                shadow,
+            )?;
+        }
+        writeln!(
+            out,
+            "static GAUGE_{side}_POSES: [BakedPose; POSE_COUNT] = ["
+        )?;
+        for (index, (elevation, _, _)) in poses.iter().enumerate() {
+            writeln!(
+                out,
+                "BakedPose {{ elevation: {}, button: GAUGE_{side}_BUTTON_{index:02}, shadow: GAUGE_{side}_BUTTON_SHADOW_{index:02} }},",
+                scalar(*elevation)
+            )?;
+        }
+        writeln!(out, "];")?;
+    }
+
+    writeln!(
+        out,
+        "pub(super) static GAUGES: [BakedCheckboxGauge; GAUGE_COUNT] = ["
+    )?;
+    for side in MECHANISM_SIDES {
+        let gauge = checkbox_gauge(side);
+        writeln!(
+            out,
+            "BakedCheckboxGauge {{ side: {}, control_height: {}, assembly_side: {}, socket_half: {}, body_half: {}, latch_up: {}, latch_down: {}, pose_min: {}, pose_max: {}, wire_count: {}, guard: GAUGE_{side}_GUARD, guard_floor_shadow: GAUGE_{side}_GUARD_FLOOR_SHADOW, guard_crown_shadow: GAUGE_{side}_GUARD_CROWN_SHADOW_SOURCE, poses: &GAUGE_{side}_POSES }},",
+            gauge.side,
+            scalar(gauge.control_height),
+            scalar(gauge.assembly_side),
+            scalar(gauge.socket_half),
+            scalar(gauge.body_half),
+            scalar(gauge.latch_up),
+            scalar(gauge.latch_down),
+            scalar(gauge.pose_min),
+            scalar(gauge.pose_max),
+            gauge.wire_stations.len(),
+        )?;
+    }
+    writeln!(out, "];")
+}
+
+fn bake_momentary(
+    path: &Path,
+    forge: fn(f32) -> Model,
+    illuminate: fn(&Model, f32) -> Compiled,
+) -> io::Result<()> {
+    let gauge = momentary_gauge(MECHANISM_SIDE_LARGE);
+    let poses = (0..MONOGLYPH_POSE_COUNT)
+        .map(|index| {
+            let elevation = monoglyph_pose_elevation(index);
+            let button = forge(elevation);
+            (
+                elevation,
+                illuminate(&button, elevation),
+                compile_shadow(&button, 0.0, 82),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    let mut out = BufWriter::new(File::create(path)?);
+    writeln!(out, "// @generated by build/foundry_atlas.rs; do not edit.")?;
+    for (name, value) in [
+        ("POSE_MIN", MONOGLYPH_POSE_MIN),
+        ("POSE_MAX", MONOGLYPH_POSE_MAX),
+        ("REST", MONOGLYPH_REST),
+        ("PRESS", MONOGLYPH_PRESS),
+        ("BODY_HALF", gauge.body_half),
+    ] {
+        writeln!(out, "pub(super) const {name}: f32 = {};", scalar(value))?;
+    }
+    writeln!(
+        out,
+        "pub(super) const POSE_COUNT: usize = {MONOGLYPH_POSE_COUNT};"
+    )?;
+    for (index, (_, button, shadow)) in poses.iter().enumerate() {
+        emit_mesh(&mut out, &format!("BUTTON_{index:02}"), button)?;
+        emit_mesh(&mut out, &format!("BUTTON_SHADOW_{index:02}"), shadow)?;
+    }
+    writeln!(out, "pub(super) static POSES: [BakedPose; POSE_COUNT] = [")?;
+    for (index, (elevation, _, _)) in poses.iter().enumerate() {
+        writeln!(
+            out,
+            "BakedPose {{ elevation: {}, button: BUTTON_{index:02}, shadow: BUTTON_SHADOW_{index:02} }},",
+            scalar(*elevation)
+        )?;
+    }
+    writeln!(out, "];")
+}
+
+fn bake_monoglyph(path: &Path) -> io::Result<()> {
+    let mut out = BufWriter::new(File::create(path)?);
+    writeln!(out, "// @generated by build/foundry_atlas.rs; do not edit.")?;
+    for (name, value) in [
+        ("POSE_MIN", MONOGLYPH_POSE_MIN),
+        ("POSE_MAX", MONOGLYPH_POSE_MAX),
+        ("REST", MONOGLYPH_REST),
+        ("PRESS", MONOGLYPH_PRESS),
+    ] {
+        writeln!(out, "pub(super) const {name}: f32 = {};", scalar(value))?;
+    }
+    writeln!(
+        out,
+        "pub(super) const POSE_COUNT: usize = {MONOGLYPH_POSE_COUNT};"
+    )?;
+    let gauge_count = MECHANISM_SIDES.len();
+    writeln!(out, "pub(super) const GAUGE_COUNT: usize = {gauge_count};")?;
+
+    for side in MECHANISM_SIDES {
+        let gauge = momentary_gauge(side);
+        let poses = (0..MONOGLYPH_POSE_COUNT)
+            .map(|index| {
+                let elevation = monoglyph_pose_elevation(index);
+                let button = monoglyph_plunger(elevation, gauge);
+                (
+                    elevation,
+                    compile_darkened_crown(&button, elevation),
+                    compile_shadow(&button, 0.0, 82),
+                )
+            })
+            .collect::<Vec<_>>();
+        for (index, (_, button, shadow)) in poses.iter().enumerate() {
+            emit_mesh(&mut out, &format!("GAUGE_{side}_BUTTON_{index:02}"), button)?;
+            emit_mesh(&mut out, &format!("GAUGE_{side}_SHADOW_{index:02}"), shadow)?;
+        }
+        writeln!(
+            out,
+            "static GAUGE_{side}_POSES: [BakedPose; POSE_COUNT] = ["
+        )?;
+        for (index, (elevation, _, _)) in poses.iter().enumerate() {
+            writeln!(
+                out,
+                "BakedPose {{ elevation: {}, button: GAUGE_{side}_BUTTON_{index:02}, shadow: GAUGE_{side}_SHADOW_{index:02} }},",
+                scalar(*elevation)
+            )?;
+        }
+        writeln!(out, "];")?;
+    }
+    writeln!(
+        out,
+        "pub(super) static GAUGES: [BakedGauge; GAUGE_COUNT] = ["
+    )?;
+    for side in MECHANISM_SIDES {
+        let gauge = momentary_gauge(side);
+        writeln!(
+            out,
+            "BakedGauge {{ side: {side}, socket_half: {}, top_half: {}, body_half: {}, poses: &GAUGE_{side}_POSES }},",
+            scalar(gauge.socket_half),
+            scalar(gauge.top_half),
+            scalar(gauge.body_half),
+        )?;
+    }
+    writeln!(out, "];")
+}
+
+fn bake_drag_handle(path: &Path) -> io::Result<()> {
+    let mut out = BufWriter::new(File::create(path)?);
+    writeln!(out, "// @generated by build/foundry_atlas.rs; do not edit.")?;
+    for (name, value) in [
+        ("POSE_MIN", BAIL_POSE_MIN),
+        ("POSE_MAX", BAIL_POSE_MAX),
+        ("REST", BAIL_REST),
+        ("LIFT", BAIL_LIFT),
+    ] {
+        writeln!(out, "pub(super) const {name}: f32 = {};", scalar(value))?;
+    }
+    writeln!(
+        out,
+        "pub(super) const POSE_COUNT: usize = {BAIL_POSE_COUNT};"
+    )?;
+    let gauge_count = MECHANISM_SIDES.len();
+    writeln!(out, "pub(super) const GAUGE_COUNT: usize = {gauge_count};")?;
+
+    for side in MECHANISM_SIDES {
+        let gauge = bail_gauge(side);
+        let plate = bail_plate(gauge);
+        let hardware = bail_hardware(gauge);
+        let mut complete = plate.clone();
+        complete.append(hardware.clone());
+        let floor_shadow = compile_shadow(&complete, 0.0, 44);
+        let static_shadow = compile_shadow(&hardware, gauge.plate_rise, 34);
+        let plate = compile_darkened_bronze(&plate, 1.0);
+        let hardware = compile_darkened_bronze(&hardware, 1.0);
+        emit_mesh(
+            &mut out,
+            &format!("GAUGE_{side}_FLOOR_SHADOW"),
+            &floor_shadow,
+        )?;
+        emit_mesh(&mut out, &format!("GAUGE_{side}_PLATE"), &plate)?;
+        emit_mesh(
+            &mut out,
+            &format!("GAUGE_{side}_STATIC_SHADOW"),
+            &static_shadow,
+        )?;
+        emit_mesh(&mut out, &format!("GAUGE_{side}_HARDWARE"), &hardware)?;
+
+        let poses = (0..BAIL_POSE_COUNT)
+            .map(|index| {
+                let angle = bail_pose_angle(index);
+                let bail = bail(gauge, angle);
+                (
+                    angle,
+                    compile_shadow(&bail, gauge.plate_rise, 78),
+                    compile_darkened_bronze(&bail, 1.0),
+                )
+            })
+            .collect::<Vec<_>>();
+        for (index, (_, shadow, bail)) in poses.iter().enumerate() {
+            emit_mesh(
+                &mut out,
+                &format!("GAUGE_{side}_BAIL_SHADOW_{index:02}"),
+                shadow,
+            )?;
+            emit_mesh(&mut out, &format!("GAUGE_{side}_BAIL_{index:02}"), bail)?;
+        }
+        writeln!(
+            out,
+            "static GAUGE_{side}_POSES: [BakedBailPose; POSE_COUNT] = ["
+        )?;
+        for (index, (angle, _, _)) in poses.iter().enumerate() {
+            writeln!(
+                out,
+                "BakedBailPose {{ angle: {}, shadow: GAUGE_{side}_BAIL_SHADOW_{index:02}, bail: GAUGE_{side}_BAIL_{index:02} }},",
+                scalar(*angle)
+            )?;
+        }
+        writeln!(out, "];")?;
+    }
+
+    for side in MECHANISM_SIDES {
+        let gauge = friction_gauge(side);
+        let plate = friction_plate(gauge);
+        let hardware = friction_hardware(gauge);
+        let mut complete = plate.clone();
+        complete.append(hardware.clone());
+        let floor_shadow = compile_shadow(&complete, 0.0, 44);
+        let static_shadow = compile_shadow(&hardware, gauge.plate_rise, 56);
+        let plate = compile_darkened_bronze(&plate, 1.0);
+        let hardware = compile_bronze(&hardware, 1.0);
+        emit_mesh(
+            &mut out,
+            &format!("FRICTION_{side}_FLOOR_SHADOW"),
+            &floor_shadow,
+        )?;
+        emit_mesh(&mut out, &format!("FRICTION_{side}_PLATE"), &plate)?;
+        emit_mesh(
+            &mut out,
+            &format!("FRICTION_{side}_STATIC_SHADOW"),
+            &static_shadow,
+        )?;
+        emit_mesh(&mut out, &format!("FRICTION_{side}_HARDWARE"), &hardware)?;
+    }
+
+    writeln!(
+        out,
+        "pub(super) static GAUGES: [BakedBailGauge; GAUGE_COUNT] = ["
+    )?;
+    for side in MECHANISM_SIDES {
+        let gauge = bail_gauge(side);
+        writeln!(
+            out,
+            "BakedBailGauge {{ side: {}, plate: GAUGE_{side}_PLATE, floor_shadow: GAUGE_{side}_FLOOR_SHADOW, static_shadow: GAUGE_{side}_STATIC_SHADOW, hardware: GAUGE_{side}_HARDWARE, sweep_per_radian: {}, poses: &GAUGE_{side}_POSES }},",
+            gauge.side,
+            scalar(bail_sweep_per_radian(gauge)),
+        )?;
+    }
+    writeln!(out, "];")?;
+    writeln!(
+        out,
+        "pub(super) static FRICTION_GAUGES: [BakedFrictionGauge; GAUGE_COUNT] = ["
+    )?;
+    for side in MECHANISM_SIDES {
+        let gauge = friction_gauge(side);
+        writeln!(
+            out,
+            "BakedFrictionGauge {{ side: {}, width: {}, plate: FRICTION_{side}_PLATE, floor_shadow: FRICTION_{side}_FLOOR_SHADOW, static_shadow: FRICTION_{side}_STATIC_SHADOW, hardware: FRICTION_{side}_HARDWARE }},",
+            gauge.side,
+            scalar(gauge.width),
+        )?;
+    }
+    writeln!(out, "];")
+}
+
+fn bake_number_input(path: &Path) -> io::Result<()> {
+    let blank = numerical_thumbwheel();
+    let mut out = BufWriter::new(File::create(path)?);
+    writeln!(out, "// @generated by build/foundry_atlas.rs; do not edit.")?;
+    for (name, value) in [
+        ("SOCKET_SIDE", WHEEL_SOCKET_SIDE),
+        ("PITCH", WHEEL_PITCH),
+        ("RADIUS", WHEEL_RADIUS),
+        ("HALF_DEPTH", WHEEL_HALF_DEPTH),
+    ] {
+        writeln!(out, "pub(super) const {name}: f32 = {};", scalar(value))?;
+    }
+    writeln!(
+        out,
+        "pub(super) const POSE_COUNT: usize = {WHEEL_POSE_COUNT};"
+    )?;
+
+    for plane in WheelPlane::ALL {
+        let name = plane.name();
+        for index in 0..WHEEL_POSE_COUNT {
+            let phase = wheel_pose_phase(index);
+            let model = blank.wheel_pose(phase, plane);
+            let wheel = compile_wheel(&model, phase, plane);
+            emit_mesh(&mut out, &format!("{name}_WHEEL_{index:02}"), &wheel)?;
+        }
+        writeln!(out, "static {name}_POSES: [BakedWheelPose; POSE_COUNT] = [")?;
+        for index in 0..WHEEL_POSE_COUNT {
+            writeln!(
+                out,
+                "BakedWheelPose {{ phase: {}, wheel: {name}_WHEEL_{index:02} }},",
+                scalar(wheel_pose_phase(index))
+            )?;
+        }
+        writeln!(out, "];")?;
+    }
+
+    writeln!(out, "pub(super) static PLANES: [BakedWheelPlane; 2] = [")?;
+    for plane in WheelPlane::ALL {
+        let name = plane.name();
+        let [width, height] = plane.aperture();
+        writeln!(
+            out,
+            "BakedWheelPlane {{ aperture: [{}, {}], poses: &{name}_POSES }},",
+            scalar(width),
+            scalar(height),
+        )?;
+    }
+    writeln!(out, "];")
+}
+
+fn bake_material_study(path: &Path) -> io::Result<()> {
+    let button_model = monoglyph_plunger(MONOGLYPH_REST, momentary_gauge(MECHANISM_SIDE_LARGE));
+    let plate_model = bail_plate(bail_gauge(MECHANISM_SIDE_LARGE));
+    let button_shadow = compile_shadow(&button_model, 0.0, 82);
+    let plate_shadow = compile_shadow(&plate_model, 0.0, 44);
+    let production_button = compile_darkened_bronze(&button_model, 1.0);
+    let production_plate = compile_darkened_bronze(&plate_model, 1.0);
+
+    let mut out = BufWriter::new(File::create(path)?);
+    writeln!(out, "// @generated by build/foundry_atlas.rs; do not edit.")?;
+    writeln!(
+        out,
+        "pub(super) const ROW_COUNT: usize = {};",
+        MATERIAL_STUDY_ROWS.len()
+    )?;
+    writeln!(
+        out,
+        "pub(super) const COLUMN_COUNT: usize = {};",
+        MATERIAL_STUDY_EXPOSURES.len()
+    )?;
+    writeln!(
+        out,
+        "pub(super) const PRODUCTION_ROW: usize = {MATERIAL_STUDY_PRODUCTION_ROW};"
+    )?;
+    writeln!(
+        out,
+        "pub(super) const PRODUCTION_COLUMN: usize = {MATERIAL_STUDY_PRODUCTION_COLUMN};"
+    )?;
+    writeln!(out, "pub(super) static ROW_NAMES: [&str; ROW_COUNT] = [")?;
+    for row in MATERIAL_STUDY_ROWS {
+        writeln!(out, "{:?},", row.name)?;
+    }
+    writeln!(out, "];")?;
+    writeln!(
+        out,
+        "pub(super) static GLINT_EXPONENTS: [f32; ROW_COUNT] = ["
+    )?;
+    for row in MATERIAL_STUDY_ROWS {
+        writeln!(out, "{},", scalar(row.glint_shine))?;
+    }
+    writeln!(out, "];")?;
+    writeln!(out, "pub(super) static EXPOSURES: [f32; COLUMN_COUNT] = [")?;
+    for exposure in MATERIAL_STUDY_EXPOSURES {
+        writeln!(out, "{},", scalar(exposure))?;
+    }
+    writeln!(out, "];")?;
+    emit_mesh(&mut out, "BUTTON_SHADOW", &button_shadow)?;
+    emit_mesh(&mut out, "PLATE_SHADOW", &plate_shadow)?;
+
+    for (row_index, law) in MATERIAL_STUDY_ROWS.into_iter().enumerate() {
+        for (column_index, exposure) in MATERIAL_STUDY_EXPOSURES.into_iter().enumerate() {
+            let button = compile_bronze_with(&button_model, |vertex| {
+                material_study_lit(vertex, law, exposure)
+            });
+            let plate = compile_bronze_with(&plate_model, |vertex| {
+                material_study_lit(vertex, law, exposure)
+            });
+            if row_index == MATERIAL_STUDY_PRODUCTION_ROW
+                && column_index == MATERIAL_STUDY_PRODUCTION_COLUMN
+            {
+                assert_eq!(button.vertices, production_button.vertices);
+                assert_eq!(button.indices, production_button.indices);
+                assert_eq!(plate.vertices, production_plate.vertices);
+                assert_eq!(plate.indices, production_plate.indices);
+            }
+            emit_mesh(
+                &mut out,
+                &format!("CELL_{row_index}_{column_index}_BUTTON"),
+                &button,
+            )?;
+            emit_mesh(
+                &mut out,
+                &format!("CELL_{row_index}_{column_index}_PLATE"),
+                &plate,
+            )?;
+        }
+    }
+    writeln!(
+        out,
+        "pub(super) static CELLS: [BakedStudyCell; ROW_COUNT * COLUMN_COUNT] = ["
+    )?;
+    for row in 0..MATERIAL_STUDY_ROWS.len() {
+        for column in 0..MATERIAL_STUDY_EXPOSURES.len() {
+            writeln!(
+                out,
+                "BakedStudyCell {{ button: CELL_{row}_{column}_BUTTON, plate: CELL_{row}_{column}_PLATE }},"
+            )?;
+        }
+    }
+    writeln!(out, "];")
+}
+
+fn emit_mesh(out: &mut impl Write, name: &str, mesh: &Compiled) -> io::Result<()> {
+    writeln!(out, "static {name}_VERTICES: &[BakedVertex] = &[")?;
+    for vertex in &mesh.vertices {
+        let [x, y] = vertex.position;
+        let [r, g, b, a] = vertex.color;
+        writeln!(
+            out,
+            "BakedVertex {{ position: [{}, {}], color: [{r}, {g}, {b}, {a}] }},",
+            scalar(x),
+            scalar(y)
+        )?;
+    }
+    writeln!(out, "];")?;
+    writeln!(out, "static {name}_INDICES: &[u32] = &[")?;
+    for chunk in mesh.indices.chunks(24) {
+        for index in chunk {
+            write!(out, "{index},")?;
+        }
+        writeln!(out)?;
+    }
+    writeln!(out, "];")?;
+    writeln!(
+        out,
+        "pub(super) static {name}: BakedMesh = BakedMesh {{ vertices: {name}_VERTICES, indices: {name}_INDICES }};"
+    )
+}
+
+/// Emit the exact IEEE-754 payload rather than a lossy decimal approximation.
+/// Grouped hexadecimal also keeps generated code clear of numeric-literal
+/// heuristics in downstream lint configurations.
+fn scalar(value: f32) -> String {
+    let bits = value.to_bits();
+    format!("f32::from_bits(0x{:04x}_{:04x})", bits >> 16, bits & 0xffff)
+}
+
+fn emit_shadow(out: &mut impl Write, name: &str, shadow: &Compiled) -> io::Result<()> {
+    emit_mesh(out, name, shadow)?;
+    writeln!(
+        out,
+        "pub(super) static {name}_SOURCE: BakedShadow = BakedShadow {{ mesh: {name} }};"
+    )
+}
+
+fn checkbox_pose_elevation(index: usize, gauge: CheckboxGauge) -> f32 {
+    match index {
+        0 => gauge.pose_min,
+        i if i + 1 == POSE_COUNT => gauge.pose_max,
+        _ => lerp(
+            gauge.pose_min,
+            gauge.pose_max,
+            index as f32 / (POSE_COUNT - 1) as f32,
+        ),
+    }
+}
+
+fn monoglyph_pose_elevation(index: usize) -> f32 {
+    match index {
+        0 => MONOGLYPH_POSE_MIN,
+        i if i + 1 == MONOGLYPH_POSE_COUNT => MONOGLYPH_POSE_MAX,
+        _ => lerp(
+            MONOGLYPH_POSE_MIN,
+            MONOGLYPH_POSE_MAX,
+            index as f32 / (MONOGLYPH_POSE_COUNT - 1) as f32,
+        ),
+    }
+}
+
+fn bail_pose_angle(index: usize) -> f32 {
+    match index {
+        0 => BAIL_POSE_MIN,
+        i if i + 1 == BAIL_POSE_COUNT => BAIL_POSE_MAX,
+        _ => lerp(
+            BAIL_POSE_MIN,
+            BAIL_POSE_MAX,
+            index as f32 / (BAIL_POSE_COUNT - 1) as f32,
+        ),
+    }
+}
+
+fn wheel_pose_phase(index: usize) -> f32 {
+    match index {
+        0 => 0.0,
+        i if i + 1 == WHEEL_POSE_COUNT => WHEEL_PITCH,
+        _ => WHEEL_PITCH * index as f32 / (WHEEL_POSE_COUNT - 1) as f32,
+    }
+}
+
+fn project(point: V3) -> [f32; 2] {
+    let scale = EYE_Z / (EYE_Z - point.z).max(1.0);
+    [point.x * scale, point.y * scale]
+}
+
+fn view(point: V3) -> V3 {
+    (V3::new(0.0, 0.0, EYE_Z) - point).normalized()
+}
+
+fn visible(triangle: &[Vertex; 3]) -> bool {
+    let center = triangle
+        .iter()
+        .fold(V3::ZERO, |sum, vertex| sum + vertex.position)
+        / 3.0;
+    let normal = triangle
+        .iter()
+        .fold(V3::ZERO, |sum, vertex| sum + vertex.normal)
+        .normalized();
+    normal.dot(view(center)) > 0.0
+}
+
+fn depth(triangle: &[Vertex; 3]) -> f32 {
+    triangle.iter().map(|vertex| vertex.position.z).sum::<f32>() / 3.0
+}
+
+fn lit(vertex: Vertex, exposure: f32) -> [u8; 4] {
+    let position = vertex.position;
+    let normal = vertex.normal;
+    let rgb = bronze_rgb(metal_tone(
+        [position.x, position.y, position.z],
+        [normal.x, normal.y, normal.z],
+    ));
+    let channel = |value: u8| (f32::from(value) * exposure).round().clamp(0.0, 255.0) as u8;
+    [channel(rgb[0]), channel(rgb[1]), channel(rgb[2]), 255]
+}
+
+fn lit_with_key(vertex: Vertex, visibility: f32) -> [u8; 4] {
+    let position = vertex.position;
+    let normal = vertex.normal;
+    let rgb = bronze_rgb(metal_tone_with_key(
+        [position.x, position.y, position.z],
+        [normal.x, normal.y, normal.z],
+        visibility,
+    ));
+    [rgb[0], rgb[1], rgb[2], 255]
+}
+
+fn darkened_lit(vertex: Vertex, exposure: f32) -> [u8; 4] {
+    let position = vertex.position;
+    let normal = vertex.normal;
+    let rgb = darkened_bronze_rgb(darkened_metal_tone(
+        [position.x, position.y, position.z],
+        [normal.x, normal.y, normal.z],
+    ));
+    let channel = |value: u8| (f32::from(value) * exposure).round().clamp(0.0, 255.0) as u8;
+    [channel(rgb[0]), channel(rgb[1]), channel(rgb[2]), 255]
+}
+
+fn darkened_lit_with_key(vertex: Vertex, visibility: f32) -> [u8; 4] {
+    let position = vertex.position;
+    let normal = vertex.normal;
+    let rgb = darkened_bronze_rgb(darkened_metal_tone_with_key(
+        [position.x, position.y, position.z],
+        [normal.x, normal.y, normal.z],
+        visibility,
+    ));
+    [rgb[0], rgb[1], rgb[2], 255]
+}
+
+fn material_study_lit(vertex: Vertex, law: StudyReflection, exposure: f32) -> [u8; 4] {
+    let position = [vertex.position.x, vertex.position.y, vertex.position.z];
+    let normal = [vertex.normal.x, vertex.normal.y, vertex.normal.z];
+    let (diffuse, reflection) = material_terms(position, normal);
+    let tone = (DARK_AMBIENT
+        + (DARK_DIFFUSE_WEIGHT * diffuse
+            + law.broad_weight * reflection.powf(law.broad_shine)
+            + law.glint_weight * reflection.powf(law.glint_shine)))
+    .min(DARK_TONE_CEILING);
+    let rgb = bronze_rgb(tone);
+    let channel = |value: u8| (f32::from(value) * exposure).round().clamp(0.0, 255.0) as u8;
+    [channel(rgb[0]), channel(rgb[1]), channel(rgb[2]), 255]
+}
+
+fn compile_bronze(model: &Model, exposure: f32) -> Compiled {
+    compile_bronze_with(model, |vertex| lit(vertex, exposure))
+}
+
+fn compile_darkened_bronze(model: &Model, exposure: f32) -> Compiled {
+    compile_bronze_with(model, |vertex| darkened_lit(vertex, exposure))
+}
+
+fn compile_bronze_with(model: &Model, illuminate: impl Fn(Vertex) -> [u8; 4]) -> Compiled {
+    let mut facets = model
+        .triangles
+        .iter()
+        .filter(|triangle| visible(triangle))
+        .collect::<Vec<_>>();
+    facets.sort_by(|a, b| depth(a).total_cmp(&depth(b)));
+    let mut compiled = Compiled::default();
+    for triangle in facets {
+        compiled.triangle(triangle.map(|vertex| Pixel {
+            position: project(vertex.position),
+            color: illuminate(vertex),
+        }));
+    }
+    compiled
+}
+
+fn compile_wheel(model: &Model, phase: f32, plane: WheelPlane) -> Compiled {
+    let [width, height] = plane.aperture();
+    let [hx, hy] = [width * 0.5 + 0.8, height * 0.5 + 0.8];
+    let mut facets = model
+        .triangles
+        .iter()
+        .filter(|triangle| visible(triangle))
+        .filter(|triangle| {
+            let projected = triangle.map(|vertex| project(vertex.position));
+            let min_x = projected.iter().map(|p| p[0]).fold(f32::INFINITY, f32::min);
+            let max_x = projected
+                .iter()
+                .map(|p| p[0])
+                .fold(f32::NEG_INFINITY, f32::max);
+            let min_y = projected.iter().map(|p| p[1]).fold(f32::INFINITY, f32::min);
+            let max_y = projected
+                .iter()
+                .map(|p| p[1])
+                .fold(f32::NEG_INFINITY, f32::max);
+            min_x <= hx && max_x >= -hx && min_y <= hy && max_y >= -hy
+        })
+        .collect::<Vec<_>>();
+    facets.sort_by(|a, b| depth(a).total_cmp(&depth(b)));
+    let mut compiled = Compiled::default();
+    let mut visibility = HashMap::<[u32; 3], f32>::new();
+    for triangle in facets {
+        compiled.triangle(triangle.map(|vertex| Pixel {
+            position: project(vertex.position),
+            color: {
+                let p = vertex.position;
+                let key = [p.x.to_bits(), p.y.to_bits(), p.z.to_bits()];
+                let seen = *visibility
+                    .entry(key)
+                    .or_insert_with(|| numerical_wheel_key_visibility(p, phase, plane));
+                lit_with_key(vertex, seen)
+            },
+        }));
+    }
+    compiled
+}
+
+fn compile_darkened_crown(model: &Model, _elevation: f32) -> Compiled {
+    compile_darkened_bronze(model, 1.0)
+}
+
+fn compile_close_crown(model: &Model, elevation: f32) -> Compiled {
+    compile_bronze_with(model, |vertex| {
+        darkened_lit_with_key(vertex, close_key_visibility(vertex.position, elevation))
+    })
+}
+
+fn compile_shadow(model: &Model, receiver_z: f32, alpha: u8) -> Compiled {
+    let light = V3::new(0.0, LIGHT_Y, LIGHT_Z);
+    let mut compiled = Compiled::default();
+    for triangle in &model.triangles {
+        let normal = triangle
+            .iter()
+            .fold(V3::ZERO, |sum, vertex| sum + vertex.normal)
+            .normalized();
+        if normal.dot(light) <= 0.0
+            || triangle
+                .iter()
+                .any(|vertex| vertex.position.z <= receiver_z)
+        {
+            continue;
+        }
+        compiled.triangle(triangle.map(|vertex| {
+            let distance = (vertex.position.z - receiver_z) / LIGHT_Z;
+            Pixel {
+                position: project(vertex.position - light * distance),
+                color: [0, 0, 0, alpha],
+            }
+        }));
+    }
+    compiled
+}
+
+/// Receiver-independent directional shadow coordinates. A runtime receiver at
+/// z=r applies s=eye/(eye-r), then (x, y+kz) ↦ s·(x, y+kz-kr).
+fn compile_shadow_source(model: &Model, receiver_ceiling: f32, alpha: u8) -> Compiled {
+    let light = V3::new(0.0, LIGHT_Y, LIGHT_Z);
+    let slope = -LIGHT_Y / LIGHT_Z;
+    let mut compiled = Compiled::default();
+    for triangle in &model.triangles {
+        let normal = triangle
+            .iter()
+            .fold(V3::ZERO, |sum, vertex| sum + vertex.normal)
+            .normalized();
+        if normal.dot(light) <= 0.0
+            || triangle
+                .iter()
+                .any(|vertex| vertex.position.z <= receiver_ceiling)
+        {
+            continue;
+        }
+        compiled.triangle(triangle.map(|vertex| Pixel {
+            position: [
+                vertex.position.x,
+                vertex.position.y + slope * vertex.position.z,
+            ],
+            color: [0, 0, 0, alpha],
+        }));
+    }
+    compiled
+}
+
+fn plunger(elevation: f32, gauge: CheckboxGauge) -> Model {
+    let mut model = Model::default();
+    dish(&mut model, elevation, gauge);
+    crown(&mut model, elevation, gauge);
+    bevel(&mut model, elevation, gauge);
+    skirt(&mut model, elevation, gauge);
+    model
+}
+
+fn monoglyph_plunger(elevation: f32, gauge: MomentaryGauge) -> Model {
+    let mut model = Model::default();
+    let h = gauge.top_half;
+    planar_face(&mut model, [h, h], elevation);
+    square_bevel(
+        &mut model,
+        elevation,
+        gauge.top_half,
+        gauge.body_half,
+        MONOGLYPH_BEVEL_DEPTH,
+    );
+    square_skirt(
+        &mut model,
+        elevation,
+        gauge.body_half,
+        MONOGLYPH_BEVEL_DEPTH,
+        MONOGLYPH_BODY_ROOT,
+    );
+    model
+}
+
+fn corner_close_plunger(elevation: f32) -> Model {
+    let mut model = Model::default();
+    let gauge = momentary_gauge(MECHANISM_SIDE_LARGE);
+    let h = gauge.top_half;
+    let step = h * 2.0 / CLOSE_CROWN_CELLS as f32;
+    let sample = |x: usize, y: usize| {
+        let x = -h + x as f32 * step;
+        let y = -h + y as f32 * step;
+        let epsilon = step * 0.08;
+        let z = close_surface(x, y, elevation);
+        let dz_dx = (close_surface(x + epsilon, y, elevation)
+            - close_surface(x - epsilon, y, elevation))
+            / (2.0 * epsilon);
+        let dz_dy = (close_surface(x, y + epsilon, elevation)
+            - close_surface(x, y - epsilon, elevation))
+            / (2.0 * epsilon);
+        Vertex::new(V3::new(x, y, z), V3::new(-dz_dx, -dz_dy, 1.0).normalized())
+    };
+    for y in 0..CLOSE_CROWN_CELLS {
+        for x in 0..CLOSE_CROWN_CELLS {
+            model.quad([
+                sample(x, y),
+                sample(x + 1, y),
+                sample(x + 1, y + 1),
+                sample(x, y + 1),
+            ]);
+        }
+    }
+    square_bevel(
+        &mut model,
+        elevation,
+        gauge.top_half,
+        gauge.body_half,
+        MONOGLYPH_BEVEL_DEPTH,
+    );
+    square_skirt(
+        &mut model,
+        elevation,
+        gauge.body_half,
+        MONOGLYPH_BEVEL_DEPTH,
+        MONOGLYPH_BODY_ROOT,
+    );
+    model
+}
+
+fn close_surface(x: f32, y: f32, elevation: f32) -> f32 {
+    elevation - CLOSE_DENT_DEPTH * close_relief(x, y)
+}
+
+fn close_relief(x: f32, y: f32) -> f32 {
+    let inverse_root_two = 0.5_f32.sqrt();
+    let descending = close_cut((x + y) * inverse_root_two, (y - x) * inverse_root_two);
+    let ascending = close_cut((x - y) * inverse_root_two, (x + y) * inverse_root_two);
+    1.0 - descending.min(ascending).clamp(0.0, 1.0)
+}
+
+fn close_cut(along: f32, across: f32) -> f32 {
+    let flank = (across.abs() - CLOSE_FLOOR_HALF) / (CLOSE_MOUTH_HALF - CLOSE_FLOOR_HALF);
+    let cap = (along.abs() - CLOSE_FLOOR_REACH) / (CLOSE_MOUTH_REACH - CLOSE_FLOOR_REACH);
+    flank.max(cap)
+}
+
+fn close_key_visibility(position: V3, elevation: f32) -> f32 {
+    let top_half = momentary_gauge(MECHANISM_SIDE_LARGE).top_half;
+    let dent = elevation - position.z;
+    if dent <= 0.02 || position.x.abs() > top_half || position.y.abs() > top_half {
+        return 1.0;
+    }
+
+    // The key lies in the y-z plane. March a ray from the recessed surface
+    // toward that light; any higher part of the stamped crown blocks it.
+    let light = V3::new(0.0, LIGHT_Y, LIGHT_Z);
+    let mut distance = 0.05;
+    while distance < 4.0 {
+        let ray = position + light * distance;
+        if ray.y < -top_half {
+            break;
+        }
+        if ray.z + 0.025 < close_surface(ray.x, ray.y, elevation) {
+            return 0.0;
+        }
+        distance += 0.05;
+    }
+    1.0
+}
+
+fn dish(model: &mut Model, elevation: f32, gauge: CheckboxGauge) {
+    const CELLS: usize = 8;
+    let sample = |x: usize, y: usize| {
+        let u = x as f32 / CELLS as f32 * 2.0 - 1.0;
+        let v = y as f32 / CELLS as f32 * 2.0 - 1.0;
+        let u4 = u.powi(4);
+        let v4 = v.powi(4);
+        let z = elevation - gauge.bowl_depth * (1.0 - u4) * (1.0 - v4);
+        let dz_dx = 4.0 * gauge.bowl_depth * u.powi(3) * (1.0 - v4) / gauge.dish_half;
+        let dz_dy = 4.0 * gauge.bowl_depth * v.powi(3) * (1.0 - u4) / gauge.dish_half;
+        Vertex::new(
+            V3::new(u * gauge.dish_half, v * gauge.dish_half, z),
+            V3::new(-dz_dx, -dz_dy, 1.0).normalized(),
+        )
+    };
+    for y in 0..CELLS {
+        for x in 0..CELLS {
+            model.quad([
+                sample(x, y),
+                sample(x + 1, y),
+                sample(x + 1, y + 1),
+                sample(x, y + 1),
+            ]);
+        }
+    }
+}
+
+fn crown(model: &mut Model, elevation: f32, gauge: CheckboxGauge) {
+    let z = V3::new(0.0, 0.0, 1.0);
+    let v = |x, y| Vertex::new(V3::new(x, y, elevation), z);
+    let h = gauge.top_half;
+    let d = gauge.dish_half;
+    model.quad([v(-h, -h), v(h, -h), v(d, -d), v(-d, -d)]);
+    model.quad([v(h, -h), v(h, h), v(d, d), v(d, -d)]);
+    model.quad([v(h, h), v(-h, h), v(-d, d), v(d, d)]);
+    model.quad([v(-h, h), v(-h, -h), v(-d, -d), v(-d, d)]);
+}
+
+fn bevel(model: &mut Model, elevation: f32, gauge: CheckboxGauge) {
+    square_bevel(
+        model,
+        elevation,
+        gauge.top_half,
+        gauge.body_half,
+        gauge.bevel_depth,
+    );
+}
+
+fn square_bevel(model: &mut Model, elevation: f32, h: f32, b: f32, depth: f32) {
+    rectangular_bevel(model, elevation, [h, h], [b, b], depth);
+}
+
+fn planar_face(model: &mut Model, [hx, hy]: [f32; 2], z: f32) {
+    let columns = (2.0 * hx / DARK_REFLECTION_CELL).ceil() as usize;
+    let rows = (2.0 * hy / DARK_REFLECTION_CELL).ceil() as usize;
+    let vertex = |x: usize, y: usize| {
+        let x = -hx + 2.0 * hx * x as f32 / columns as f32;
+        let y = -hy + 2.0 * hy * y as f32 / rows as f32;
+        Vertex::new(V3::new(x, y, z), V3::new(0.0, 0.0, 1.0))
+    };
+    for y in 0..rows {
+        for x in 0..columns {
+            model.quad([
+                vertex(x, y),
+                vertex(x + 1, y),
+                vertex(x + 1, y + 1),
+                vertex(x, y + 1),
+            ]);
+        }
+    }
+}
+
+fn rectangular_bevel(
+    model: &mut Model,
+    elevation: f32,
+    [hx, hy]: [f32; 2],
+    [bx, by]: [f32; 2],
+    depth: f32,
+) {
+    let floor = elevation - depth;
+    let face = |positions: [V3; 4], normal: V3, model: &mut Model| {
+        model.quad(positions.map(|position| Vertex::new(position, normal.normalized())));
+    };
+    face(
+        [
+            V3::new(-hx, -hy, elevation),
+            V3::new(hx, -hy, elevation),
+            V3::new(bx, -by, floor),
+            V3::new(-bx, -by, floor),
+        ],
+        V3::new(0.0, -depth, by - hy),
+        model,
+    );
+    face(
+        [
+            V3::new(hx, -hy, elevation),
+            V3::new(hx, hy, elevation),
+            V3::new(bx, by, floor),
+            V3::new(bx, -by, floor),
+        ],
+        V3::new(depth, 0.0, bx - hx),
+        model,
+    );
+    face(
+        [
+            V3::new(hx, hy, elevation),
+            V3::new(-hx, hy, elevation),
+            V3::new(-bx, by, floor),
+            V3::new(bx, by, floor),
+        ],
+        V3::new(0.0, depth, by - hy),
+        model,
+    );
+    face(
+        [
+            V3::new(-hx, hy, elevation),
+            V3::new(-hx, -hy, elevation),
+            V3::new(-bx, -by, floor),
+            V3::new(-bx, by, floor),
+        ],
+        V3::new(-depth, 0.0, bx - hx),
+        model,
+    );
+}
+
+fn skirt(model: &mut Model, elevation: f32, gauge: CheckboxGauge) {
+    square_skirt(
+        model,
+        elevation,
+        gauge.body_half,
+        gauge.bevel_depth,
+        gauge.body_root,
+    );
+}
+
+fn square_skirt(model: &mut Model, elevation: f32, h: f32, bevel_depth: f32, root: f32) {
+    let top = elevation - bevel_depth;
+    let face = |positions: [V3; 4], normal: V3, model: &mut Model| {
+        model.quad(positions.map(|position| Vertex::new(position, normal)));
+    };
+    face(
+        [
+            V3::new(-h, -h, top),
+            V3::new(h, -h, top),
+            V3::new(h, -h, root),
+            V3::new(-h, -h, root),
+        ],
+        V3::new(0.0, -1.0, 0.0),
+        model,
+    );
+    face(
+        [
+            V3::new(h, -h, top),
+            V3::new(h, h, top),
+            V3::new(h, h, root),
+            V3::new(h, -h, root),
+        ],
+        V3::new(1.0, 0.0, 0.0),
+        model,
+    );
+    face(
+        [
+            V3::new(h, h, top),
+            V3::new(-h, h, top),
+            V3::new(-h, h, root),
+            V3::new(h, h, root),
+        ],
+        V3::new(0.0, 1.0, 0.0),
+        model,
+    );
+    face(
+        [
+            V3::new(-h, h, top),
+            V3::new(-h, -h, top),
+            V3::new(-h, -h, root),
+            V3::new(-h, h, root),
+        ],
+        V3::new(-1.0, 0.0, 0.0),
+        model,
+    );
+}
+
+#[derive(Clone, Copy)]
+struct WheelSurface {
+    z: f32,
+    normal: V3,
+}
+
+fn numerical_thumbwheel() -> Model {
+    let mut model = Model::default();
+    for side in [1.0_f32, -1.0] {
+        let center = wheel_vertex(0.0, 0.0, side);
+        let first_radius = WHEEL_RADIUS * (FRAC_PI_2 / WHEEL_RADIAL_RINGS as f32).sin();
+        for longitude in 0..WHEEL_LONGITUDES {
+            let next = (longitude + 1) % WHEEL_LONGITUDES;
+            model.triangle(
+                center,
+                wheel_ring_vertex(first_radius, longitude, side),
+                wheel_ring_vertex(first_radius, next, side),
+            );
+        }
+        for ring in 1..WHEEL_RADIAL_RINGS {
+            let inner = WHEEL_RADIUS * (FRAC_PI_2 * ring as f32 / WHEEL_RADIAL_RINGS as f32).sin();
+            let outer =
+                WHEEL_RADIUS * (FRAC_PI_2 * (ring + 1) as f32 / WHEEL_RADIAL_RINGS as f32).sin();
+            for longitude in 0..WHEEL_LONGITUDES {
+                let next = (longitude + 1) % WHEEL_LONGITUDES;
+                model.quad([
+                    wheel_ring_vertex(inner, longitude, side),
+                    wheel_ring_vertex(outer, longitude, side),
+                    wheel_ring_vertex(outer, next, side),
+                    wheel_ring_vertex(inner, next, side),
+                ]);
+            }
+        }
+    }
+    model
+}
+
+fn wheel_ring_vertex(radius: f32, longitude: usize, side: f32) -> Vertex {
+    let theta = TAU * longitude as f32 / WHEEL_LONGITUDES as f32;
+    let (sin, cos) = theta.sin_cos();
+    wheel_vertex(radius * cos, radius * sin, side)
+}
+
+fn wheel_vertex(x: f32, y: f32, side: f32) -> Vertex {
+    let surface = numerical_wheel_surface(x, y);
+    Vertex::new(
+        V3::new(x, y, side * surface.z),
+        V3::new(surface.normal.x, surface.normal.y, side * surface.normal.z),
+    )
+}
+
+fn numerical_wheel_surface(x: f32, y: f32) -> WheelSurface {
+    let radial_fraction = (x * x + y * y) / WHEEL_RADIUS.powi(2);
+    let z = WHEEL_HALF_DEPTH * (1.0 - radial_fraction).max(0.0).sqrt();
+    let mut surface = WheelSurface {
+        z,
+        normal: V3::new(
+            x / WHEEL_RADIUS.powi(2),
+            y / WHEEL_RADIUS.powi(2),
+            z / WHEEL_HALF_DEPTH.powi(2),
+        )
+        .normalized(),
+    };
+    for station in 0..WHEEL_STATIONS {
+        let theta = TAU * station as f32 / WHEEL_STATIONS as f32;
+        let (sin, cos) = theta.sin_cos();
+        let radial = V3::new(cos, sin, 0.0);
+        let tangent = V3::new(-sin, cos, 0.0);
+        let point = V3::new(x, y, 0.0);
+        let u = point.dot(tangent);
+        let v = point.dot(radial) - WHEEL_SCALLOP_RADIUS;
+        let cut = WHEEL_SCALLOP_VERTEX
+            + WHEEL_SCALLOP_TANGENT_CURVATURE * u * u
+            + WHEEL_SCALLOP_RADIAL_CURVATURE * v * v;
+        if cut < surface.z {
+            let gradient = tangent * (2.0 * WHEEL_SCALLOP_TANGENT_CURVATURE * u)
+                + radial * (2.0 * WHEEL_SCALLOP_RADIAL_CURVATURE * v);
+            surface = WheelSurface {
+                z: cut,
+                normal: V3::new(-gradient.x, -gradient.y, 1.0).normalized(),
+            };
+        }
+    }
+    surface
+}
+
+fn numerical_wheel_key_visibility(position: V3, phase: f32, plane: WheelPlane) -> f32 {
+    const STEP: f32 = 0.12;
+    const START: f32 = 0.08;
+    let light = V3::new(0.0, LIGHT_Y, LIGHT_Z);
+    let mut distance = START;
+    while distance <= 2.0 * WHEEL_RADIUS + 2.0 * WHEEL_HALF_DEPTH {
+        let world = position + light * distance;
+        let oriented = match plane {
+            WheelPlane::YZ => V3::new(-world.z, world.y, world.x),
+            WheelPlane::XZ => V3::new(world.x, -world.z, world.y),
+        };
+        if numerical_wheel_contains(oriented.rotate_z(-phase)) {
+            return 0.0;
+        }
+        distance += STEP;
+    }
+    1.0
+}
+
+fn numerical_wheel_contains(point: V3) -> bool {
+    let radial_fraction = (point.x * point.x + point.y * point.y) / WHEEL_RADIUS.powi(2);
+    if radial_fraction > 1.0 {
+        return false;
+    }
+    let surface = numerical_wheel_surface(point.x, point.y).z;
+    point.z.abs() < surface - 0.01
+}
+
+fn bail_plate(gauge: BailGauge) -> Model {
+    let mut model = Model::default();
+    let h = gauge.face_half;
+    planar_face(&mut model, [h, h], gauge.plate_rise);
+    square_bevel(
+        &mut model,
+        gauge.plate_rise,
+        gauge.face_half,
+        gauge.base_half,
+        gauge.plate_rise,
+    );
+    model
+}
+
+fn friction_plate(gauge: FrictionGauge) -> Model {
+    let mut model = Model::default();
+    planar_face(
+        &mut model,
+        [gauge.face_half_x, gauge.face_half_y],
+        gauge.plate_rise,
+    );
+    rectangular_bevel(
+        &mut model,
+        gauge.plate_rise,
+        [gauge.face_half_x, gauge.face_half_y],
+        [gauge.base_half_x, gauge.base_half_y],
+        gauge.plate_rise,
+    );
+    model
+}
+
+fn bail_hardware(gauge: BailGauge) -> Model {
+    let mut model = Model::default();
+    hatch_plate(
+        &mut model,
+        gauge.face_half - 0.8,
+        gauge.face_half - 0.8,
+        gauge.plate_rise,
+        BAIL_HATCH_PITCH,
+        BAIL_HATCH_WIDTH,
+        BAIL_HATCH_RISE,
+    );
+
+    for x in [-gauge.rivet_offset, gauge.rivet_offset] {
+        for y in [-gauge.rivet_offset, gauge.rivet_offset] {
+            model.append(sphere(V3::new(x, y, gauge.plate_rise), gauge.rivet_radius));
+        }
+    }
+
+    let lug_radius = gauge.stock_radius * 1.28;
+    let lug_half = gauge.stock_radius * 1.05;
+    for x in [-gauge.span, gauge.span] {
+        let center = V3::new(x, gauge.hinge_y, gauge.hinge_z);
+        model.append(sphere(center, lug_radius));
+        model.append(tube(
+            &[
+                center + V3::new(-lug_half, 0.0, 0.0),
+                center + V3::new(lug_half, 0.0, 0.0),
+            ],
+            V3::new(0.0, 0.0, 1.0),
+            gauge.stock_radius * 1.08,
+            false,
+        ));
+    }
+    model
+}
+
+fn friction_hardware(gauge: FrictionGauge) -> Model {
+    let mut model = Model::default();
+    hatch_plate(
+        &mut model,
+        gauge.face_half_x - 0.45,
+        gauge.rivet_y - gauge.rivet_radius - FRICTION_HATCH_WIDTH,
+        gauge.plate_rise,
+        FRICTION_HATCH_PITCH,
+        FRICTION_HATCH_WIDTH,
+        FRICTION_HATCH_RISE,
+    );
+    for x in [-gauge.rivet_x, gauge.rivet_x] {
+        for y in [-gauge.rivet_y, gauge.rivet_y] {
+            model.append(sphere(V3::new(x, y, gauge.plate_rise), gauge.rivet_radius));
+        }
+    }
+
+    model
+}
+
+fn hatch_plate(
+    model: &mut Model,
+    half_x: f32,
+    half_y: f32,
+    z: f32,
+    pitch: f32,
+    width: f32,
+    rise: f32,
+) {
+    let stations = ((half_x + half_y) / pitch).ceil() as i32;
+    for station in -stations..=stations {
+        let offset = station as f32 * pitch;
+        for descending in [false, true] {
+            if let Some((start, end)) = hatch_segment(half_x, half_y, offset, descending) {
+                model.append(ridge(start, end, z, width, rise));
+            }
+        }
+    }
+}
+
+fn hatch_segment(half_x: f32, half_y: f32, offset: f32, descending: bool) -> Option<(V3, V3)> {
+    let (y_lo, y_hi) = if descending {
+        (offset - half_y, offset + half_y)
+    } else {
+        (-half_y - offset, half_y - offset)
+    };
+    let lo = (-half_x).max(y_lo);
+    let hi = half_x.min(y_hi);
+    (hi - lo > 0.4).then(|| {
+        let y = |x: f32| if descending { -x + offset } else { x + offset };
+        (V3::new(lo, y(lo), 0.0), V3::new(hi, y(hi), 0.0))
+    })
+}
+
+fn ridge(start: V3, end: V3, z: f32, width: f32, rise: f32) -> Model {
+    let axis = (end - start).normalized();
+    let wing = V3::new(-axis.y, axis.x, 0.0);
+    let start = V3::new(start.x, start.y, z);
+    let end = V3::new(end.x, end.y, z);
+    let left = wing * (width * 0.5);
+    let apex = V3::new(0.0, 0.0, rise);
+    let mut model = Model::default();
+    for (base, sign) in [(left, 1.0), (left * -1.0, -1.0)] {
+        let mut normal = axis.cross(apex - base).normalized() * sign;
+        if normal.z < 0.0 {
+            normal = normal * -1.0;
+        }
+        model.quad(
+            [start + base, end + base, end + apex, start + apex]
+                .map(|position| Vertex::new(position, normal)),
+        );
+    }
+    model
+}
+
+fn bail(gauge: BailGauge, angle: f32) -> Model {
+    let (sin, cos) = angle.sin_cos();
+    let points = bail_profile(gauge)
+        .into_iter()
+        .map(|point| {
+            V3::new(
+                point.x,
+                gauge.hinge_y + point.y * cos,
+                gauge.hinge_z + point.y * sin,
+            )
+        })
+        .collect::<Vec<_>>();
+    tube(&points, V3::new(0.0, -sin, cos), gauge.stock_radius, false)
+}
+
+fn bail_profile(gauge: BailGauge) -> Vec<V3> {
+    const BEND_STEPS: usize = 5;
+    let bend = (gauge.stock_radius * 1.65).min(gauge.span * 0.28);
+    let mut points = vec![
+        V3::new(-gauge.span, 0.0, 0.0),
+        V3::new(-gauge.span, gauge.reach - bend, 0.0),
+    ];
+    let left_center = V3::new(-gauge.span + bend, gauge.reach - bend, 0.0);
+    for step in 1..=BEND_STEPS {
+        let theta = lerp(PI, FRAC_PI_2, step as f32 / BEND_STEPS as f32);
+        points.push(left_center + V3::new(theta.cos(), theta.sin(), 0.0) * bend);
+    }
+    points.push(V3::new(gauge.span - bend, gauge.reach, 0.0));
+    let right_center = V3::new(gauge.span - bend, gauge.reach - bend, 0.0);
+    for step in 1..=BEND_STEPS {
+        let theta = lerp(FRAC_PI_2, 0.0, step as f32 / BEND_STEPS as f32);
+        points.push(right_center + V3::new(theta.cos(), theta.sin(), 0.0) * bend);
+    }
+    points.push(V3::new(gauge.span, 0.0, 0.0));
+    points
+}
+
+fn bail_sweep_per_radian(gauge: BailGauge) -> f32 {
+    let profile = bail_profile(gauge);
+    2.0 * gauge.stock_radius
+        * profile
+            .windows(2)
+            .map(|span| {
+                let radius = (span[0].y + span[1].y) * 0.5;
+                radius * (span[1] - span[0]).length()
+            })
+            .sum::<f32>()
+}
+
+fn guard(gauge: CheckboxGauge) -> Model {
+    let mut model = Model::default();
+    for &x in gauge.wire_stations {
+        let points = (0..=CURVE_STEPS)
+            .map(|step| {
+                let y = lerp(
+                    -gauge.guard_half,
+                    gauge.guard_half,
+                    step as f32 / CURVE_STEPS as f32,
+                );
+                guard_wire_point(gauge, x, y, WIRE_LAYER)
+            })
+            .collect::<Vec<_>>();
+        model.append(tube(&points, V3::new(1.0, 0.0, 0.0), WIRE_RADIUS, false));
+    }
+    for &y in gauge.wire_stations {
+        let points = (0..=CURVE_STEPS)
+            .map(|step| {
+                let x = lerp(
+                    -gauge.guard_half,
+                    gauge.guard_half,
+                    step as f32 / CURVE_STEPS as f32,
+                );
+                guard_wire_point(gauge, x, y, -WIRE_LAYER)
+            })
+            .collect::<Vec<_>>();
+        model.append(tube(&points, V3::new(0.0, 1.0, 0.0), WIRE_RADIUS, false));
+    }
+    for &x in gauge.wire_stations {
+        for &y in gauge.wire_stations {
+            model.append(sphere(guard_surface(gauge, x, y).0, WELD_RADIUS));
+        }
+    }
+    model.append(tube(
+        &guard_frame(gauge),
+        V3::new(0.0, 0.0, 1.0),
+        FRAME_RADIUS,
+        true,
+    ));
+    model
+}
+
+fn guard_surface(gauge: CheckboxGauge, x: f32, y: f32) -> (V3, V3) {
+    let ax = x.abs();
+    let ay = y.abs();
+    let r = ax.max(ay) / gauge.guard_half;
+    let z = gauge.guard_base + gauge.guard_rise * (1.0 - r.clamp(0.0, 1.0).powi(4));
+    let slope = -4.0 * gauge.guard_rise * r.powi(3) / gauge.guard_half;
+    let (dz_dx, dz_dy) = if ax >= ay {
+        (slope * x.signum(), 0.0)
+    } else {
+        (0.0, slope * y.signum())
+    };
+    (V3::new(x, y, z), V3::new(-dz_dx, -dz_dy, 1.0).normalized())
+}
+
+fn guard_wire_point(gauge: CheckboxGauge, x: f32, y: f32, layer: f32) -> V3 {
+    let (surface, normal) = guard_surface(gauge, x, y);
+    let edge = (x.abs().max(y.abs()) / gauge.guard_half).clamp(0.0, 1.0);
+    surface + normal * layer * (1.0 - edge.powi(8))
+}
+
+fn guard_frame(gauge: CheckboxGauge) -> Vec<V3> {
+    const SAMPLES: usize = 40;
+    const POWER: f32 = 6.0;
+    (0..SAMPLES)
+        .map(|sample| {
+            let theta = sample as f32 / SAMPLES as f32 * TAU;
+            let (sin, cos) = theta.sin_cos();
+            V3::new(
+                gauge.guard_half * cos.signum() * cos.abs().powf(2.0 / POWER),
+                gauge.guard_half * sin.signum() * sin.abs().powf(2.0 / POWER),
+                gauge.guard_base + FRAME_RADIUS,
+            )
+        })
+        .collect()
+}
+
+fn tube(points: &[V3], seed: V3, radius: f32, closed: bool) -> Model {
+    assert!(
+        points.len() >= 2,
+        "a physical wire requires at least two stations"
+    );
+    let n = points.len();
+    let tangents = (0..n)
+        .map(|i| {
+            let prior = if i == 0 {
+                if closed { points[n - 1] } else { points[0] }
+            } else {
+                points[i - 1]
+            };
+            let next = if i + 1 == n {
+                if closed { points[0] } else { points[n - 1] }
+            } else {
+                points[i + 1]
+            };
+            (next - prior).normalized()
+        })
+        .collect::<Vec<_>>();
+    let mut axes = Vec::with_capacity(n);
+    let mut axis = (seed - tangents[0] * seed.dot(tangents[0])).normalized();
+    for tangent in &tangents {
+        let transported = axis - *tangent * axis.dot(*tangent);
+        axis = if transported.length() > 0.01 {
+            transported.normalized()
+        } else {
+            (seed - *tangent * seed.dot(*tangent)).normalized()
+        };
+        axes.push(axis);
+    }
+
+    let rings = points
+        .iter()
+        .zip(&tangents)
+        .zip(&axes)
+        .map(|((point, tangent), axis)| {
+            let wing = tangent.cross(*axis).normalized();
+            (0..TUBE_SIDES)
+                .map(|side| {
+                    let theta = side as f32 / TUBE_SIDES as f32 * TAU;
+                    let normal = *axis * theta.cos() + wing * theta.sin();
+                    Vertex::new(*point + normal * radius, normal)
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+
+    let mut model = Model::default();
+    let spans = if closed { n } else { n - 1 };
+    for i in 0..spans {
+        let next = (i + 1) % n;
+        for side in 0..TUBE_SIDES {
+            let around = (side + 1) % TUBE_SIDES;
+            model.quad([
+                rings[i][side],
+                rings[next][side],
+                rings[next][around],
+                rings[i][around],
+            ]);
+        }
+    }
+    model
+}
+
+fn sphere(center: V3, radius: f32) -> Model {
+    const LATITUDES: usize = 5;
+    const LONGITUDES: usize = 8;
+    let vertex = |latitude: usize, longitude: usize| {
+        let phi = -FRAC_PI_2 + latitude as f32 / LATITUDES as f32 * FRAC_PI_2 * 2.0;
+        let theta = longitude as f32 / LONGITUDES as f32 * TAU;
+        let normal = V3::new(phi.cos() * theta.cos(), phi.cos() * theta.sin(), phi.sin());
+        Vertex::new(center + normal * radius, normal)
+    };
+    let mut model = Model::default();
+    for latitude in 0..LATITUDES {
+        for longitude in 0..LONGITUDES {
+            let around = (longitude + 1) % LONGITUDES;
+            model.quad([
+                vertex(latitude, longitude),
+                vertex(latitude, around),
+                vertex(latitude + 1, around),
+                vertex(latitude + 1, longitude),
+            ]);
+        }
+    }
+    model
+}
+
+fn verify_geometry() {
+    assert!((HALF_Y * HALF_Y + HALF_Z * HALF_Z - 1.0).abs() < 1e-6);
+    let fixed_half = V3::new(0.0, LIGHT_Y, LIGHT_Z) + V3::new(0.0, 0.0, 1.0);
+    let fixed_half = fixed_half.normalized();
+    assert!((fixed_half.y - HALF_Y).abs() < 1e-6);
+    assert!((fixed_half.z - HALF_Z).abs() < 1e-6);
+    for side in MECHANISM_SIDES {
+        let gauge = checkbox_gauge(side);
+        assert_eq!(
+            gauge.wire_stations.len(),
+            match side {
+                MECHANISM_SIDE_SMALL => 2,
+                MECHANISM_SIDE_MEDIUM => 3,
+                MECHANISM_SIDE_LARGE => 4,
+                _ => unreachable!(),
+            }
+        );
+        assert!(
+            gauge
+                .wire_stations
+                .windows(2)
+                .all(|stations| (stations[1] - stations[0] - 7.0).abs() < f32::EPSILON)
+        );
+        for &x in gauge.wire_stations {
+            for step in 0..=CURVE_STEPS {
+                let y = lerp(
+                    -gauge.guard_half,
+                    gauge.guard_half,
+                    step as f32 / CURVE_STEPS as f32,
+                );
+                let wire = guard_wire_point(gauge, x, y, WIRE_LAYER);
+                if x.abs() <= gauge.body_half && y.abs() <= gauge.body_half {
+                    assert!(
+                        wire.z - WIRE_RADIUS > gauge.pose_max,
+                        "upper guard wire collides with gauge {side} crown at ({x}, {y})"
+                    );
+                }
+            }
+        }
+        for &y in gauge.wire_stations {
+            for step in 0..=CURVE_STEPS {
+                let x = lerp(
+                    -gauge.guard_half,
+                    gauge.guard_half,
+                    step as f32 / CURVE_STEPS as f32,
+                );
+                let wire = guard_wire_point(gauge, x, y, -WIRE_LAYER);
+                if x.abs() <= gauge.body_half && y.abs() <= gauge.body_half {
+                    assert!(
+                        wire.z - WIRE_RADIUS > gauge.pose_max,
+                        "lower guard wire collides with gauge {side} crown at ({x}, {y})"
+                    );
+                }
+            }
+        }
+        for &x in gauge.wire_stations {
+            for &y in gauge.wire_stations {
+                let upper = guard_wire_point(gauge, x, y, WIRE_LAYER);
+                let lower = guard_wire_point(gauge, x, y, -WIRE_LAYER);
+                let edge = x.abs().max(y.abs()) / gauge.guard_half;
+                let separation = 2.0 * WIRE_LAYER * (1.0 - edge.powi(8));
+                assert!(((upper - lower).length() - separation).abs() < 1e-5);
+                assert!((upper - lower).length() <= 2.0 * WELD_RADIUS);
+            }
+        }
+    }
+    assert!((close_relief(0.0, 0.0) - 1.0).abs() < f32::EPSILON);
+    let top_half = momentary_gauge(MECHANISM_SIDE_LARGE).top_half;
+    assert!(close_relief(top_half, 0.0).abs() < f32::EPSILON);
+    let floor = V3::new(0.0, 0.0, MONOGLYPH_REST - CLOSE_DENT_DEPTH);
+    assert!(close_key_visibility(floor, MONOGLYPH_REST).abs() < f32::EPSILON);
+    let cut = numerical_wheel_surface(WHEEL_SCALLOP_RADIUS, 0.0);
+    assert!((cut.z - WHEEL_SCALLOP_VERTEX).abs() < 1e-5);
+    let uncut = WHEEL_HALF_DEPTH * (1.0 - (WHEEL_SCALLOP_RADIUS / WHEEL_RADIUS).powi(2)).sqrt();
+    assert!(cut.z < uncut);
+    assert!(numerical_wheel_surface(WHEEL_RADIUS, 0.0).z.abs() < 1e-5);
+    let blank = numerical_thumbwheel();
+    assert!(blank.triangles.iter().flatten().all(|vertex| {
+        let n = vertex.normal;
+        vertex.position.x.is_finite()
+            && vertex.position.y.is_finite()
+            && vertex.position.z.is_finite()
+            && (n.length() - 1.0).abs() < 1e-4
+    }));
+    let canonical_span = blank
+        .triangles
+        .iter()
+        .flatten()
+        .map(|vertex| vertex.position.length())
+        .fold(0.0_f32, f32::max);
+    for plane in WheelPlane::ALL {
+        let oriented_span = blank
+            .wheel_pose(0.37, plane)
+            .triangles
+            .iter()
+            .flatten()
+            .map(|vertex| vertex.position.length())
+            .fold(0.0_f32, f32::max);
+        assert!((canonical_span - oriented_span).abs() < 1e-4);
+    }
+    // The public atlas is deliberately discrete. Keep the forge itself proven
+    // across the integer continuum so reopening size policy does not require a
+    // geometry rewrite.
+    for side in MECHANISM_SIDE_SMALL..=MECHANISM_SIDE_LARGE {
+        let gauge = bail_gauge(side);
+        let profile = bail_profile(gauge);
+        assert_eq!(profile.first().map(|point| point.y), Some(0.0));
+        assert_eq!(profile.last().map(|point| point.y), Some(0.0));
+        let bar_floor = gauge.hinge_z + gauge.reach * BAIL_REST.sin() - gauge.stock_radius;
+        assert!(
+            bar_floor > gauge.plate_rise,
+            "resting bail collides with its backplate at gauge {side}"
+        );
+        assert!(bail_sweep_per_radian(gauge) > 100.0);
+
+        let gauge = friction_gauge(side);
+        assert!(gauge.base_half_y < momentary_gauge(side).socket_half);
+        assert!(gauge.face_half_x > gauge.rivet_x + gauge.rivet_radius);
+        assert!(gauge.face_half_y > gauge.rivet_y + gauge.rivet_radius);
+        assert!(gauge.rivet_x > gauge.rivet_radius);
+        assert!(gauge.rivet_y > gauge.rivet_radius);
+        let crest = friction_hardware(gauge)
+            .triangles
+            .iter()
+            .flatten()
+            .map(|vertex| vertex.position.z)
+            .fold(f32::NEG_INFINITY, f32::max);
+        assert!(crest > gauge.plate_rise + FRICTION_HATCH_RISE * 0.9);
+        assert!(crest <= gauge.plate_rise + gauge.rivet_radius + 1e-5);
+    }
+}
+
+fn lerp(lo: f32, hi: f32, t: f32) -> f32 {
+    lo + (hi - lo) * t
+}

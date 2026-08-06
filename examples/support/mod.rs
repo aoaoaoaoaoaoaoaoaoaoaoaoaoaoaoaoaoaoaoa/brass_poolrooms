@@ -1,20 +1,22 @@
-use std::{
-    sync::{Arc, Mutex, MutexGuard},
-    time::Instant,
-};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use anyhow::{Context as _, Result};
+#[cfg(target_arch = "wasm32")]
+use dwemer_poolrooms::egui_wgpu::WgpuSetup;
 use dwemer_poolrooms::{
     chrome, egui,
     egui_wgpu::{RenderState, RendererOptions, ScreenDescriptor, WgpuConfiguration, wgpu},
     water::{Domain, Engine, Floor, Surface, Wetness},
 };
-use egui_winit::winit::{
+use web_time::Instant;
+#[cfg(not(target_arch = "wasm32"))]
+use winit::dpi::LogicalSize;
+use winit::{
     application::ApplicationHandler,
-    dpi::{LogicalSize, PhysicalSize},
+    dpi::PhysicalSize,
     event::{StartCause, WindowEvent},
     event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy},
-    window::{Window, WindowAttributes},
+    window::{Window, WindowAttributes, WindowId},
 };
 
 pub trait Exhibit {
@@ -24,12 +26,17 @@ pub trait Exhibit {
     fn ui(&mut self, ui: &mut egui::Ui, water: &mut Surface);
 }
 
-#[derive(Clone, Copy, Debug)]
-struct Spark;
+enum Spark {
+    Repaint,
+    #[cfg(target_arch = "wasm32")]
+    Forged(std::result::Result<Box<Rig>, String>),
+}
 
 type Alarm = Arc<Mutex<Option<Instant>>>;
 
 pub fn run(app: impl Exhibit + 'static) -> Result<()> {
+    #[cfg(target_arch = "wasm32")]
+    console_error_panic_hook::set_once();
     let ctx = egui::Context::default();
     chrome::install(&ctx);
     let event_loop = EventLoop::<Spark>::with_user_event()
@@ -37,22 +44,40 @@ pub fn run(app: impl Exhibit + 'static) -> Result<()> {
         .context("build gallery event loop")?;
     event_loop.set_control_flow(ControlFlow::Wait);
     let alarm = Alarm::default();
-    arm_repaints(&ctx, alarm.clone(), event_loop.create_proxy());
-    event_loop
-        .run_app(&mut Boiler {
-            ctx,
-            app,
-            water: Surface::new(Wetness::Wet),
-            alarm,
-            rig: None,
-        })
-        .context("run gallery event loop")
+    let proxy = event_loop.create_proxy();
+    arm_repaints(&ctx, alarm.clone(), proxy.clone());
+    let boiler = Boiler {
+        ctx,
+        app,
+        water: Surface::new(Wetness::Wet),
+        alarm,
+        rig: None,
+        #[cfg(target_arch = "wasm32")]
+        proxy,
+        #[cfg(target_arch = "wasm32")]
+        forging: false,
+        #[cfg(target_arch = "wasm32")]
+        proven: false,
+    };
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let mut boiler = boiler;
+        event_loop
+            .run_app(&mut boiler)
+            .context("run gallery event loop")
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        use winit::platform::web::EventLoopExtWebSys as _;
+        event_loop.spawn_app(boiler);
+        Ok(())
+    }
 }
 
 fn arm_repaints(ctx: &egui::Context, alarm: Alarm, proxy: EventLoopProxy<Spark>) {
     ctx.set_request_repaint_callback(move |info| {
         advance_alarm(&alarm, Instant::now() + info.delay);
-        let _woken = proxy.send_event(Spark);
+        let _woken = proxy.send_event(Spark::Repaint);
     });
 }
 
@@ -76,6 +101,12 @@ struct Boiler<A> {
     water: Surface,
     alarm: Alarm,
     rig: Option<Rig>,
+    #[cfg(target_arch = "wasm32")]
+    proxy: EventLoopProxy<Spark>,
+    #[cfg(target_arch = "wasm32")]
+    forging: bool,
+    #[cfg(target_arch = "wasm32")]
+    proven: bool,
 }
 
 impl<A: Exhibit> Boiler<A> {
@@ -99,12 +130,17 @@ impl<A: Exhibit> Boiler<A> {
         if water.wants_repaint() {
             rig.window.request_redraw();
         }
-        rig.render(
+        let _presented = rig.render(
             &primitives,
             &output.textures_delta,
             output.pixels_per_point,
             &water,
         );
+        #[cfg(target_arch = "wasm32")]
+        if _presented && !self.proven {
+            self.proven = true;
+            signal("ready", "Poolrooms WebGPU is live");
+        }
         if let Some(viewport) = output.viewport_output.get(&egui::ViewportId::ROOT) {
             if viewport.repaint_delay.is_zero() {
                 rig.window.request_redraw();
@@ -128,14 +164,43 @@ impl<A: Exhibit> Boiler<A> {
 
 impl<A: Exhibit> ApplicationHandler<Spark> for Boiler<A> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        if self.rig.is_some() {
-            return;
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            if self.rig.is_some() {
+                return;
+            }
+            match Cradle::new::<A>(event_loop, &self.ctx)
+                .and_then(|cradle| pollster::block_on(cradle.forge()))
+            {
+                Ok(rig) => self.rig = Some(rig),
+                Err(err) => {
+                    eprintln!("could not raise widget gallery: {err:#}");
+                    event_loop.exit();
+                }
+            }
         }
-        match Rig::raise::<A>(event_loop, &self.ctx) {
-            Ok(rig) => self.rig = Some(rig),
-            Err(err) => {
-                eprintln!("could not raise widget gallery: {err:#}");
-                event_loop.exit();
+        #[cfg(target_arch = "wasm32")]
+        {
+            if self.rig.is_some() || self.forging {
+                return;
+            }
+            match Cradle::new::<A>(event_loop, &self.ctx) {
+                Ok(cradle) => {
+                    self.forging = true;
+                    let proxy = self.proxy.clone();
+                    wasm_bindgen_futures::spawn_local(async move {
+                        let result = cradle
+                            .forge()
+                            .await
+                            .map(Box::new)
+                            .map_err(|err| format!("{err:#}"));
+                        let _sent = proxy.send_event(Spark::Forged(result));
+                    });
+                }
+                Err(err) => {
+                    self.forging = true;
+                    signal("failed", &format!("Could not create canvas: {err:#}"));
+                }
             }
         }
     }
@@ -146,14 +211,30 @@ impl<A: Exhibit> ApplicationHandler<Spark> for Boiler<A> {
         }
     }
 
-    fn user_event(&mut self, _event_loop: &ActiveEventLoop, _event: Spark) {
-        self.tend_alarm();
+    fn user_event(&mut self, _event_loop: &ActiveEventLoop, event: Spark) {
+        match event {
+            Spark::Repaint => self.tend_alarm(),
+            #[cfg(target_arch = "wasm32")]
+            Spark::Forged(result) => {
+                self.forging = false;
+                match result {
+                    Ok(rig) => {
+                        rig.window.request_redraw();
+                        self.rig = Some(*rig);
+                    }
+                    Err(err) => {
+                        self.forging = true;
+                        signal("failed", &format!("Could not start WebGPU: {err}"));
+                    }
+                }
+            }
+        }
     }
 
     fn window_event(
         &mut self,
         event_loop: &ActiveEventLoop,
-        _window_id: egui_winit::winit::window::WindowId,
+        _window_id: WindowId,
         event: WindowEvent,
     ) {
         match &event {
@@ -199,16 +280,39 @@ struct Rig {
     water: Engine,
 }
 
-impl Rig {
-    fn raise<A: Exhibit>(event_loop: &ActiveEventLoop, ctx: &egui::Context) -> Result<Self> {
-        let [width, height] = A::SIZE;
+struct Cradle {
+    window: Arc<Window>,
+    input: egui_winit::State,
+}
+
+impl Cradle {
+    fn new<A: Exhibit>(event_loop: &ActiveEventLoop, ctx: &egui::Context) -> Result<Self> {
+        let attributes = WindowAttributes::default().with_title(A::TITLE);
+        #[cfg(not(target_arch = "wasm32"))]
+        let attributes = {
+            let [width, height] = A::SIZE;
+            attributes.with_inner_size(LogicalSize::new(width, height))
+        };
+        #[cfg(target_arch = "wasm32")]
+        let _design_size = A::SIZE;
+        #[cfg(target_arch = "wasm32")]
+        let attributes = {
+            use wasm_bindgen::JsCast as _;
+            use winit::platform::web::WindowAttributesExtWebSys as _;
+
+            let canvas = web_sys::window()
+                .and_then(|window| window.document())
+                .and_then(|document| document.get_element_by_id("poolrooms"))
+                .and_then(|element| element.dyn_into::<web_sys::HtmlCanvasElement>().ok())
+                .context("missing #poolrooms canvas")?;
+            attributes
+                .with_canvas(Some(canvas))
+                .with_focusable(true)
+                .with_prevent_default(true)
+        };
         let window = Arc::new(
             event_loop
-                .create_window(
-                    WindowAttributes::default()
-                        .with_title(A::TITLE)
-                        .with_inner_size(LogicalSize::new(width, height)),
-                )
+                .create_window(attributes)
                 .context("create gallery window")?,
         );
         let input = egui_winit::State::new(
@@ -219,18 +323,33 @@ impl Rig {
             window.theme(),
             None,
         );
+        Ok(Self { window, input })
+    }
+
+    async fn forge(self) -> Result<Rig> {
+        let Self { window, mut input } = self;
         let configuration = WgpuConfiguration::default();
-        let instance = pollster::block_on(configuration.wgpu_setup.new_instance());
+        #[cfg(target_arch = "wasm32")]
+        let configuration = {
+            let mut configuration = configuration;
+            if let WgpuSetup::CreateNew(setup) = &mut configuration.wgpu_setup {
+                setup.instance_descriptor.backends = wgpu::Backends::BROWSER_WEBGPU;
+            }
+            configuration
+        };
+        let instance = configuration.wgpu_setup.new_instance().await;
         let surface = instance
             .create_surface(window.clone())
             .context("create gallery surface")?;
-        let gpu = pollster::block_on(RenderState::create(
+        let gpu = RenderState::create(
             &configuration,
             &instance,
             Some(&surface),
             RendererOptions::default(),
-        ))
+        )
+        .await
         .context("create gallery wgpu state")?;
+        input.set_max_texture_side(gpu.device.limits().max_texture_dimension_2d as usize);
         let size = window.inner_size();
         let mut config = surface
             .get_default_config(&gpu.adapter, size.width.max(1), size.height.max(1))
@@ -241,7 +360,7 @@ impl Rig {
         surface.configure(&gpu.device, &config);
         let mut water = Engine::new(&gpu.device, gpu.target_format);
         water.resize(&gpu.device, config.width, config.height);
-        Ok(Self {
+        Ok(Rig {
             window,
             input,
             surface,
@@ -250,7 +369,9 @@ impl Rig {
             water,
         })
     }
+}
 
+impl Rig {
     fn resize(&mut self, size: PhysicalSize<u32>) {
         if size.width == 0 || size.height == 0 {
             return;
@@ -267,7 +388,7 @@ impl Rig {
         delta: &egui::TexturesDelta,
         pixels_per_point: f32,
         water: &dwemer_poolrooms::water::Frame,
-    ) {
+    ) -> bool {
         let screen = ScreenDescriptor {
             size_in_pixels: [self.config.width, self.config.height],
             pixels_per_point,
@@ -296,17 +417,17 @@ impl Rig {
             | wgpu::CurrentSurfaceTexture::Suboptimal(frame) => frame,
             wgpu::CurrentSurfaceTexture::Timeout => {
                 self.window.request_redraw();
-                return;
+                return false;
             }
-            wgpu::CurrentSurfaceTexture::Occluded => return,
+            wgpu::CurrentSurfaceTexture::Occluded => return false,
             wgpu::CurrentSurfaceTexture::Outdated | wgpu::CurrentSurfaceTexture::Lost => {
                 self.surface.configure(&self.gpu.device, &self.config);
                 self.window.request_redraw();
-                return;
+                return false;
             }
             wgpu::CurrentSurfaceTexture::Validation => {
                 eprintln!("gallery surface texture validation failure");
-                return;
+                return false;
             }
         };
         let surface_view = frame
@@ -370,5 +491,22 @@ impl Rig {
         for id in &delta.free {
             renderer.free_texture(id);
         }
+        true
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+fn signal(state: &str, message: &str) {
+    let Some(document) = web_sys::window().and_then(|window| window.document()) else {
+        return;
+    };
+    if let Some(root) = document.document_element() {
+        let _marked = root.set_attribute("data-poolrooms", state);
+    }
+    if let Some(status) = document.get_element_by_id("status") {
+        status.set_text_content(Some(message));
+    }
+    if state == "failed" {
+        web_sys::console::error_1(&message.into());
     }
 }

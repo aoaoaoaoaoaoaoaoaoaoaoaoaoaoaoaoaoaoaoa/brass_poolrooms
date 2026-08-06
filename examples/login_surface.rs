@@ -25,7 +25,8 @@ fn main() {
             water.begin(Domain::shelf(ui.max_rect()));
             let _title = ui.label(chrome::title("REMINDERS LOGIN"));
             let _account = ui.text_edit_singleline(&mut account);
-            let login = chrome::glyph(ui, "LOGIN", false);
+            let login = ui.button("LOGIN");
+            chrome::tension(ui, &login);
             water.hover("login", login.rect);
             if login.clicked() {
                 water.click(login.rect);

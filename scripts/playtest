@@ -7,6 +7,11 @@ case "$gallery" in
     slider_gallery) ;;
     date_spool_gallery) ;;
     checkbox_gallery) ;;
+    corner_close_gallery) ;;
+    drag_handle_gallery) ;;
+    number_input_gallery) ;;
+    material_study_gallery) ;;
+    widget_gallery) ;;
     *) printf 'unknown gallery: %s\n' "$gallery" >&2; exit 2 ;;
 esac
 
@@ -51,6 +56,19 @@ fi
 
 case "$gallery" in
     slider_gallery)
+        xdotool mousemove --window "$window" 131 295 mousedown 1
+        xdotool mousemove --sync --window "$window" 132 295
+        sleep 0.50
+        import -window "$window" "$out/monoglyph-pressed.png"
+        if cmp -s "$out/initial.png" "$out/monoglyph-pressed.png"; then
+            printf 'monoglyph press produced no presented-frame change\n' >&2
+            exit 1
+        fi
+        xdotool mouseup 1
+        sleep 0.09
+        import -window "$window" "$out/monoglyph-recoil.png"
+        sleep 0.16
+        import -window "$window" "$out/monoglyph-wake.png"
         xdotool mousemove --window "$window" 296 143 mousedown 1
         sleep 0.12
         for x in 360 430 500 570; do
@@ -61,9 +79,29 @@ case "$gallery" in
         xdotool mousemove --window "$window" 610 143
         sleep 0.06
         xdotool mouseup 1
+        xdotool click 5 click 5
+        sleep 0.15
+        import -window "$window" "$out/wheel.png"
         ;;
     date_spool_gallery)
-        xdotool mousemove --window "$window" 185 190 click 4 click 4
+        xdotool mousemove --window "$window" 185 170 mousedown 1
+        xdotool mousemove --sync --window "$window" 185 205
+        sleep 0.12
+        import -window "$window" "$out/drag.png"
+        if cmp -s "$out/initial.png" "$out/drag.png"; then
+            printf 'date-reel drag produced no presented-frame change\n' >&2
+            exit 1
+        fi
+        xdotool mouseup 1
+        sleep 0.15
+        xdotool mousemove --window "$window" 185 170 click 4 click 4
+        xdotool mousemove --window "$window" 47 443 click 1
+        sleep 0.45
+        import -window "$window" "$out/cassette-inserted.png"
+        if cmp -s "$out/initial.png" "$out/cassette-inserted.png"; then
+            printf 'optional cassette control produced no presented-frame change\n' >&2
+            exit 1
+        fi
         ;;
     checkbox_gallery)
         xdotool mousemove --window "$window" 47 145 mousedown 1
@@ -79,6 +117,93 @@ case "$gallery" in
         sleep 0.15
         import -window "$window" "$out/wake-350ms.png"
         ;;
+    corner_close_gallery)
+        xdotool mousemove --window "$window" 368 110 mousedown 1
+        sleep 0.35
+        import -window "$window" "$out/pressed.png"
+        if cmp -s "$out/initial.png" "$out/pressed.png"; then
+            printf 'corner-close press produced no presented-frame change\n' >&2
+            exit 1
+        fi
+        xdotool mousemove --window "$window" 430 74
+        xdotool mouseup 1
+        sleep 0.04
+        import -window "$window" "$out/recoil-40ms.png"
+        sleep 0.12
+        import -window "$window" "$out/wake-160ms.png"
+        xdotool mousemove --window "$window" 368 110 click 1
+        sleep 0.15
+        import -window "$window" "$out/closed.png"
+        ;;
+    drag_handle_gallery)
+        # The first two rows are deliberately rigid; exercise the third row's
+        # explicit folding-bail variant.
+        xdotool mousemove --sync --window "$window" 42 194
+        sleep 0.20
+        xdotool mousedown 1
+        sleep 0.20
+        import -window "$window" "$out/bail-lifted.png"
+        if cmp -s "$out/initial.png" "$out/bail-lifted.png"; then
+            printf 'drag-handle pull produced no presented-frame change\n' >&2
+            exit 1
+        fi
+        xdotool mousemove --sync --window "$window" 94 214
+        sleep 0.12
+        import -window "$window" "$out/dragged.png"
+        xdotool mouseup 1
+        sleep 0.06
+        import -window "$window" "$out/bail-seating.png"
+        ;;
+    number_input_gallery)
+        xdotool mousemove --window "$window" 121 113
+        xdotool click --repeat 6 4
+        sleep 0.02
+        import -window "$window" "$out/fast-spin.png"
+        if cmp -s "$out/initial.png" "$out/fast-spin.png"; then
+            printf 'numerical wheel produced no presented-frame change\n' >&2
+            exit 1
+        fi
+        xdotool mousemove --window "$window" 104 113 click --repeat 2 1
+        xdotool key --window "$window" ctrl+a
+        xdotool type --window "$window" --delay 20 -- '-0.625'
+        xdotool key --window "$window" Return
+        sleep 0.12
+        import -window "$window" "$out/exact-entry.png"
+        xdotool mousemove --window "$window" 109 192
+        xdotool mousedown 4
+        sleep 0.02
+        import -window "$window" "$out/hard-stop.png"
+        xdotool mouseup 4
+        ;;
+    widget_gallery)
+        # The numerical wheel owns its complete smoothed impulse. Its value and
+        # water may move, but the enclosing menagerie must remain nailed down.
+        xdotool mousemove --window "$window" 121 657
+        xdotool click 5
+        sleep 0.30
+        import -window "$window" "$out/contained-number-wheel.png"
+        magick "$out/initial.png" -crop 600x500+0+0 "$out/containment-before.png"
+        magick "$out/contained-number-wheel.png" -crop 600x500+0+0 "$out/containment-after.png"
+        contained=$(magick \
+            "$out/containment-before.png" \
+            "$out/containment-after.png" \
+            -compose difference \
+            -composite \
+            -format '%[fx:mean<0.004?1:0]' \
+            info:)
+        if [ "$contained" -ne 1 ]; then
+            printf 'numerical wheel leaked into the enclosing scroll area\n' >&2
+            exit 1
+        fi
+        xdotool mousemove --window "$window" 740 820
+        xdotool click --repeat 18 5
+        sleep 0.45
+        import -window "$window" "$out/lower-menagerie.png"
+        if cmp -s "$out/initial.png" "$out/lower-menagerie.png"; then
+            printf 'menagerie scroll produced no presented-frame change\n' >&2
+            exit 1
+        fi
+        ;;
 esac
 sleep 0.5
 import -window "$window" "$out/actuated.png"
@@ -86,8 +211,9 @@ import -window "$window" "$out/actuated.png"
 if [ "$gallery" = slider_gallery ]; then
     # Drive the external ceiling through the carriage. This exercises both a
     # moving blocker and the blocker's compulsory displacement of the handle.
-    xdotool mousemove --window "$window" 128 290 click 1 click 1 click 1
-    sleep 0.25
+    xdotool mousemove --window "$window" 131 295
+    xdotool click 1 click 1
+    sleep 0.20
     import -window "$window" "$out/blocker.png"
 fi
 

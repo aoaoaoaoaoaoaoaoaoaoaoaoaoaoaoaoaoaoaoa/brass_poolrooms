@@ -75,6 +75,12 @@ def load_commands(metadata: dict[str, object]) -> dict[str, Command | CommandSeq
             raw_doc_command,
             key_path="workspace.metadata.rust-starter.doc_command",
         )
+    raw_web_command = metadata.get("web_command")
+    if raw_web_command is not None:
+        commands["web_command"] = load_command(
+            raw_web_command,
+            key_path="workspace.metadata.rust-starter.web_command",
+        )
     return commands
 
 
@@ -211,6 +217,8 @@ def main() -> None:
         run_command_sequence("canonicalize", commands["canonicalize_commands"])
 
     run("fmt", commands["format_command"])
+    if "web_command" in commands:
+        run("web", commands["web_command"])
     run("clippy", commands["clippy_command"])
     run("test", commands["test_command"])
 

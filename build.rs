@@ -1,7 +1,7 @@
 use std::{env, error::Error, io, path::PathBuf};
 
-#[path = "build/checkbox_atlas.rs"]
-mod checkbox_atlas;
+#[path = "build/foundry_atlas.rs"]
+mod foundry_atlas;
 #[path = "src/chrome/foundry/law.rs"]
 mod foundry_law;
 
@@ -23,9 +23,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         .into());
     }
     println!("cargo::rerun-if-changed=build.rs");
-    println!("cargo::rerun-if-changed=build/checkbox_atlas.rs");
+    println!("cargo::rerun-if-changed=build/foundry_atlas.rs");
     println!("cargo::rerun-if-changed=src/chrome/foundry/law.rs");
-    let output = PathBuf::from(env::var("OUT_DIR")?).join("checkbox_atlas.rs");
-    checkbox_atlas::bake(&output)?;
+    let output = PathBuf::from(env::var("OUT_DIR")?);
+    foundry_atlas::bake(
+        &output.join("checkbox_atlas.rs"),
+        &output.join("monoglyph_atlas.rs"),
+        &output.join("corner_close_atlas.rs"),
+        &output.join("drag_handle_atlas.rs"),
+        &output.join("number_input_atlas.rs"),
+        &output.join("material_study_atlas.rs"),
+    )?;
     Ok(())
 }
