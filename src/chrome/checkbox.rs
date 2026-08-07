@@ -12,7 +12,8 @@
 //!
 //! Optional descriptions inhabit a casing-height bronze plaque with 45° edge
 //! facets and two cylindrical ties. Its parameterized plate geometry and
-//! dynamic V-bit text mask are projected under the same camera and illuminant.
+//! dynamic flat-bottomed text cut are projected under the same camera and
+//! illuminant.
 
 #![deny(missing_docs)]
 

@@ -22,13 +22,10 @@ const STAMP_GAUGE: f32 = 1.0;
 const PLAQUE_RISE: f32 = 2.0;
 const PLAQUE_BEVEL_RUN: f32 = PLAQUE_RISE;
 const PLAQUE_TEXT_PAD_X: f32 = 6.0;
-const PLAQUE_ETCH_DEPTH: f32 = 0.72;
-const PLAQUE_ETCH_BEVEL_RUN: f32 = 0.20;
-/// Radial allowance cut into the soot-black floor beyond the nominal glyph.
-/// It preserves a black core after antialiasing without widening the exposed
-/// bronze wall.
-const PLAQUE_ETCH_FLOOR_SHOULDER: f32 = 0.16;
-const _: () = assert!(PLAQUE_ETCH_DEPTH / PLAQUE_ETCH_BEVEL_RUN > 3.0);
+const PLAQUE_ETCH_DEPTH: f32 = 0.96;
+const PLAQUE_ETCH_BEVEL_RUN: f32 = 0.42;
+const _: () =
+    assert!(PLAQUE_ETCH_DEPTH < PLAQUE_RISE && PLAQUE_ETCH_DEPTH / PLAQUE_ETCH_BEVEL_RUN > 2.0);
 const COUPLING_TIE_DIAMETER: f32 = 1.55;
 const COUPLING_TIE_BURIAL: f32 = 0.7;
 
@@ -88,9 +85,9 @@ pub(crate) fn darkened_bronze(position: [f32; 3], normal: [f32; 3]) -> Color32 {
 
 /// Engrave a dynamic plaque glyph with a steep, flat-bottomed cutter.
 ///
-/// The exposed key-facing wall advances only by the cutter's narrow bevel run;
-/// the soot-black floor then occludes its center. Unlike a broad V-bit, this
-/// preserves a decisive black letterfield at small UI gauges.
+/// The exposed key-facing wall advances by a raster-legible but steep bevel
+/// run. The nominal glyph then forms the soot-black floor: the cutter changes
+/// the incision's relief without emboldening its letterform.
 fn plaque_engraving(
     painter: &egui::Painter,
     clip: Rect,
@@ -107,15 +104,7 @@ fn plaque_engraving(
         galley.clone(),
         fresh_cut_bronze(-depth / normalizer, PLAQUE_ETCH_BEVEL_RUN / normalizer),
     );
-    for shoulder in [
-        Vec2::new(-PLAQUE_ETCH_FLOOR_SHOULDER, 0.0),
-        Vec2::new(0.0, -PLAQUE_ETCH_FLOOR_SHOULDER),
-        Vec2::ZERO,
-        Vec2::new(0.0, PLAQUE_ETCH_FLOOR_SHOULDER),
-        Vec2::new(PLAQUE_ETCH_FLOOR_SHOULDER, 0.0),
-    ] {
-        incision.galley_with_override_text_color(pos + shoulder, galley.clone(), Color32::BLACK);
-    }
+    incision.galley_with_override_text_color(pos, galley, Color32::BLACK);
 }
 
 /// A freshly exposed V-cut whose key-facing wall is the dominant glyph face.
