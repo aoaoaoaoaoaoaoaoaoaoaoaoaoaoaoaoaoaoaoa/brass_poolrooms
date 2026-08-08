@@ -118,20 +118,20 @@ case "$gallery" in
         import -window "$window" "$out/wake-350ms.png"
         ;;
     corner_close_gallery)
-        xdotool mousemove --window "$window" 368 110 mousedown 1
+        xdotool mousemove --window "$window" 468 124 mousedown 1
         sleep 0.35
         import -window "$window" "$out/pressed.png"
         if cmp -s "$out/initial.png" "$out/pressed.png"; then
             printf 'corner-close press produced no presented-frame change\n' >&2
             exit 1
         fi
-        xdotool mousemove --window "$window" 430 74
+        xdotool mousemove --window "$window" 430 84
         xdotool mouseup 1
         sleep 0.04
         import -window "$window" "$out/recoil-40ms.png"
         sleep 0.12
         import -window "$window" "$out/wake-160ms.png"
-        xdotool mousemove --window "$window" 368 110 click 1
+        xdotool mousemove --window "$window" 468 124 click 1
         sleep 0.15
         import -window "$window" "$out/closed.png"
         ;;
@@ -178,7 +178,7 @@ case "$gallery" in
     widget_gallery)
         # The numerical wheel owns its complete smoothed impulse. Its value and
         # water may move, but the enclosing menagerie must remain nailed down.
-        xdotool mousemove --window "$window" 121 657
+        xdotool mousemove --window "$window" 121 852
         xdotool click 5
         sleep 0.30
         import -window "$window" "$out/contained-number-wheel.png"

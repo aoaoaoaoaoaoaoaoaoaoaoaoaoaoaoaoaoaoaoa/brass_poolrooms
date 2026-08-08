@@ -3,19 +3,20 @@ use std::hash::Hash;
 use dwemer_poolrooms::{
     chrome::{
         self, Checkbox, CornerClose, Coupled, CouplingGap, DateReels, DateSpool, DragHandle,
-        GregorianDay, LabelSide, MechanismSize, Monoglyph, NumberInput, Rail, WheelPlane,
+        ForgePin, GregorianDay, LabelSide, MechanismSize, Monoglyph, NumberInput, Rail, Symbol,
+        WheelPlane,
     },
     egui,
     water::Surface,
 };
 
 pub struct Closures {
-    open: bool,
+    open: [bool; 3],
 }
 
 impl Default for Closures {
     fn default() -> Self {
-        Self { open: true }
+        Self { open: [true; 3] }
     }
 }
 
@@ -27,43 +28,64 @@ impl Closures {
         ));
         ui.add_space(18.0);
 
-        if self.open {
-            ui.add_space(CornerClose::HEADROOM);
-            let pane = egui::Frame::new()
-                .fill(chrome::SURFACE)
-                .stroke(egui::Stroke::new(1.0_f32, chrome::EDGE_STRONG))
-                .inner_margin(egui::Margin::symmetric(14, 11))
-                .show(ui, |ui| {
-                    ui.set_min_width(310.0);
-                    let _heading = ui.label(chrome::eyebrow("PRESSURE VESSEL 07"));
-                    ui.add_space(7.0);
-                    let _reading = ui.label(chrome::section_title("NOMINAL · 2.41 bar"));
-                    let _detail = ui.label(chrome::muted(
-                        "The pane corner passes through the closure axis.",
-                    ));
+        let _gauges = ui.horizontal_top(|ui| {
+            for (index, (size, open)) in MechanismSize::ALL
+                .into_iter()
+                .zip(&mut self.open)
+                .enumerate()
+            {
+                let _gauge = ui.vertical(|ui| {
+                    let close_die = CornerClose::new().size(size);
+                    let name = match size {
+                        MechanismSize::Small => "SMALL",
+                        MechanismSize::Medium => "MEDIUM",
+                        MechanismSize::Large => "LARGE",
+                    };
+                    let _name = ui.label(chrome::eyebrow(name));
+                    if *open {
+                        ui.add_space(close_die.headroom());
+                        let margin = egui::Margin::symmetric(10, 8);
+                        let pane = egui::Frame::new()
+                            .fill(chrome::SURFACE)
+                            .stroke(egui::Stroke::new(1.0_f32, chrome::EDGE_STRONG))
+                            .inner_margin(margin)
+                            .show(ui, |ui| {
+                                ui.set_min_width(184.0);
+                                let _heading = close_die.guarded_header(ui, margin, |ui| {
+                                    ui.label(chrome::eyebrow("PRESSURE VESSEL 07"))
+                                });
+                                ui.add_space(5.0);
+                                let _reading =
+                                    ui.label(chrome::section_title("NOMINAL · 2.41 bar"));
+                            });
+                        let close = close_die
+                            .show(ui, pane.response.rect, ("gallery-close", index))
+                            .on_hover_text("close pane");
+                        water.corner_close(&close);
+                        if close.clicked() {
+                            *open = false;
+                        }
+                        let _telemetry = ui.label(chrome::muted(format!(
+                            "CROWN Z · {:+06.2} pt",
+                            close.elevation()
+                        )));
+                    } else {
+                        let _sealed = ui.label(chrome::muted("PANE WITHDRAWN"));
+                        let restore = Monoglyph::symbol(Symbol::Restore)
+                            .size(size)
+                            .show(ui)
+                            .on_hover_text("restore pane");
+                        water.monoglyph(&restore);
+                        if restore.clicked() {
+                            *open = true;
+                        }
+                    }
                 });
-            let close = CornerClose::new()
-                .show(ui, pane.response.rect, "gallery-close")
-                .on_hover_text("close pane");
-            water.corner_close(&close);
-            if close.clicked() {
-                self.open = false;
-            }
-            let _telemetry = ui.label(chrome::muted(format!(
-                "CLOSURE CROWN Z · {:+06.2} pt",
-                close.elevation()
-            )));
-        } else {
-            let _sealed = ui.label(chrome::eyebrow("PANE WITHDRAWN"));
-            let _rearm = ui.horizontal(|ui| {
-                let restore = Monoglyph::new('↺').show(ui).on_hover_text("restore pane");
-                water.monoglyph(&restore);
-                if restore.clicked() {
-                    self.open = true;
+                if index + 1 < MechanismSize::ALL.len() {
+                    ui.add_space(12.0);
                 }
-                let _label = ui.label(chrome::muted("restore the exhibit"));
-            });
-        }
+            }
+        });
     }
 }
 
@@ -91,7 +113,11 @@ impl Handles {
                     Coupled::horizontal_with_gap(
                         ui,
                         CouplingGap::MINIMUM,
-                        |ui| Monoglyph::new('×').size(MechanismSize::Small).show(ui),
+                        |ui| {
+                            Monoglyph::symbol(Symbol::Remove)
+                                .size(MechanismSize::Small)
+                                .show(ui)
+                        },
                         |ui| Monoglyph::new('▣').size(MechanismSize::Small).show(ui),
                     )
                 },
@@ -123,6 +149,86 @@ impl Handles {
             DragHandle::folding_bail,
         );
         ui.add_space(10.0);
+    }
+}
+
+#[derive(Default)]
+pub struct Pins;
+
+impl Pins {
+    pub fn show(&mut self, ui: &mut egui::Ui) {
+        let _title = ui.label(chrome::title("FORGE PINS"));
+        let _law = ui.label(chrome::muted(
+            "coordinate-fixed shaft · raised spherical grip · inscribable medium and large dies",
+        ));
+        ui.add_space(16.0);
+
+        let _gauges = ui.horizontal(|ui| {
+            for size in MechanismSize::ALL {
+                let _gauge = ui.allocate_ui_with_layout(
+                    egui::vec2(158.0, 98.0),
+                    egui::Layout::top_down(egui::Align::Center),
+                    |ui| {
+                        let (rect, _space) =
+                            ui.allocate_exact_size(egui::vec2(158.0, 72.0), egui::Sense::hover());
+                        let anchor = egui::pos2(rect.center().x, rect.bottom() - 8.0);
+                        let pin = ForgePin::new(anchor).size(size);
+                        let pin = match size {
+                            MechanismSize::Small => pin,
+                            MechanismSize::Medium => pin.inscription("12"),
+                            MechanismSize::Large => pin.inscription("128"),
+                        };
+                        let id = ui.make_persistent_id(("forge-pin-gallery", size));
+                        let response = ui.interact(pin.grip(), id, egui::Sense::drag());
+                        let seized = response.dragged_by(egui::PointerButton::Primary);
+                        let hot = ui
+                            .input(|input| input.pointer.hover_pos())
+                            .is_some_and(|pointer| pin.grip().contains(pointer));
+                        pin.paint(ui.painter(), seized || hot);
+                        let name = match size {
+                            MechanismSize::Small => "SMALL · BLANK",
+                            MechanismSize::Medium => "MEDIUM · TEXT",
+                            MechanismSize::Large => "LARGE · TEXT",
+                        };
+                        let _name = ui.label(chrome::eyebrow(name));
+                    },
+                );
+            }
+        });
+    }
+}
+
+#[derive(Default)]
+pub struct Symbols;
+
+impl Symbols {
+    pub fn show(&mut self, ui: &mut egui::Ui, water: &mut Surface) {
+        let _title = ui.label(chrome::title("SYMBOLOGY ARMORY"));
+        let _law = ui.label(chrome::muted(
+            "one semantic mark · one Unicode cut · one typographic die per mechanism gauge",
+        ));
+        ui.add_space(16.0);
+
+        for size in MechanismSize::ALL {
+            let _gauge = ui.horizontal(|ui| {
+                ui.set_min_height(size.side());
+                let name = match size {
+                    MechanismSize::Small => "SMALL",
+                    MechanismSize::Medium => "MEDIUM",
+                    MechanismSize::Large => "LARGE",
+                };
+                let _name =
+                    ui.add_sized([74.0, size.side()], egui::Label::new(chrome::eyebrow(name)));
+                for symbol in Symbol::ALL {
+                    let button = Monoglyph::symbol(symbol)
+                        .size(size)
+                        .show(ui)
+                        .on_hover_text(symbol.name());
+                    water.monoglyph(&button);
+                }
+            });
+            ui.add_space(8.0);
+        }
     }
 }
 
@@ -211,7 +317,7 @@ fn bail_exhibit(
                 Coupled::horizontal_with_gap(
                     ui,
                     gap,
-                    |ui| Monoglyph::new('×').size(size).show(ui),
+                    |ui| Monoglyph::symbol(Symbol::Remove).size(size).show(ui),
                     |ui| Monoglyph::new('▣').size(size).show(ui),
                 )
             },
@@ -288,12 +394,12 @@ impl Sliders {
         ui.add_space(15.0);
         let _gate = ui.horizontal(|ui| {
             let _caption = ui.label(chrome::muted("external stop"));
-            let decrement = Monoglyph::new('−').show(ui);
+            let decrement = Monoglyph::symbol(Symbol::Decrement).show(ui);
             water.monoglyph(&decrement);
             if decrement.clicked() {
                 self.ceiling = self.ceiling.saturating_sub(1);
             }
-            let increment = Monoglyph::new('+').show(ui);
+            let increment = Monoglyph::symbol(Symbol::Increment).show(ui);
             water.monoglyph(&increment);
             if increment.clicked() {
                 self.ceiling = self.ceiling.saturating_add(1).min(10);

@@ -167,14 +167,14 @@ pub trait CouplingTarget: sealed::Sealed {
 ///
 /// ```
 /// use dwemer_poolrooms::{
-///     chrome::{Coupled, MechanismSize, Monoglyph},
+///     chrome::{Coupled, MechanismSize, Monoglyph, Symbol},
 ///     egui,
 /// };
 ///
 /// fn paired_actions(ui: &mut egui::Ui) -> (bool, bool) {
 ///     let pair = Coupled::horizontal(
 ///         ui,
-///         |ui| Monoglyph::new('×').size(MechanismSize::Small).show(ui),
+///         |ui| Monoglyph::symbol(Symbol::Remove).size(MechanismSize::Small).show(ui),
 ///         |ui| Monoglyph::new('▣').size(MechanismSize::Small).show(ui),
 ///     );
 ///     (pair.left.clicked(), pair.right.clicked())
@@ -284,7 +284,7 @@ mod tests {
     use egui::{RawInput, Vec2};
 
     use super::*;
-    use crate::chrome::Monoglyph;
+    use crate::chrome::{Monoglyph, Symbol};
 
     #[test]
     fn public_gauges_are_discrete_and_preserve_the_standard_default() {
@@ -309,8 +309,16 @@ mod tests {
         let _frame = ctx.run_ui(RawInput::default(), |ui| {
             let pair = Coupled::horizontal(
                 ui,
-                |ui| Monoglyph::new('×').size(MechanismSize::Small).show(ui),
-                |ui| Monoglyph::new('+').size(MechanismSize::Small).show(ui),
+                |ui| {
+                    Monoglyph::symbol(Symbol::Remove)
+                        .size(MechanismSize::Small)
+                        .show(ui)
+                },
+                |ui| {
+                    Monoglyph::symbol(Symbol::Add)
+                        .size(MechanismSize::Small)
+                        .show(ui)
+                },
             );
             rects = [pair.left.rect, pair.right.rect];
         });
@@ -326,8 +334,16 @@ mod tests {
             let pair = Coupled::horizontal_with_gap(
                 ui,
                 CouplingGap::TIGHT,
-                |ui| Monoglyph::new('×').size(MechanismSize::Small).show(ui),
-                |ui| Monoglyph::new('+').size(MechanismSize::Small).show(ui),
+                |ui| {
+                    Monoglyph::symbol(Symbol::Remove)
+                        .size(MechanismSize::Small)
+                        .show(ui)
+                },
+                |ui| {
+                    Monoglyph::symbol(Symbol::Add)
+                        .size(MechanismSize::Small)
+                        .show(ui)
+                },
             );
             rects = [pair.left.rect, pair.right.rect];
         });
@@ -353,8 +369,16 @@ mod tests {
                     Coupled::horizontal_with_gap(
                         ui,
                         CouplingGap::TIGHT,
-                        |ui| Monoglyph::new('×').size(MechanismSize::Small).show(ui),
-                        |ui| Monoglyph::new('+').size(MechanismSize::Small).show(ui),
+                        |ui| {
+                            Monoglyph::symbol(Symbol::Remove)
+                                .size(MechanismSize::Small)
+                                .show(ui)
+                        },
+                        |ui| {
+                            Monoglyph::symbol(Symbol::Add)
+                                .size(MechanismSize::Small)
+                                .show(ui)
+                        },
                     )
                 },
             );
@@ -379,7 +403,11 @@ mod tests {
                         .size(MechanismSize::Small)
                         .show(ui)
                 },
-                |ui| Monoglyph::new('×').size(MechanismSize::Small).show(ui),
+                |ui| {
+                    Monoglyph::symbol(Symbol::Remove)
+                        .size(MechanismSize::Small)
+                        .show(ui)
+                },
             );
             rects = [pair.left.rect, pair.right.rect];
         });

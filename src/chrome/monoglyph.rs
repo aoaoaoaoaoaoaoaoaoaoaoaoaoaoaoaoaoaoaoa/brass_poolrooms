@@ -9,7 +9,7 @@ use std::ops::Deref;
 
 use egui::{CursorIcon, FontId, Pos2, Rect, Sense, Vec2, WidgetInfo, WidgetType};
 
-use super::{MechanismSize, foundry};
+use super::{MechanismSize, Symbol, foundry};
 
 use super::mechanism::{CouplingPorts, CouplingTarget, sealed};
 use super::plunger::{self, BakedGauge, BakedMesh, BakedPose, BakedVertex, PlungerWake, SpringLaw};
@@ -33,19 +33,22 @@ mod baked {
 /// A square, momentary Poolrooms button carrying exactly one etched glyph.
 ///
 /// The `char` constructor makes the one-glyph boundary structural: text labels
-/// and rectangular actions cannot accidentally enter this mechanism. Pointer
-/// pressure plunges the flat crown into its black socket; release excites a
-/// stiff underdamped spring that makes one small return bounce.
+/// and rectangular actions cannot accidentally enter this mechanism.
+/// [`Monoglyph::symbol`] selects common action marks from the typed Poolrooms
+/// armory so their Unicode scalar and S/M/L typography cannot drift between
+/// applications. Pointer pressure plunges the flat crown into its black
+/// socket; release excites a stiff underdamped spring that makes one small
+/// return bounce.
 /// [`Monoglyph::size`] selects one of the exact gauges admitted by
 /// [`MechanismSize`].
 ///
 /// # Example
 ///
 /// ```
-/// use dwemer_poolrooms::{chrome::Monoglyph, egui};
+/// use dwemer_poolrooms::{chrome::{Monoglyph, Symbol}, egui};
 ///
 /// fn decrement(ui: &mut egui::Ui) -> bool {
-///     Monoglyph::new('−').show(ui).clicked()
+///     Monoglyph::symbol(Symbol::Decrement).show(ui).clicked()
 /// }
 /// ```
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -61,6 +64,15 @@ impl Monoglyph {
             glyph,
             size: MechanismSize::Large,
         }
+    }
+
+    /// Forge one canonical action mark from the shared symbology armory.
+    ///
+    /// The selected [`MechanismSize`] remains the sole typographic gauge:
+    /// equal symbols at equal sizes therefore have identical glyph, font,
+    /// crown, relief, and motion.
+    pub const fn symbol(symbol: Symbol) -> Self {
+        Self::new(symbol.glyph())
     }
 
     /// Select a build-time forged square footprint.
@@ -256,7 +268,9 @@ mod tests {
                 screen_rect: Some(Rect::from_min_size(Pos2::ZERO, Vec2::splat(80.0))),
                 ..egui::RawInput::default()
             },
-            |ui| actual = Monoglyph::new('+').show(ui).rect.size(),
+            |ui| {
+                actual = Monoglyph::symbol(Symbol::Add).show(ui).rect.size();
+            },
         );
         assert_eq!(actual, Vec2::splat(MechanismSize::Large.side()));
     }
@@ -271,7 +285,11 @@ mod tests {
             let ctx = egui::Context::default();
             let mut actual = Vec2::ZERO;
             let _frame = ctx.run_ui(egui::RawInput::default(), |ui| {
-                actual = Monoglyph::new('×').size(size).show(ui).rect.size();
+                actual = Monoglyph::symbol(Symbol::Remove)
+                    .size(size)
+                    .show(ui)
+                    .rect
+                    .size();
             });
             assert_eq!(actual, Vec2::splat(f32::from(side)));
         }
@@ -290,13 +308,13 @@ mod tests {
             ..egui::RawInput::default()
         };
         let _prime = ctx.run_ui(input(Vec::new()), |ui| {
-            let button = Monoglyph::new('+').show(ui);
+            let button = Monoglyph::symbol(Symbol::Add).show(ui);
             center = button.rect.center();
         });
         let drive = |events| {
             let mut sample = (baked::REST, 0.0);
             let _frame = ctx.run_ui(input(events), |ui| {
-                let button = Monoglyph::new('+').show(ui);
+                let button = Monoglyph::symbol(Symbol::Add).show(ui);
                 sample = (
                     button.elevation(),
                     button.wake().map_or(0.0, MonoglyphWake::swept_volume),

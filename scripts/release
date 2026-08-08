@@ -30,6 +30,7 @@ grep -Fqx "version = \"$version\"" Cargo.toml ||
     die "v$version does not uniquely tag HEAD"
 
 ./check.py verify
+scripts/audit
 cargo package --locked
 
 if [ "$mode" = publish ]; then

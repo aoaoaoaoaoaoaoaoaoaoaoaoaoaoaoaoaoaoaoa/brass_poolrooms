@@ -1130,12 +1130,16 @@ mod tests {
             ..egui::RawInput::default()
         };
         let _prime = ctx.run_ui(input(Vec::new()), |ui| {
-            center = crate::chrome::Monoglyph::new('+').show(ui).rect.center();
+            center = crate::chrome::Monoglyph::symbol(crate::chrome::Symbol::Add)
+                .show(ui)
+                .rect
+                .center();
         });
         {
             let mut drive = |events| {
                 let _frame = ctx.run_ui(input(events), |ui| {
-                    let button = crate::chrome::Monoglyph::new('+').show(ui);
+                    let button =
+                        crate::chrome::Monoglyph::symbol(crate::chrome::Symbol::Add).show(ui);
                     surface.monoglyph(&button);
                 });
             };

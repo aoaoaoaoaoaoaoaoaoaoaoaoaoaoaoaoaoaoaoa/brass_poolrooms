@@ -8,9 +8,10 @@ motion. Its custom controls are the linkage-driven [`Rail`], tape-transport
 [`DateSpool`], spring-latched [`Checkbox`], and momentary square [`Monoglyph`].
 The corner-mounted [`CornerClose`] uses that same plunger stock with a fixed,
 deeply recessed X. [`DragHandle`] supplies fixed friction pads and rigid or
-folding bails for reorder gestures. [`NumberInput`] couples an exact scalar
-register to a scalloped thumbwheel. All are machined in one fixed projection,
-material, and lighting model.
+folding bails for reorder gestures. The map-anchored [`ForgePin`] unifies its
+shaft, spherical grip, hit region, and optional inscription. [`NumberInput`]
+couples an exact scalar register to a scalloped thumbwheel. All are machined in
+one fixed projection, material, and lighting model.
 
 ## Scope
 
@@ -33,26 +34,34 @@ composition.
 | [`Rail`] | Bounded linear transport with explicit total and admissible spans, detents, and optional wheel input | `Surface::rail` |
 | [`DateSpool`] | One-to-three Gregorian tape reels with explicit width and a reel-derived rigid minimum | `Surface::date_spool` |
 | [`Checkbox`] | Three-gauge latching plunger with an optional side-selectable etched plaque and a state-transparent fixed-stock guard | `Surface::checkbox` |
-| [`Monoglyph`] | Momentary square plunger carrying exactly one etched Unicode scalar | `Surface::monoglyph` |
-| [`CornerClose`] | Momentary close plunger centered on a pane corner, with a build-time modelled and self-shadowed X trench | `Surface::corner_close` |
+| [`Monoglyph`] | Three-gauge momentary square plunger carrying one etched scalar; [`Symbol`] supplies the canonical common-action armory | `Surface::monoglyph` |
+| [`CornerClose`] | Three-gauge momentary close plunger centered on a pane corner, with a build-time modelled and self-shadowed X trench | `Surface::corner_close` |
 | [`DragHandle`] | Rigid half-width friction pad, rigid square bail, or sprung folding bail on a riveted crosshatched plate | `Surface::drag_handle` |
+| [`ForgePin`] | Three-gauge coordinate pin with one coherent shaft, bulb, grip region, and medium/large inscription API | application-defined |
 | [`NumberInput`] | Bounded integer or floating register with an explicit quantum, precision, exact-entry override, two wheel planes, and sprung limit refusal | `Surface::number_input` |
 
-These seven types are the complete inventory of foundry-owned controls: their
+These eight types are the complete inventory of foundry-owned controls: their
 geometry, dynamics, material response, and displaced-water contract live here.
 The other `chrome` exports are shared typography, layout, and interaction
 plumbing rather than standalone mechanisms. [`widget_gallery`](examples/widget_gallery.rs)
 is the living visual contract: it keeps one legible exemplar of every material
 variant and interaction without multiplying equivalent Cartesian combinations.
 
-[`MechanismSize`] gives compatible `Checkbox`, `Monoglyph`, and `DragHandle`
-casings three named gauges: 20-point `Small`, 24-point `Medium`, and 32-point
-`Large`. The point count is the nominal casing and interaction height, not a
-transparent layout envelope. Monoglyphs and bails are square; friction pads are
-half-width. Checkbox guards retain one wire gauge while their lattices step
-from 2×2 through 3×3 to 4×4, and their full protective envelopes are allocated
-explicitly. Each admitted gauge is independently projected and illuminated at
-build time.
+[`MechanismSize`] gives compatible `Checkbox`, `Monoglyph`, `CornerClose`,
+`DragHandle`, and `ForgePin` dies three named gauges. Cased mechanisms use the
+20-point `Small`, 24-point `Medium`, and 32-point `Large` values as their
+nominal casing and interaction height, not as a transparent layout envelope.
+Monoglyphs and bails are square; friction pads are half-width. Checkbox guards
+retain one wire gauge while their lattices step from 2×2 through 3×3 to 4×4,
+and their full protective envelopes are allocated explicitly. Forge pins have
+their own map-anchored gauge geometry; medium and large bulbs admit native
+centered text while small remains unlettered. Each admitted cased gauge is
+independently projected and illuminated at build time.
+`Monoglyph::symbol(Symbol::Add)` and the other armory constructors bind a
+common action to one scalar and the selected foundry gauge's typography. A
+product-specific mark may still use `Monoglyph::new(char)`; common add, remove,
+duplicate, rename, confirm, disclosure, restore, and increment/decrement marks
+must not be re-authored at application call sites.
 [`Coupled::horizontal`] places any two coupling-capable foundry responses at the
 canonical six-point gap and runs the standard twin bronze ties behind both
 casings. [`Coupled::horizontal_with_gap`] accepts a [`CouplingGap`] when dense
@@ -121,7 +130,7 @@ is deliberately a hardware WebGPU workload.
 
 ```toml
 [dependencies]
-dwemer_poolrooms = "0.8.2"
+dwemer_poolrooms = "0.9.0"
 ```
 
 Import egui through the crate to keep its public geometry types aligned with
@@ -137,7 +146,7 @@ chrome::install(&ctx);
 For chrome without GPU water:
 
 ```toml
-dwemer_poolrooms = { version = "0.8.2", default-features = false }
+dwemer_poolrooms = { version = "0.9.0", default-features = false }
 ```
 
 ## Water
@@ -164,8 +173,10 @@ The default `water` feature contains the simulator and compositor.
 [`Monoglyph`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.Monoglyph.html
 [`CornerClose`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.CornerClose.html
 [`DragHandle`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.DragHandle.html
+[`ForgePin`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.ForgePin.html
 [`NumberInput`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.NumberInput.html
 [`MechanismSize`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/enum.MechanismSize.html
+[`Symbol`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/enum.Symbol.html
 [`CouplingGap`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.CouplingGap.html
 [`Coupled::horizontal`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.Coupled.html#method.horizontal
 [`Coupled::horizontal_with_gap`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.Coupled.html#method.horizontal_with_gap

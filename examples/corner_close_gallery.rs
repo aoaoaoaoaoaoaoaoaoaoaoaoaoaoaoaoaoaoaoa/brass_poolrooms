@@ -13,7 +13,7 @@ use support::Exhibit;
 
 impl Exhibit for Closures {
     const TITLE: &'static str = "Poolrooms · corner-close gallery";
-    const SIZE: [f64; 2] = [520.0, 330.0];
+    const SIZE: [f64; 2] = [760.0, 350.0];
 
     fn ui(&mut self, ui: &mut egui::Ui, water: &mut Surface) {
         let _panel = egui::CentralPanel::default()
