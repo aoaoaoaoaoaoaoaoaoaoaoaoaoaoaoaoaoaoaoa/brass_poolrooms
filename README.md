@@ -130,7 +130,7 @@ is deliberately a hardware WebGPU workload.
 
 ```toml
 [dependencies]
-dwemer_poolrooms = "0.9.0"
+dwemer_poolrooms = "0.9.1"
 ```
 
 Import egui through the crate to keep its public geometry types aligned with
@@ -146,7 +146,7 @@ chrome::install(&ctx);
 For chrome without GPU water:
 
 ```toml
-dwemer_poolrooms = { version = "0.9.0", default-features = false }
+dwemer_poolrooms = { version = "0.9.1", default-features = false }
 ```
 
 ## Water
@@ -166,6 +166,21 @@ engine.
 
 The default `water` feature contains the simulator and compositor.
 `instrumentation` adds semantic chrome anchors for deterministic UI driving.
+
+The submerged mosaic is registered to the viewport by default. Applications
+whose own geometry names the visible tile lattice can register the same floor
+to one grout intersection and square pitch, both in egui logical points:
+
+```rust
+use dwemer_poolrooms::water::{Floor, FloorRegistration};
+
+let floor = Floor::shallow(basin)
+    .registered(FloorRegistration::square(board.min, cell_pitch));
+surface.set_floor(Some(floor));
+```
+
+Registration changes only the mosaic's geometry. Poolrooms retains its
+material, mortar, deterministic tile variation, and refractive law.
 
 [`Rail`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.Rail.html
 [`DateSpool`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.DateSpool.html

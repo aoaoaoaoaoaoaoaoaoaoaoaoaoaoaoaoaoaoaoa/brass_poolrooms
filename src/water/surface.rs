@@ -238,23 +238,79 @@ pub struct Domain {
 pub struct Floor {
     rect: egui::Rect,
     depth: f32,
+    registration: FloorRegistration,
+}
+
+/// Registration of the square floor mosaic in egui logical points.
+///
+/// `joint` names one grout intersection. Every other joint is an integral
+/// multiple of `pitch` from it, so a consumer can register the submerged
+/// mosaic to geometry painted during the ordinary egui pass.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FloorRegistration {
+    joint: egui::Pos2,
+    pitch: f32,
+}
+
+impl FloorRegistration {
+    const STANDARD: Self = Self {
+        joint: egui::Pos2::ZERO,
+        pitch: 42.0,
+    };
+
+    /// Register a square mosaic to one grout intersection and tile pitch.
+    ///
+    /// # Panics
+    ///
+    /// Panics when either coordinate or the pitch is non-finite, or when the
+    /// pitch is not positive.
+    pub fn square(joint: egui::Pos2, pitch: f32) -> Self {
+        assert!(
+            joint.x.is_finite() && joint.y.is_finite() && pitch.is_finite() && pitch > 0.0,
+            "floor registration requires a finite joint and positive finite pitch"
+        );
+        Self { joint, pitch }
+    }
+
+    fn physical(self, scale: f32) -> engine::FloorRegistration {
+        engine::FloorRegistration {
+            joint: egui::pos2(self.joint.x * scale, self.joint.y * scale),
+            pitch: self.pitch * scale,
+        }
+    }
 }
 
 impl Floor {
     /// Lamplit tile near the surface, used while the gallery is empty.
     pub const fn shallow(rect: egui::Rect) -> Self {
-        Self { rect, depth: 0.0 }
+        Self {
+            rect,
+            depth: 0.0,
+            registration: FloorRegistration::STANDARD,
+        }
     }
 
     /// The same tile sunk into darker water, suitable for enclosed basins.
     pub const fn deep(rect: egui::Rect) -> Self {
-        Self { rect, depth: 0.68 }
+        Self {
+            rect,
+            depth: 0.68,
+            registration: FloorRegistration::STANDARD,
+        }
+    }
+
+    /// Register the mosaic beneath this floor to consumer-owned geometry.
+    #[must_use]
+    pub const fn registered(mut self, registration: FloorRegistration) -> Self {
+        self.registration = registration;
+        self
     }
 
     fn physical(self, scale: f32) -> engine::Floor {
         engine::Floor {
             rect: scale_rect(self.rect, scale),
             depth: self.depth,
+            registration: self.registration.physical(scale),
         }
     }
 }
@@ -1020,6 +1076,33 @@ fn far_rect() -> egui::Rect {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn floor_registration_scales_with_egui_geometry() {
+        let rect = egui::Rect::from_min_max(egui::pos2(3.0, 5.0), egui::pos2(83.0, 47.0));
+        let floor =
+            Floor::deep(rect).registered(FloorRegistration::square(egui::pos2(7.0, 11.0), 31.0));
+        let physical = floor.physical(2.0);
+        assert_eq!(
+            physical.rect,
+            egui::Rect::from_min_max(egui::pos2(6.0, 10.0), egui::pos2(166.0, 94.0))
+        );
+        assert_eq!(physical.depth, 0.68);
+        assert_eq!(physical.registration.joint, egui::pos2(14.0, 22.0));
+        assert_eq!(physical.registration.pitch, 62.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "floor registration requires")]
+    fn floor_registration_refuses_nonpositive_pitch() {
+        let _invalid = FloorRegistration::square(egui::Pos2::ZERO, 0.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "floor registration requires")]
+    fn floor_registration_refuses_nonfinite_geometry() {
+        let _invalid = FloorRegistration::square(egui::pos2(f32::NAN, 0.0), 42.0);
+    }
 
     #[test]
     fn first_scroll_frame_hits_force_ceiling_without_second_lowpass() {

@@ -189,6 +189,13 @@ pub(super) struct Domain {
 pub(super) struct Floor {
     pub(super) rect: egui::Rect,
     pub(super) depth: f32,
+    pub(super) registration: FloorRegistration,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct FloorRegistration {
+    pub(super) joint: egui::Pos2,
+    pub(super) pitch: f32,
 }
 
 impl Floor {
@@ -198,6 +205,10 @@ impl Floor {
             max: egui::Pos2 { x: -4e6, y: -4e6 },
         },
         depth: 0.0,
+        registration: FloorRegistration {
+            joint: egui::Pos2::ZERO,
+            pitch: 42.0,
+        },
     };
 }
 
@@ -954,8 +965,17 @@ fn uniforms(frame: &super::Frame) -> Uniforms {
         frame.floor.rect.max.x,
         frame.floor.rect.max.y,
     ];
-    packed.floor_vitals = [frame.floor.depth.clamp(0.0, 1.0), 0.0, 0.0, 0.0];
+    packed.floor_vitals = floor_vitals(frame.floor);
     packed
+}
+
+fn floor_vitals(floor: Floor) -> [f32; 4] {
+    [
+        floor.depth.clamp(0.0, 1.0),
+        floor.registration.pitch,
+        floor.registration.joint.x,
+        floor.registration.joint.y,
+    ]
 }
 
 const WGSL: &str = concat!(
@@ -966,3 +986,21 @@ const SIM_WGSL: &str = concat!(
     include_str!("engine/forcing.wgsl"),
     include_str!("engine/sim.wgsl")
 );
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn floor_uniform_treaty_carries_depth_pitch_and_joint() {
+        let floor = Floor {
+            rect: egui::Rect::ZERO,
+            depth: 1.7,
+            registration: FloorRegistration {
+                joint: egui::pos2(13.0, 29.0),
+                pitch: 61.0,
+            },
+        };
+        assert_eq!(floor_vitals(floor), [1.0, 61.0, 13.0, 29.0]);
+    }
+}

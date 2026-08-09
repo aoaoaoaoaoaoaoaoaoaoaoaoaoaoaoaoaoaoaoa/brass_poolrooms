@@ -69,7 +69,7 @@ resolver = "3"
 edition = "2024"
 license = "MIT"
 rust-version = "1.96"
-version = "0.9.0"
+version = "0.9.1"
 
 [features]
 default = ["water"]

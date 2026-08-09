@@ -99,16 +99,17 @@ fn turn(p: vec2f, angle: f32) -> vec2f {
 }
 
 fn mosaic(px: vec2f) -> vec3f {
-    const TILE: f32 = 42.0;
-    let q = px / TILE;
+    let pitch = max(forcing.floor_vitals.y, 1.0);
+    let joint = forcing.floor_vitals.zw;
+    let q = (px - joint) / pitch;
     let c = floor(q);
-    let local = (fract(q) - vec2f(0.5)) * TILE;
+    let local = (fract(q) - vec2f(0.5)) * pitch;
     // Each tile is laid independently by a mildly inattentive mason. Two
     // degrees is enough to catch the eye without turning the pool into rubble.
     let angle = (hash21(c + vec2f(7.3, 19.1)) * 2.0 - 1.0) * 0.034906585;
     let laid = turn(local, angle);
-    let edge = TILE * 0.5 - max(abs(laid.x), abs(laid.y));
-    let grout = 1.0 - smoothstep(1.15, 2.35, edge);
+    let edge = pitch * 0.5 - max(abs(laid.x), abs(laid.y));
+    let grout = 1.0 - smoothstep(pitch * 0.027380952, pitch * 0.055952381, edge);
     let n = hash21(c);
     let m = hash21(c + vec2f(19.7, 3.1));
     let pulse = (0.5 + 0.5 * sin(c.x * 0.67 + c.y * 1.21 + forcing.optics.w * 0.13)) * 0.014;
