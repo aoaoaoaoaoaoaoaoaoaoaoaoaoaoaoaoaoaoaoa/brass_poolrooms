@@ -217,6 +217,6 @@ if [ "$gallery" = slider_gallery ]; then
     import -window "$window" "$out/blocker.png"
 fi
 
-if rg -i 'panic|validation (error|failure)|device lost' "$out/app.log"; then
+if grep -Ei 'panic|validation (error|failure)|device lost' "$out/app.log"; then
     exit 1
 fi

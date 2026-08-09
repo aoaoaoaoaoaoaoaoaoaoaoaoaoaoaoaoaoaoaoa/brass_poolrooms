@@ -34,10 +34,10 @@ verify_bundle() {
     test -s "$bundle/index.html"
     test -s "$bundle/poolrooms.js"
     test -s "$bundle/poolrooms_bg.wasm"
-    rg -q --fixed-strings 'import init from "./poolrooms.js"' "$bundle/index.html"
-    rg -q --fixed-strings 'await navigator.gpu.requestAdapter({' "$bundle/index.html"
-    rg -q --fixed-strings '"swiftshader"' "$bundle/index.html"
-    rg -q --fixed-strings 'wasm.__wbindgen_start();' "$bundle/poolrooms.js"
+    grep -Fq 'import init from "./poolrooms.js"' "$bundle/index.html"
+    grep -Fq 'await navigator.gpu.requestAdapter({' "$bundle/index.html"
+    grep -Fq '"swiftshader"' "$bundle/index.html"
+    grep -Fq 'wasm.__wbindgen_start();' "$bundle/poolrooms.js"
 }
 
 if [ "$action" != serve-built ]; then
