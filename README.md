@@ -130,7 +130,7 @@ is deliberately a hardware WebGPU workload.
 
 ```toml
 [dependencies]
-dwemer_poolrooms = "0.9.1"
+dwemer_poolrooms = "0.9.2"
 ```
 
 Import egui through the crate to keep its public geometry types aligned with
@@ -146,7 +146,7 @@ chrome::install(&ctx);
 For chrome without GPU water:
 
 ```toml
-dwemer_poolrooms = { version = "0.9.1", default-features = false }
+dwemer_poolrooms = { version = "0.9.2", default-features = false }
 ```
 
 ## Water
@@ -166,6 +166,12 @@ engine.
 
 The default `water` feature contains the simulator and compositor.
 `instrumentation` adds semantic chrome anchors for deterministic UI driving.
+Poolrooms deliberately selects no native wgpu backend for a consuming
+application. The application host owns that policy and should enable only its
+target's backend: Vulkan on Linux, Metal on macOS, or DX12 on Windows. The
+native and WebGPU galleries select exactly their own backend as dev-only host
+dependencies; Poolrooms therefore cannot smuggle alien platform machinery into
+an application's binary.
 
 The submerged mosaic is registered to the viewport by default. Applications
 whose own geometry names the visible tile lattice can register the same floor
