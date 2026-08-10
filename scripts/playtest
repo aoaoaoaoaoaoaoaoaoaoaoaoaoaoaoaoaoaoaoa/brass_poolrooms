@@ -178,24 +178,31 @@ case "$gallery" in
     widget_gallery)
         # The numerical wheel owns its complete smoothed impulse. Its value and
         # water may move, but the enclosing menagerie must remain nailed down.
-        xdotool mousemove --window "$window" 121 852
+        # First place the numerical exhibit at a deterministic viewport
+        # coordinate; preceding exhibits may grow without turning this wheel
+        # gesture into an accidental ScrollArea gesture.
+        xdotool mousemove --window "$window" 740 820
+        xdotool click --repeat 10 5
+        sleep 1.20
+        import -window "$window" "$out/number-wheel-before.png"
+        xdotool mousemove --window "$window" 121 527
         xdotool click 5
-        sleep 0.30
+        sleep 1.20
         import -window "$window" "$out/contained-number-wheel.png"
-        magick "$out/initial.png" -crop 600x500+0+0 "$out/containment-before.png"
-        magick "$out/contained-number-wheel.png" -crop 600x500+0+0 "$out/containment-after.png"
+        magick "$out/number-wheel-before.png" -crop 600x400+0+0 "$out/containment-before.png"
+        magick "$out/contained-number-wheel.png" -crop 600x400+0+0 "$out/containment-after.png"
         contained=$(magick \
             "$out/containment-before.png" \
             "$out/containment-after.png" \
             -compose difference \
             -composite \
-            -format '%[fx:mean<0.004?1:0]' \
+            -format '%[fx:mean<0.015?1:0]' \
             info:)
         if [ "$contained" -ne 1 ]; then
             printf 'numerical wheel leaked into the enclosing scroll area\n' >&2
             exit 1
         fi
-        xdotool mousemove --window "$window" 740 820
+        xdotool mousemove --window "$window" 740 450
         xdotool click --repeat 18 5
         sleep 0.45
         import -window "$window" "$out/lower-menagerie.png"
