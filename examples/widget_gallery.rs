@@ -8,7 +8,7 @@ mod support;
 
 use anyhow::Result;
 use dwemer_poolrooms::{chrome, egui, water::Surface};
-use exhibits::{Checkboxes, Closures, Dates, Handles, Numbers, Pins, Sliders, Symbols};
+use exhibits::{Checkboxes, Closures, Dates, Handles, Legends, Numbers, Pins, Sliders, Symbols};
 use support::Exhibit;
 
 #[derive(Default)]
@@ -16,6 +16,7 @@ struct Menagerie {
     closures: Closures,
     handles: Handles,
     symbols: Symbols,
+    legends: Legends,
     pins: Pins,
     numbers: Numbers,
     sliders: Sliders,
@@ -46,6 +47,8 @@ impl Exhibit for Menagerie {
                         self.handles.show(ui, water);
                         ui.add_space(42.0);
                         self.symbols.show(ui, water);
+                        ui.add_space(42.0);
+                        self.legends.show(ui, water);
                         ui.add_space(42.0);
                         self.pins.show(ui);
                         ui.add_space(42.0);

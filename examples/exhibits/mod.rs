@@ -3,8 +3,8 @@ use std::hash::Hash;
 use dwemer_poolrooms::{
     chrome::{
         self, Checkbox, CornerClose, Coupled, CouplingGap, DateReels, DateSpool, DragHandle,
-        ForgePin, GregorianDay, LabelSide, MechanismSize, Monoglyph, NumberInput, Rail, Symbol,
-        WheelPlane,
+        ForgePin, GregorianDay, Keycap, LabelSide, MechanismSize, MnemonicText, Monoglyph,
+        NumberInput, Rail, Section, Symbol, WheelPlane,
     },
     egui,
     water::Surface,
@@ -229,6 +229,48 @@ impl Symbols {
             });
             ui.add_space(8.0);
         }
+    }
+}
+
+#[derive(Default)]
+pub struct Legends;
+
+impl Legends {
+    pub fn show(&mut self, ui: &mut egui::Ui, water: &mut Surface) {
+        let _title = ui.label(chrome::title("COMMAND LEGENDS"));
+        let _law = ui.label(chrome::muted(
+            "one mnemonic underline · one chord plate · inherited enabled state",
+        ));
+        ui.add_space(16.0);
+
+        let _buttons = ui.horizontal(|ui| {
+            let open = MnemonicText::new("Open archive", 'O').widget_text(ui);
+            let _open = ui.add(egui::Button::new(open).shortcut_text("Alt+O"));
+            let save = MnemonicText::new("Save archive", 'S').widget_text(ui);
+            let _save = ui.add(egui::Button::new(save).shortcut_text("Ctrl+S"));
+        });
+        ui.add_space(10.0);
+        let _caps = ui.horizontal(|ui| {
+            let _primary = Keycap::new("Ctrl+Shift+S").show(ui);
+            let _function = Keycap::new("F2").show(ui);
+            let _tab = Keycap::new("Ctrl+Tab").show(ui);
+            let _arrows = Keycap::new("← / →").show(ui);
+        });
+        ui.add_space(10.0);
+        let _disabled = ui.add_enabled_ui(false, |ui| {
+            let _caption = ui.label(chrome::muted("DISABLED COMMAND"));
+            let _cap = Keycap::new("Alt+R").show(ui);
+        });
+        ui.add_space(16.0);
+        let section = Section::new("ACTIVE PANEL")
+            .default_open(true)
+            .active(true)
+            .show(ui, "gallery-active-panel", |ui| {
+                let _body = ui.label(chrome::muted(
+                    "Poolrooms embodies the disclosure; application logic owns panel traversal.",
+                ));
+            });
+        water.fold(section.wake);
     }
 }
 

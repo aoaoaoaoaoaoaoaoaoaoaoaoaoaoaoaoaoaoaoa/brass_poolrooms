@@ -102,11 +102,13 @@ impl Monoglyph {
             response = response.on_hover_cursor(CursorIcon::PointingHand);
         }
         response.widget_info(|| WidgetInfo::labeled(WidgetType::Button, enabled, self.glyph));
+        let activated = super::exact_activation(ui, &response);
 
         let motion = plunger::momentary_motion(
             ui,
             &response,
             enabled,
+            activated,
             baked::REST,
             baked::PRESS,
             SPRING_LAW,
@@ -149,6 +151,7 @@ impl Monoglyph {
             response,
             elevation: motion.position,
             ports: CouplingPorts::around(anatomy.socket),
+            activated,
         }
     }
 }
@@ -160,9 +163,15 @@ pub struct MonoglyphResponse {
     wake: Option<MonoglyphWake>,
     elevation: f32,
     ports: CouplingPorts,
+    activated: bool,
 }
 
 impl MonoglyphResponse {
+    /// Whether pointer, accessibility, or exact keyboard activation fired it.
+    pub const fn clicked(&self) -> bool {
+        self.activated
+    }
+
     /// The plunger volume swept since the preceding frame, if it moved.
     pub fn wake(&self) -> Option<MonoglyphWake> {
         self.wake

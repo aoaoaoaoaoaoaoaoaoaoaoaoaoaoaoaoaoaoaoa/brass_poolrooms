@@ -117,6 +117,7 @@ pub(super) fn momentary_motion(
     ui: &egui::Ui,
     response: &egui::Response,
     enabled: bool,
+    activated: bool,
     rest: f32,
     press: f32,
     law: SpringLaw,
@@ -124,8 +125,7 @@ pub(super) fn momentary_motion(
     let dt = ui
         .input(|input| input.stable_dt)
         .clamp(1.0 / 240.0, 1.0 / 30.0);
-    let synthetic =
-        enabled && response.clicked() && !response.clicked_by(egui::PointerButton::Primary);
+    let synthetic = enabled && activated && !response.clicked_by(egui::PointerButton::Primary);
     // Egui assigns click ownership after the press frame. Observe that frame
     // directly so a sleeping host sees the first stroke before button-up.
     let struck_here = response.hovered()

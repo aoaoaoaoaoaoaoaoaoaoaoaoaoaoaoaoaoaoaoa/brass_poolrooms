@@ -22,6 +22,8 @@ pub enum Symbol {
     Duplicate,
     /// Expand a closed disclosure.
     Expand,
+    /// Open contextual help and keyboard guidance.
+    Help,
     /// Increase a scalar by one application-defined quantum.
     Increment,
     /// Remove, clear, or dismiss the targeted member.
@@ -34,7 +36,7 @@ pub enum Symbol {
 
 impl Symbol {
     /// Complete armory in stable presentation order.
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 11] = [
         Self::Add,
         Self::Remove,
         Self::Duplicate,
@@ -42,6 +44,7 @@ impl Symbol {
         Self::Confirm,
         Self::Expand,
         Self::Collapse,
+        Self::Help,
         Self::Restore,
         Self::Increment,
         Self::Decrement,
@@ -56,6 +59,7 @@ impl Symbol {
             Self::Decrement => '−',
             Self::Duplicate => '⧉',
             Self::Expand => '▸',
+            Self::Help => '?',
             Self::Remove => '×',
             Self::Rename => '✎',
             Self::Restore => '↺',
@@ -71,6 +75,7 @@ impl Symbol {
             Self::Decrement => "DECREMENT",
             Self::Duplicate => "DUPLICATE",
             Self::Expand => "EXPAND",
+            Self::Help => "HELP",
             Self::Increment => "INCREMENT",
             Self::Remove => "REMOVE",
             Self::Rename => "RENAME",

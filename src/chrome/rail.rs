@@ -36,8 +36,8 @@ const DEFAULT_DETENTS: NonZeroU16 = NonZeroU16::MIN.saturating_add(10);
 
 #[derive(Clone, Copy, Default)]
 enum WheelPolicy {
-    #[default]
     Pass,
+    #[default]
     Detents,
 }
 
@@ -49,8 +49,9 @@ enum WheelPolicy {
 /// stop plates instead of disappearing.
 ///
 /// The control supports pointer dragging, clicks, the left/right arrow keys,
-/// and Home/End while focused. [`Rail::wheel`] additionally enables hovered
-/// wheel/trackpad motion. Its response dereferences to `egui::Response` and
+/// Home/End while focused, and hovered wheel/trackpad motion. [`Rail::pass_wheel`]
+/// relinquishes wheel gestures to an enclosing scrolling surface. Its response
+/// dereferences to `egui::Response` and
 /// also carries the solids' displaced-water wakes.
 ///
 /// # Example
@@ -127,15 +128,23 @@ impl<'a, N: Numeric> Rail<'a, N> {
         self
     }
 
-    /// Enable unmodified vertical wheel and trackpad gestures while hovered.
+    /// Explicitly retain the default unmodified wheel and trackpad gestures.
     ///
     /// Each mouse-wheel notch advances one station on the immutable total
-    /// scale; fine trackpad travel is accumulated across frames. This is
-    /// opt-in so a rail embedded in a scrolling surface passes wheel motion
-    /// through by default. Use [`super::take_control_wheel`] when an enclosing
-    /// scroll surface must observe that the rail claimed a gesture.
+    /// scale; fine trackpad travel is accumulated across frames. This method
+    /// remains as an intention-revealing compatibility surface. Use
+    /// [`super::take_control_wheel`] when an enclosing scroll surface must
+    /// observe that the rail claimed a gesture.
     pub fn wheel(mut self) -> Self {
         self.wheel = WheelPolicy::Detents;
+        self
+    }
+
+    /// Relinquish wheel and trackpad gestures to an enclosing scroll surface.
+    ///
+    /// Pointer dragging and focused keyboard adjustment remain enabled.
+    pub fn pass_wheel(mut self) -> Self {
+        self.wheel = WheelPolicy::Pass;
         self
     }
 
@@ -205,10 +214,10 @@ impl<'a, N: Numeric> Rail<'a, N> {
         }
         if response.has_focus() {
             let key = ui.input_mut(|input| {
-                let home = input.consume_key(Modifiers::NONE, Key::Home);
-                let end = input.consume_key(Modifiers::NONE, Key::End);
-                let steps = input.count_and_consume_key(Modifiers::NONE, Key::ArrowRight) as i32
-                    - input.count_and_consume_key(Modifiers::NONE, Key::ArrowLeft) as i32;
+                let home = super::count_key_exact(input, Modifiers::NONE, Key::Home) != 0;
+                let end = super::count_key_exact(input, Modifiers::NONE, Key::End) != 0;
+                let steps = super::count_key_exact(input, Modifiers::NONE, Key::ArrowRight) as i32
+                    - super::count_key_exact(input, Modifiers::NONE, Key::ArrowLeft) as i32;
                 (home, end, steps)
             });
             let next = match key {
@@ -824,7 +833,7 @@ mod tests {
     }
 
     #[test]
-    fn wheel_is_opt_in_banked_and_stopped_by_the_allowed_span() {
+    fn wheel_is_canonical_banked_and_stopped_by_the_allowed_span() {
         let ctx = egui::Context::default();
         let mut value = 4_u16;
         let screen = Rect::from_min_size(Pos2::ZERO, Vec2::new(320.0, H));
@@ -845,10 +854,14 @@ mod tests {
         let _pass = ctx.run_ui(input(egui::MouseWheelUnit::Line, 1.0), |ui| {
             let _rail = Rail::new(&mut value, 0..=10)
                 .detents(11)
+                .pass_wheel()
                 .width(320.0)
                 .show(ui);
         });
-        assert_eq!(value, 4, "wheel motion must pass through by default");
+        assert_eq!(
+            value, 4,
+            "the explicit pass-through must not claim wheel motion"
+        );
         assert!(!crate::chrome::take_control_wheel(&ctx));
 
         let mut swept = 0.0;
@@ -856,7 +869,6 @@ mod tests {
             let _frame = ctx.run_ui(input(egui::MouseWheelUnit::Point, points), |ui| {
                 let rail = Rail::new(&mut value, 0..=10)
                     .detents(11)
-                    .wheel()
                     .width(320.0)
                     .show(ui);
                 swept += rail.wakes().map(RailWake::swept_area).sum::<f32>();
@@ -870,7 +882,6 @@ mod tests {
             let _rail = Rail::new(&mut value, 0..=10)
                 .allowed(0..=5)
                 .detents(11)
-                .wheel()
                 .width(320.0)
                 .show(ui);
         });
@@ -881,11 +892,56 @@ mod tests {
             let _rail = Rail::new(&mut value, 0..=10)
                 .allowed(0..=5)
                 .detents(11)
-                .wheel()
                 .width(320.0)
                 .show(ui);
         });
         assert_eq!(value, 4);
         assert!(crate::chrome::take_control_wheel(&ctx));
+    }
+
+    #[test]
+    fn focused_keyboard_adjustment_owns_only_exact_arrows() {
+        let stroke = |modifiers| {
+            let ctx = egui::Context::default();
+            let mut value = 4_u16;
+            let screen = Rect::from_min_size(Pos2::ZERO, Vec2::new(320.0, H));
+            let _prime = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(screen),
+                    ..egui::RawInput::default()
+                },
+                |ui| {
+                    Rail::new(&mut value, 0..=10)
+                        .detents(11)
+                        .width(320.0)
+                        .show(ui)
+                        .request_focus();
+                },
+            );
+            let _stroke = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(screen),
+                    modifiers,
+                    events: vec![egui::Event::Key {
+                        key: Key::ArrowRight,
+                        physical_key: Some(Key::ArrowRight),
+                        pressed: true,
+                        repeat: false,
+                        modifiers,
+                    }],
+                    ..egui::RawInput::default()
+                },
+                |ui| {
+                    let _rail = Rail::new(&mut value, 0..=10)
+                        .detents(11)
+                        .width(320.0)
+                        .show(ui);
+                },
+            );
+            (value, ctx.input(|input| input.key_pressed(Key::ArrowRight)))
+        };
+
+        assert_eq!(stroke(Modifiers::NONE), (5, false));
+        assert_eq!(stroke(Modifiers::SHIFT), (4, true));
     }
 }

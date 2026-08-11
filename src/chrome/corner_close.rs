@@ -149,11 +149,13 @@ impl CornerClose {
             response = response.on_hover_cursor(CursorIcon::PointingHand);
         }
         response.widget_info(|| WidgetInfo::labeled(WidgetType::Button, enabled, "Close"));
+        let activated = super::exact_activation(ui, &response);
 
         let motion = plunger::momentary_motion(
             ui,
             &response,
             enabled,
+            activated,
             baked::REST,
             baked::PRESS,
             SPRING_LAW,
@@ -186,6 +188,7 @@ impl CornerClose {
             wake: CornerCloseWake::new(anatomy.button, motion.travel),
             response,
             elevation: motion.position,
+            activated,
         }
     }
 }
@@ -196,9 +199,15 @@ pub struct CornerCloseResponse {
     response: egui::Response,
     wake: Option<CornerCloseWake>,
     elevation: f32,
+    activated: bool,
 }
 
 impl CornerCloseResponse {
+    /// Whether pointer, accessibility, or exact keyboard activation fired it.
+    pub const fn clicked(&self) -> bool {
+        self.activated
+    }
+
     /// The plunger volume swept since the preceding frame, if it moved.
     pub fn wake(&self) -> Option<CornerCloseWake> {
         self.wake

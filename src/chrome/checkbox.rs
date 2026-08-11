@@ -185,7 +185,8 @@ impl<'a> Checkbox<'a> {
         if enabled {
             response = response.on_hover_cursor(CursorIcon::PointingHand);
         }
-        if response.clicked() {
+        let activated = super::exact_activation(ui, &response);
+        if activated {
             *checked = !*checked;
             response.mark_changed();
         }
@@ -221,7 +222,7 @@ impl<'a> Checkbox<'a> {
             response.id,
             seed,
             target,
-            response.clicked().then_some(-32.0 * scale),
+            activated.then_some(-32.0 * scale),
             dt,
             spring_law(gauge),
         );
@@ -248,6 +249,7 @@ impl<'a> Checkbox<'a> {
             wake,
             elevation: motion.position,
             ports: anatomy.coupling_ports(),
+            activated,
         }
     }
 }
@@ -271,9 +273,15 @@ pub struct CheckboxResponse {
     wake: Option<CheckboxWake>,
     elevation: f32,
     ports: CouplingPorts,
+    activated: bool,
 }
 
 impl CheckboxResponse {
+    /// Whether pointer, accessibility, or exact keyboard activation toggled it.
+    pub const fn clicked(&self) -> bool {
+        self.activated
+    }
+
     /// The plunger volume swept since the preceding frame, if it moved.
     pub fn wake(&self) -> Option<CheckboxWake> {
         self.wake

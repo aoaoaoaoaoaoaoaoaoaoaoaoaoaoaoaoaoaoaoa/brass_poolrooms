@@ -31,7 +31,7 @@ composition.
 
 | Mechanism | Contract | Water hook |
 | --- | --- | --- |
-| [`Rail`] | Bounded linear transport with explicit total and admissible spans, detents, and optional wheel input | `Surface::rail` |
+| [`Rail`] | Bounded linear transport with explicit total and admissible spans, detents, focused Left/Right/Home/End input, and hovered wheel input by default | `Surface::rail` |
 | [`DateSpool`] | One-to-three Gregorian tape reels with explicit width and a reel-derived rigid minimum | `Surface::date_spool` |
 | [`Checkbox`] | Three-gauge latching plunger with an optional side-selectable etched plaque and a state-transparent fixed-stock guard | `Surface::checkbox` |
 | [`Monoglyph`] | Three-gauge momentary square plunger carrying one etched scalar; [`Symbol`] supplies the canonical common-action armory | `Surface::monoglyph` |
@@ -40,12 +40,23 @@ composition.
 | [`ForgePin`] | Three-gauge coordinate pin with one coherent shaft, bulb, grip region, and medium/large inscription API | application-defined |
 | [`NumberInput`] | Bounded integer or floating register with an explicit quantum, precision, exact-entry override, two wheel planes, and sprung limit refusal | `Surface::number_input` |
 
-These eight types are the complete inventory of foundry-owned controls: their
-geometry, dynamics, material response, and displaced-water contract live here.
-The other `chrome` exports are shared typography, layout, and interaction
-plumbing rather than standalone mechanisms. [`widget_gallery`](examples/widget_gallery.rs)
-is the living visual contract: it keeps one legible exemplar of every material
-variant and interaction without multiplying equivalent Cartesian combinations.
+These eight types are the complete inventory of authored foundry mechanisms:
+their projected geometry, dynamics, material response, and displaced-water
+contract live here. The other `chrome` exports are shared typography, frames,
+layout, and interaction assemblies rather than custom projected mechanisms.
+[`widget_gallery`](examples/widget_gallery.rs) is the living visual contract:
+it keeps one legible exemplar of every material variant and interaction without
+multiplying equivalent Cartesian combinations.
+
+[`Section`] embodies the recessed disclosure used by higher-level panel
+managers. Its active and focused states are physical indications only;
+application logic owns panel selection and traversal. [`MnemonicText`] marks
+one permanent Alt glyph, while [`Keycap`] renders a noninteractive chord plate.
+`chrome::exact_activation` refines button-like egui responses to pointer,
+accessibility, or fresh unmodified Enter/Space activation and leaves modified
+chords for their exact owner. Disabled controls and controls behind a modal
+layer cannot activate. These parts state a common physical interaction language
+without introducing commands, menus, or navigation policy.
 
 [`MechanismSize`] gives compatible `Checkbox`, `Monoglyph`, `CornerClose`,
 `DragHandle`, and `ForgePin` dies three named gauges. Cased mechanisms use the
@@ -60,8 +71,8 @@ independently projected and illuminated at build time.
 `Monoglyph::symbol(Symbol::Add)` and the other armory constructors bind a
 common action to one scalar and the selected foundry gauge's typography. A
 product-specific mark may still use `Monoglyph::new(char)`; common add, remove,
-duplicate, rename, confirm, disclosure, restore, and increment/decrement marks
-must not be re-authored at application call sites.
+duplicate, rename, confirm, disclosure, restore, help, and increment/decrement
+marks must not be re-authored at application call sites.
 [`Coupled::horizontal`] places any two coupling-capable foundry responses at the
 canonical six-point gap and runs the standard twin bronze ties behind both
 casings. [`Coupled::horizontal_with_gap`] accepts a [`CouplingGap`] when dense
@@ -130,7 +141,7 @@ is deliberately a hardware WebGPU workload.
 
 ```toml
 [dependencies]
-dwemer_poolrooms = "0.9.2"
+dwemer_poolrooms = "0.10.0"
 ```
 
 Import egui through the crate to keep its public geometry types aligned with
@@ -146,7 +157,7 @@ chrome::install(&ctx);
 For chrome without GPU water:
 
 ```toml
-dwemer_poolrooms = { version = "0.9.2", default-features = false }
+dwemer_poolrooms = { version = "0.10.0", default-features = false }
 ```
 
 ## Water
@@ -196,6 +207,9 @@ material, mortar, deterministic tile variation, and refractive law.
 [`DragHandle`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.DragHandle.html
 [`ForgePin`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.ForgePin.html
 [`NumberInput`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.NumberInput.html
+[`Section`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.Section.html
+[`MnemonicText`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.MnemonicText.html
+[`Keycap`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.Keycap.html
 [`MechanismSize`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/enum.MechanismSize.html
 [`Symbol`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/enum.Symbol.html
 [`CouplingGap`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.CouplingGap.html

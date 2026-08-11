@@ -249,8 +249,8 @@ where
         }
         if enabled && !editing && wheel_response.has_focus() {
             requested += ui.input_mut(|input| {
-                input.count_and_consume_key(Modifiers::NONE, Key::ArrowUp) as i32
-                    - input.count_and_consume_key(Modifiers::NONE, Key::ArrowDown) as i32
+                super::count_key_exact(input, Modifiers::NONE, Key::ArrowUp) as i32
+                    - super::count_key_exact(input, Modifiers::NONE, Key::ArrowDown) as i32
             });
         }
         let Step { accepted, refusal } = apply_steps(value, &range, step, requested);
@@ -462,7 +462,8 @@ where
         state.store(ui.ctx(), id);
     }
 
-    let escape = ui.input(|input| input.key_pressed(Key::Escape));
+    let escape =
+        ui.input_mut(|input| super::count_key_exact(input, Modifiers::NONE, Key::Escape) != 0);
     let commit = response.lost_focus() && !escape;
     if escape {
         ui.ctx().memory_mut(|memory| memory.surrender_focus(id));
