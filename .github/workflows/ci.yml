@@ -5,44 +5,17 @@ on:
   pull_request:
   workflow_dispatch:
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  CARGO_INCREMENTAL: 0
-  CARGO_TERM_COLOR: always
-  RUST_BACKTRACE: 1
-  RUSTUP_TOOLCHAIN: 1.96.0
-
 jobs:
-  source:
-    name: Native, WebGPU, and package contract
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Install Rust 1.96
-        run: rustup toolchain install 1.96.0 --profile minimal --component clippy,rustfmt --target wasm32-unknown-unknown
-      - name: Install WebAssembly binder
-        run: cargo install wasm-bindgen-cli --version 0.2.126 --locked
-      - name: Verify source
-        run: ./check.py verify
-      - name: Verify package
-        run: cargo package --locked
-
-  security:
-    name: Locked dependency audit
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Install Rust 1.96
-        run: rustup toolchain install 1.96.0 --profile minimal
-      - name: Install cargo-audit
-        run: cargo install cargo-audit --version 0.22.2 --locked
-      - name: Audit locked dependencies
-        run: scripts/audit
+  foundry:
+    name: Foundry
+    permissions:
+      contents: read
+    uses: aoaoaoaoaoaoaoaoaoaoaoaoaoaoaoaoaoaoaoa/eternalist-foundry/.github/workflows/pipeline.yml@434df1d663ea0cf4e8836dc7235b9fdc4a1d6a1b
+    with:
+      publish: false
