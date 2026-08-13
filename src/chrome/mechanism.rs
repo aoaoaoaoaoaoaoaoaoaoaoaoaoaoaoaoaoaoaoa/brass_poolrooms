@@ -166,7 +166,7 @@ pub trait CouplingTarget: sealed::Sealed {
 /// # Example
 ///
 /// ```
-/// use dwemer_poolrooms::{
+/// use brass_poolrooms::{
 ///     chrome::{Coupled, MechanismSize, Monoglyph, Symbol},
 ///     egui,
 /// };

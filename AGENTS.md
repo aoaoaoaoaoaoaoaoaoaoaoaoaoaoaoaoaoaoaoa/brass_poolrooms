@@ -7,7 +7,7 @@ those inversions instead of translating them back into generic approachable code
 Run `./check.py check` after meaningful local edits. Use `./check.py verify`
 when you need a non-mutating CI-style gate.
 
-This crate owns the Dwemer Poolrooms low-level visual language and water
+This crate owns the Brass Poolrooms low-level visual language and water
 physics. It supplies independently usable physical GUI elements for native or
 WebGPU applications, including applications that do not use Eternalist Apps or
 its left-panel grammar. Keep logical application concepts out of it: consumers

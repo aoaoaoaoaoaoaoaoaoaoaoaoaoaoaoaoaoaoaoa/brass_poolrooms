@@ -8,7 +8,7 @@ mod support;
 use std::sync::Arc;
 
 use anyhow::Result;
-use dwemer_poolrooms::{
+use brass_poolrooms::{
     chrome,
     egui::{self, Align2, Color32, FontId, Pos2, Rect, Sense, Shape, Stroke, StrokeKind, Vec2},
     water::{Surface, Wetness},

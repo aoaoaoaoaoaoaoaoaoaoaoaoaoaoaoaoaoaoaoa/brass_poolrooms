@@ -1,6 +1,6 @@
 //! Optional semantic anchors for deterministic external UI choreography.
 
-const STORE: &str = "dwemer-poolroom-anchors";
+const STORE: &str = "brass-poolroom-anchors";
 
 #[derive(Clone, Debug)]
 pub struct Anchor {

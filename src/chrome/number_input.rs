@@ -120,7 +120,7 @@ impl NumberRefusal {
 /// # Example
 ///
 /// ```
-/// use dwemer_poolrooms::{chrome::{NumberInput, WheelPlane}, egui};
+/// use brass_poolrooms::{chrome::{NumberInput, WheelPlane}, egui};
 ///
 /// fn gain(ui: &mut egui::Ui, value: &mut f32) {
 ///     let _gain = NumberInput::new(value, -2.0..=2.0, 0.01, 2)
@@ -791,7 +791,7 @@ mod tests {
         let screen = Rect::from_min_size(Pos2::ZERO, Vec2::new(180.0, 40.0));
         let mut value = 0_i32;
         let mut wheel_center = Pos2::ZERO;
-        let _prime = ctx.run_ui(
+        ctx.run_ui(
             egui::RawInput {
                 screen_rect: Some(screen),
                 ..egui::RawInput::default()
@@ -803,13 +803,15 @@ mod tests {
                     response.rect.center().y,
                 );
             },
-        );
-        let _spin = ctx.run_ui(
+        )
+        .drop_without_applying_deltas();
+        ctx.run_ui(
             wheel_input(screen, wheel_center, egui::MouseWheelUnit::Line, 7.0),
             |ui| {
                 let _response = NumberInput::new(&mut value, -100..=100, 2, 0).show(ui);
             },
-        );
+        )
+        .drop_without_applying_deltas();
         assert_eq!(value, 14);
         assert!(crate::chrome::take_control_wheel(&ctx));
     }
@@ -820,7 +822,7 @@ mod tests {
         let screen = Rect::from_min_size(Pos2::ZERO, Vec2::new(180.0, 40.0));
         let mut value = 0.0_f32;
         let mut wheel_center = Pos2::ZERO;
-        let _prime = ctx.run_ui(
+        ctx.run_ui(
             egui::RawInput {
                 screen_rect: Some(screen),
                 ..egui::RawInput::default()
@@ -832,14 +834,16 @@ mod tests {
                     response.rect.center().y,
                 );
             },
-        );
+        )
+        .drop_without_applying_deltas();
         for points in [20.0, 30.0] {
-            let _spin = ctx.run_ui(
+            ctx.run_ui(
                 wheel_input(screen, wheel_center, egui::MouseWheelUnit::Point, points),
                 |ui| {
                     let _response = NumberInput::new(&mut value, -1.0..=1.0, 0.125, 3).show(ui);
                 },
-            );
+            )
+            .drop_without_applying_deltas();
         }
         assert_eq!(value, 0.125);
     }
@@ -849,7 +853,7 @@ mod tests {
         fn frame(ctx: &egui::Context, value: &mut i32, input: egui::RawInput) -> (Pos2, f32) {
             let mut wheel_center = Pos2::ZERO;
             let mut offset = 0.0;
-            let _pass = ctx.run_ui(input, |ui| {
+            ctx.run_ui(input, |ui| {
                 let scroll = egui::ScrollArea::vertical()
                     .id_salt("number-input-scroll-containment")
                     .show(ui, |ui| {
@@ -861,7 +865,8 @@ mod tests {
                         ui.add_space(400.0);
                     });
                 offset = scroll.state.offset.y;
-            });
+            })
+            .drop_without_applying_deltas();
             (wheel_center, offset)
         }
 

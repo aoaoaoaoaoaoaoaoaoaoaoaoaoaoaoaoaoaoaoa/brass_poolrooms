@@ -6,7 +6,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-const MAGIC: &[u8] = b"DWEMER_WATER_DUMP\0";
+const MAGIC: &[u8] = b"BRASS_WATER_DUMP\0";
 
 impl Engine {
     pub fn dump(
@@ -184,7 +184,9 @@ fn read_texture(
     rx.recv_timeout(Duration::from_secs(10))
         .context("receive water dump map result")?
         .context("map water dump readback")?;
-    let view = slice.get_mapped_range();
+    let view = slice
+        .get_mapped_range()
+        .context("borrow water dump readback")?;
     let mut bytes = Vec::with_capacity((row * size.height) as usize);
     for y in 0..size.height {
         let start = (y * pitch) as usize;

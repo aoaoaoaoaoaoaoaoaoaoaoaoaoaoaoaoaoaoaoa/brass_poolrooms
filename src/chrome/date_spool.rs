@@ -215,7 +215,7 @@ impl DateWake {
 /// # Example
 ///
 /// ```
-/// use dwemer_poolrooms::{chrome::{DateReels, DateSpool, GregorianDay}, egui};
+/// use brass_poolrooms::{chrome::{DateReels, DateSpool, GregorianDay}, egui};
 ///
 /// # #[derive(Clone, Copy, Eq, PartialEq)]
 /// # struct Day(i32, u32, u32);
@@ -1418,12 +1418,13 @@ mod tests {
     fn hidden_year_remains_the_month_day_banks_leap_context() {
         let ctx = egui::Context::default();
         let mut day = Day(1904, 2, 29);
-        let _frame = ctx.run_ui(egui::RawInput::default(), |ui| {
+        ctx.run_ui(egui::RawInput::default(), |ui| {
             let _spool = DateSpool::new(&mut day, 2005..=2027)
                 .reels(DateReels::MONTH_DAY)
                 .width(DateReels::MONTH_DAY.minimum_width())
                 .show(ui, "hidden-year");
-        });
+        })
+        .drop_without_applying_deltas();
 
         assert_eq!(day.ymd(), (1904, 2, 29));
     }

@@ -343,7 +343,9 @@ impl Field {
         rx.recv_timeout(Duration::from_secs(10))
             .context("receive basin audit map result")?
             .context("map basin audit readback")?;
-        let view = slice.get_mapped_range();
+        let view = slice
+            .get_mapped_range()
+            .context("borrow basin audit readback")?;
         let mut bytes = Vec::with_capacity((row * basin.size.height) as usize);
         for y in 0..basin.size.height {
             let start = (y * pitch) as usize;

@@ -25,7 +25,7 @@ pub(crate) fn push(
         omega,
     };
     ctx.data_mut(|data| {
-        data.get_temp_mut_or_default::<Vec<Tension>>(egui::Id::new("dwemer-tension-field"))
+        data.get_temp_mut_or_default::<Vec<Tension>>(egui::Id::new("brass-tension-field"))
             .push(tension);
     });
 }
@@ -43,6 +43,6 @@ pub(crate) fn push(
 
 #[cfg(feature = "water")]
 pub(crate) fn take(ctx: &egui::Context) -> Vec<Tension> {
-    ctx.data_mut(|data| data.remove_temp::<Vec<Tension>>(egui::Id::new("dwemer-tension-field")))
+    ctx.data_mut(|data| data.remove_temp::<Vec<Tension>>(egui::Id::new("brass-tension-field")))
         .unwrap_or_default()
 }

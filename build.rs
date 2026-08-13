@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Err(io::Error::other(format!(
             "build-script cache crossed source roots: compiled for \
              {COMPILED_MANIFEST_DIR}, invoked for {manifest_dir}; run \
-             `cargo clean -p dwemer_poolrooms`, and give `cargo package` a \
+             `cargo clean -p brass_poolrooms`, and give `cargo package` a \
              separate --target-dir"
         ))
         .into());

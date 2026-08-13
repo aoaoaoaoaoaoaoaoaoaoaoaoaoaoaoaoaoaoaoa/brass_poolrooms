@@ -90,7 +90,7 @@ struct Inscription {
 /// # Example
 ///
 /// ```
-/// use dwemer_poolrooms::{chrome::{ForgePin, MechanismSize}, egui};
+/// use brass_poolrooms::{chrome::{ForgePin, MechanismSize}, egui};
 ///
 /// fn support(painter: &egui::Painter, anchor: egui::Pos2, seized: bool) {
 ///     ForgePin::new(anchor)

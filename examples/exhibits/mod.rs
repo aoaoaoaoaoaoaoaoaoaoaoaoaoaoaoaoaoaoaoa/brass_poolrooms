@@ -1,4 +1,4 @@
-use dwemer_poolrooms::{
+use brass_poolrooms::{
     chrome::{
         self, Checkbox, CornerClose, Coupled, CouplingGap, DateReels, DateSpool, DragHandle,
         ForgePin, GregorianDay, Keycap, LabelSide, MechanismSize, MnemonicText, Monoglyph,

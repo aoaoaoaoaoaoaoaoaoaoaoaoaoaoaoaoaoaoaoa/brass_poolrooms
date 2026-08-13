@@ -478,21 +478,24 @@ mod tests {
     fn activation_owns_only_fresh_unmodified_enter_or_space() {
         let stroke = |key, modifiers| {
             let ctx = egui::Context::default();
-            let _prime = ctx.run_ui(egui::RawInput::default(), |ui| {
+            ctx.run_ui(egui::RawInput::default(), |ui| {
                 ui.button("command").request_focus();
-            });
+            })
+            .drop_without_applying_deltas();
             let mut activated = false;
             let mut retained = false;
-            let _stroke = ctx.run_ui(
+            ctx.run_ui(
                 egui::RawInput {
-                    modifiers,
-                    events: vec![egui::Event::Key {
-                        key,
-                        physical_key: Some(key),
-                        pressed: true,
-                        repeat: false,
-                        modifiers,
-                    }],
+                    events: vec![
+                        egui::Event::ModifiersChanged(modifiers),
+                        egui::Event::Key {
+                            key,
+                            physical_key: Some(key),
+                            pressed: true,
+                            repeat: false,
+                            modifiers,
+                        },
+                    ],
                     ..egui::RawInput::default()
                 },
                 |ui| {
@@ -511,14 +514,16 @@ mod tests {
                         })
                     });
                 },
-            );
+            )
+            .drop_without_applying_deltas();
             (activated, retained)
         };
         let repeat = |key| {
             let ctx = egui::Context::default();
-            let _prime = ctx.run_ui(egui::RawInput::default(), |ui| {
+            ctx.run_ui(egui::RawInput::default(), |ui| {
                 ui.button("command").request_focus();
-            });
+            })
+            .drop_without_applying_deltas();
             let input = |repeat| egui::RawInput {
                 events: vec![egui::Event::Key {
                     key,
@@ -530,17 +535,19 @@ mod tests {
                 ..egui::RawInput::default()
             };
             let mut first = false;
-            let _fresh = ctx.run_ui(input(false), |ui| {
+            ctx.run_ui(input(false), |ui| {
                 let response = ui.button("command");
                 first = exact_activation(ui, &response);
-            });
+            })
+            .drop_without_applying_deltas();
             let mut repeated = true;
             let mut retained = true;
-            let _repeat = ctx.run_ui(input(true), |ui| {
+            ctx.run_ui(input(true), |ui| {
                 let response = ui.button("command");
                 repeated = exact_activation(ui, &response);
                 retained = ui.input(|input| input.key_pressed(key));
-            });
+            })
+            .drop_without_applying_deltas();
             (first, repeated, retained)
         };
 
@@ -555,13 +562,14 @@ mod tests {
     fn accessibility_click_survives_an_unrelated_modified_activation_key() {
         let ctx = egui::Context::default();
         let mut id = egui::Id::NULL;
-        let _prime = ctx.run_ui(egui::RawInput::default(), |ui| {
+        ctx.run_ui(egui::RawInput::default(), |ui| {
             id = ui.button("command").id;
-        });
+        })
+        .drop_without_applying_deltas();
         let modifiers = egui::Modifiers::SHIFT;
         let input = egui::RawInput {
-            modifiers,
             events: vec![
+                egui::Event::ModifiersChanged(modifiers),
                 egui::Event::AccessKitActionRequest(egui::accesskit::ActionRequest {
                     action: egui::accesskit::Action::Click,
                     target_tree: egui::accesskit::TreeId::ROOT,
@@ -579,10 +587,11 @@ mod tests {
             ..egui::RawInput::default()
         };
         let mut activated = false;
-        let _stroke = ctx.run_ui(input, |ui| {
+        ctx.run_ui(input, |ui| {
             let response = ui.button("command");
             activated = exact_activation(ui, &response);
-        });
+        })
+        .drop_without_applying_deltas();
 
         assert!(activated);
         assert!(ctx.input(|input| input.key_pressed(egui::Key::Space)));
@@ -593,10 +602,11 @@ mod tests {
         let ctx = egui::Context::default();
         let modal = || egui::Modal::new(egui::Id::new("activation-barrier"));
         let mut id = egui::Id::NULL;
-        let _prime = ctx.run_ui(egui::RawInput::default(), |ui| {
+        ctx.run_ui(egui::RawInput::default(), |ui| {
             id = ui.button("command").id;
             let _modal = modal().show(ui.ctx(), |ui| ui.label("modal"));
-        });
+        })
+        .drop_without_applying_deltas();
         let input = egui::RawInput {
             events: vec![egui::Event::AccessKitActionRequest(
                 egui::accesskit::ActionRequest {
@@ -609,11 +619,12 @@ mod tests {
             ..egui::RawInput::default()
         };
         let mut activated = true;
-        let _stroke = ctx.run_ui(input, |ui| {
+        ctx.run_ui(input, |ui| {
             let response = ui.button("command");
             activated = exact_activation(ui, &response);
             let _modal = modal().show(ui.ctx(), |ui| ui.label("modal"));
-        });
+        })
+        .drop_without_applying_deltas();
 
         assert!(!activated);
     }

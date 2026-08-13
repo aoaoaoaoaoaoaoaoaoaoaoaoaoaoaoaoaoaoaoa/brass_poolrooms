@@ -79,7 +79,7 @@ enum Mechanism {
 /// # Example
 ///
 /// ```
-/// use dwemer_poolrooms::{chrome::{DragHandle, MechanismSize}, egui};
+/// use brass_poolrooms::{chrome::{DragHandle, MechanismSize}, egui};
 ///
 /// fn reorder_grip(ui: &mut egui::Ui) -> egui::Vec2 {
 ///     DragHandle::new()

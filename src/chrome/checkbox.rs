@@ -83,7 +83,7 @@ mod baked {
 /// # Example
 ///
 /// ```
-/// use dwemer_poolrooms::{chrome::{Checkbox, LabelSide}, egui};
+/// use brass_poolrooms::{chrome::{Checkbox, LabelSide}, egui};
 ///
 /// fn controls(ui: &mut egui::Ui, armed: &mut bool) {
 ///     let checkbox = Checkbox::new(armed, "ARM PUMPS")

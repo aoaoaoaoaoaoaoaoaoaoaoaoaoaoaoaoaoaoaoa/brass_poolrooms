@@ -68,11 +68,16 @@ impl Sentinel {
                     Some(Probe::Mapping(mapping)) => mapping,
                     _ => unreachable!("probe state changed while resolving map"),
                 };
-                if let Some(fault) = mapping.fault() {
-                    eprintln!("water guard reset poisoned field: {fault}");
-                    true
-                } else {
-                    false
+                match mapping.fault() {
+                    Ok(Some(fault)) => {
+                        eprintln!("water guard reset poisoned field: {fault}");
+                        true
+                    }
+                    Ok(None) => false,
+                    Err(err) => {
+                        eprintln!("water guard could not borrow readback; resetting field: {err}");
+                        true
+                    }
                 }
             }
             Ok(Err(err)) => {
@@ -132,10 +137,15 @@ struct Mapping {
 }
 
 impl Mapping {
-    fn fault(self) -> Option<Fault> {
-        let view = self.readback.buffer.slice(..).get_mapped_range();
-        let fault = self.readback.fault(&view);
-        drop(view);
+    fn fault(self) -> Result<Option<Fault>, wgpu::MapRangeError> {
+        let fault = match self.readback.buffer.slice(..).get_mapped_range() {
+            Ok(view) => {
+                let fault = self.readback.fault(&view);
+                drop(view);
+                Ok(fault)
+            }
+            Err(error) => Err(error),
+        };
         self.readback.buffer.unmap();
         fault
     }

@@ -40,7 +40,7 @@ mod baked {
 /// # Example
 ///
 /// ```
-/// use dwemer_poolrooms::{chrome::{self, CornerClose}, egui};
+/// use brass_poolrooms::{chrome::{self, CornerClose}, egui};
 ///
 /// fn popup(ui: &mut egui::Ui) -> bool {
 ///     let close = CornerClose::new().size(chrome::MechanismSize::Small);

@@ -57,7 +57,7 @@ enum WheelPolicy {
 /// # Example
 ///
 /// ```
-/// use dwemer_poolrooms::{chrome::Rail, egui};
+/// use brass_poolrooms::{chrome::Rail, egui};
 ///
 /// fn controls(ui: &mut egui::Ui, value: &mut u16, ceiling: u16) {
 ///     let rail = Rail::new(value, 0..=10)
@@ -793,13 +793,14 @@ mod tests {
             ..egui::RawInput::default()
         };
 
-        let _pass = ctx.run_ui(input(egui::MouseWheelUnit::Line, 1.0), |ui| {
+        ctx.run_ui(input(egui::MouseWheelUnit::Line, 1.0), |ui| {
             let _rail = Rail::new(&mut value, 0..=10)
                 .detents(11)
                 .pass_wheel()
                 .width(320.0)
                 .show(ui);
-        });
+        })
+        .drop_without_applying_deltas();
         assert_eq!(
             value, 4,
             "the explicit pass-through must not claim wheel motion"
@@ -808,35 +809,38 @@ mod tests {
 
         let mut swept = 0.0;
         for points in [25.0, 25.0] {
-            let _frame = ctx.run_ui(input(egui::MouseWheelUnit::Point, points), |ui| {
+            ctx.run_ui(input(egui::MouseWheelUnit::Point, points), |ui| {
                 let rail = Rail::new(&mut value, 0..=10)
                     .detents(11)
                     .width(320.0)
                     .show(ui);
                 swept += rail.wakes().map(RailWake::swept_area).sum::<f32>();
-            });
+            })
+            .drop_without_applying_deltas();
             assert!(crate::chrome::take_control_wheel(&ctx));
         }
         assert_eq!(value, 5, "two half-notches must bank into one detent");
         assert!(swept > 0.0, "wheel travel must displace water");
 
-        let _blocked = ctx.run_ui(input(egui::MouseWheelUnit::Line, 1.0), |ui| {
+        ctx.run_ui(input(egui::MouseWheelUnit::Line, 1.0), |ui| {
             let _rail = Rail::new(&mut value, 0..=10)
                 .allowed(0..=5)
                 .detents(11)
                 .width(320.0)
                 .show(ui);
-        });
+        })
+        .drop_without_applying_deltas();
         assert_eq!(value, 5, "the wheel cannot penetrate a dynamic blocker");
         assert!(crate::chrome::take_control_wheel(&ctx));
 
-        let _retreat = ctx.run_ui(input(egui::MouseWheelUnit::Line, -1.0), |ui| {
+        ctx.run_ui(input(egui::MouseWheelUnit::Line, -1.0), |ui| {
             let _rail = Rail::new(&mut value, 0..=10)
                 .allowed(0..=5)
                 .detents(11)
                 .width(320.0)
                 .show(ui);
-        });
+        })
+        .drop_without_applying_deltas();
         assert_eq!(value, 4);
         assert!(crate::chrome::take_control_wheel(&ctx));
     }
@@ -847,7 +851,7 @@ mod tests {
             let ctx = egui::Context::default();
             let mut value = 4_u16;
             let screen = Rect::from_min_size(Pos2::ZERO, Vec2::new(320.0, H));
-            let _prime = ctx.run_ui(
+            ctx.run_ui(
                 egui::RawInput {
                     screen_rect: Some(screen),
                     ..egui::RawInput::default()
@@ -859,18 +863,21 @@ mod tests {
                         .show(ui)
                         .request_focus();
                 },
-            );
-            let _stroke = ctx.run_ui(
+            )
+            .drop_without_applying_deltas();
+            ctx.run_ui(
                 egui::RawInput {
                     screen_rect: Some(screen),
-                    modifiers,
-                    events: vec![egui::Event::Key {
-                        key: Key::ArrowRight,
-                        physical_key: Some(Key::ArrowRight),
-                        pressed: true,
-                        repeat: false,
-                        modifiers,
-                    }],
+                    events: vec![
+                        egui::Event::ModifiersChanged(modifiers),
+                        egui::Event::Key {
+                            key: Key::ArrowRight,
+                            physical_key: Some(Key::ArrowRight),
+                            pressed: true,
+                            repeat: false,
+                            modifiers,
+                        },
+                    ],
                     ..egui::RawInput::default()
                 },
                 |ui| {
@@ -879,7 +886,8 @@ mod tests {
                         .width(320.0)
                         .show(ui);
                 },
-            );
+            )
+            .drop_without_applying_deltas();
             (value, ctx.input(|input| input.key_pressed(Key::ArrowRight)))
         };
 

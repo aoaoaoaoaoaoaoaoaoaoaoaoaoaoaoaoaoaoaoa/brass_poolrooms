@@ -2,12 +2,14 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use anyhow::{Context as _, Result};
 #[cfg(target_arch = "wasm32")]
-use dwemer_poolrooms::egui_wgpu::WgpuSetup;
-use dwemer_poolrooms::{
+use brass_poolrooms::egui_wgpu::WgpuSetup;
+use brass_poolrooms::{
     chrome, egui,
     egui_wgpu::{RenderState, RendererOptions, ScreenDescriptor, WgpuConfiguration},
     water::{Domain, Engine, Floor, Surface, Wetness},
 };
+#[cfg(target_arch = "wasm32")]
+use egui_winit_wasm as egui_winit;
 use web_time::Instant;
 #[cfg(not(target_arch = "wasm32"))]
 use winit::dpi::LogicalSize;
@@ -256,6 +258,26 @@ impl<A: Exhibit> ApplicationHandler<Spark> for Boiler<A> {
         let Some(rig) = &mut self.rig else {
             return;
         };
+        #[cfg(target_arch = "wasm32")]
+        match &event {
+            WindowEvent::HoveredFile(path) => {
+                rig.input
+                    .egui_input_mut()
+                    .hovered_files
+                    .push(egui::HoveredFile {
+                        path: Some(path.clone()),
+                        ..Default::default()
+                    });
+                rig.window.request_redraw();
+                return;
+            }
+            WindowEvent::HoveredFileCancelled | WindowEvent::DroppedFile(_) => {
+                rig.input.egui_input_mut().hovered_files.clear();
+                rig.window.request_redraw();
+                return;
+            }
+            _ => {}
+        }
         let response = rig.input.on_window_event(&rig.window, &event);
         if response.repaint {
             rig.window.request_redraw();
@@ -387,7 +409,7 @@ impl Rig {
         primitives: &[egui::ClippedPrimitive],
         delta: &egui::TexturesDelta,
         pixels_per_point: f32,
-        water: &dwemer_poolrooms::water::Frame,
+        water: &brass_poolrooms::water::Frame,
     ) -> bool {
         let screen = ScreenDescriptor {
             size_in_pixels: [self.config.width, self.config.height],
@@ -401,8 +423,10 @@ impl Rig {
             });
         let user_commands = {
             let mut renderer = self.gpu.renderer.write();
-            for (id, image_delta) in &delta.set {
-                renderer.update_texture(&self.gpu.device, &self.gpu.queue, *id, image_delta);
+            for (id, image_deltas) in &delta.set {
+                for image_delta in image_deltas {
+                    renderer.update_texture(&self.gpu.device, &self.gpu.queue, *id, image_delta);
+                }
             }
             renderer.update_buffers(
                 &self.gpu.device,
@@ -486,7 +510,7 @@ impl Rig {
             self.window.request_redraw();
         }
         self.window.pre_present_notify();
-        frame.present();
+        self.gpu.queue.present(frame);
         let mut renderer = self.gpu.renderer.write();
         for id in &delta.free {
             renderer.free_texture(id);

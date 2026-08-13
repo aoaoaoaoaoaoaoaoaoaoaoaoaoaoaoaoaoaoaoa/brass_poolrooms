@@ -45,7 +45,7 @@ mod baked {
 /// # Example
 ///
 /// ```
-/// use dwemer_poolrooms::{chrome::{Monoglyph, Symbol}, egui};
+/// use brass_poolrooms::{chrome::{Monoglyph, Symbol}, egui};
 ///
 /// fn decrement(ui: &mut egui::Ui) -> bool {
 ///     Monoglyph::symbol(Symbol::Decrement).show(ui).clicked()

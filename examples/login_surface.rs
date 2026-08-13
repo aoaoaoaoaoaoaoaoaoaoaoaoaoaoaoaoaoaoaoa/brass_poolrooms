@@ -3,7 +3,7 @@
     reason = "the example deliberately consumes egui and wgpu through the crate's version-locked re-exports"
 )]
 
-use dwemer_poolrooms::{
+use brass_poolrooms::{
     chrome, egui,
     water::{Domain, Poke, Surface, Wetness},
 };

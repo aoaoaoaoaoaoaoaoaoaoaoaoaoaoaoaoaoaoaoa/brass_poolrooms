@@ -7,7 +7,7 @@ pub mod exhibits;
 mod support;
 
 use anyhow::Result;
-use dwemer_poolrooms::{chrome, egui, water::Surface};
+use brass_poolrooms::{chrome, egui, water::Surface};
 use exhibits::Handles;
 use support::Exhibit;
 

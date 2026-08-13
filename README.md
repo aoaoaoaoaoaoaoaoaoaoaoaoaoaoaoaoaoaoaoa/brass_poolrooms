@@ -1,4 +1,4 @@
-# Dwemer Poolrooms
+# Brass Poolrooms
 
 Skeuomorphic controls and living water for egui.
 
@@ -122,7 +122,7 @@ scripts/gallery-service install 8080   # choose another fixed port
 ```
 
 The installer builds once, adds one integration artifact at
-`$XDG_CONFIG_HOME/systemd/user/dwemer-poolrooms-gallery.service` (falling back
+`$XDG_CONFIG_HOME/systemd/user/brass-poolrooms-gallery.service` (falling back
 to `~/.config/systemd/user`), and enables it for the user session; the bundle
 remains rebuildable Cargo target output. The server reads that output in place:
 every later `scripts/web-gallery build` or `./check.py check` is visible on the
@@ -141,14 +141,14 @@ is deliberately a hardware WebGPU workload.
 
 ```toml
 [dependencies]
-dwemer_poolrooms = "0.10.1"
+brass_poolrooms = "0.12.0"
 ```
 
 Import egui through the crate to keep its public geometry types aligned with
 the renderer, then install the chrome once:
 
 ```rust
-use dwemer_poolrooms::{chrome, egui};
+use brass_poolrooms::{chrome, egui};
 
 let ctx = egui::Context::default();
 chrome::install(&ctx);
@@ -157,7 +157,7 @@ chrome::install(&ctx);
 For chrome without GPU water:
 
 ```toml
-dwemer_poolrooms = { version = "0.10.1", default-features = false }
+brass_poolrooms = { version = "0.12.0", default-features = false }
 ```
 
 ## Water
@@ -196,7 +196,7 @@ whose own geometry names the visible tile lattice can register the same floor
 to one grout intersection and square pitch, both in egui logical points:
 
 ```rust
-use dwemer_poolrooms::water::{Floor, FloorRegistration};
+use brass_poolrooms::water::{Floor, FloorRegistration};
 
 let floor = Floor::shallow(basin)
     .registered(FloorRegistration::square(board.min, cell_pitch));
@@ -206,19 +206,19 @@ surface.set_floor(Some(floor));
 Registration changes only the mosaic's geometry. Poolrooms retains its
 material, mortar, deterministic tile variation, and refractive law.
 
-[`Rail`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.Rail.html
-[`DateSpool`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.DateSpool.html
-[`Checkbox`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.Checkbox.html
-[`Monoglyph`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.Monoglyph.html
-[`CornerClose`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.CornerClose.html
-[`DragHandle`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.DragHandle.html
-[`ForgePin`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.ForgePin.html
-[`NumberInput`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.NumberInput.html
-[`Section`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.Section.html
-[`MnemonicText`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.MnemonicText.html
-[`Keycap`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.Keycap.html
-[`MechanismSize`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/enum.MechanismSize.html
-[`Symbol`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/enum.Symbol.html
-[`CouplingGap`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.CouplingGap.html
-[`Coupled::horizontal`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.Coupled.html#method.horizontal
-[`Coupled::horizontal_with_gap`]: https://docs.rs/dwemer_poolrooms/latest/dwemer_poolrooms/chrome/struct.Coupled.html#method.horizontal_with_gap
+[`Rail`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.Rail.html
+[`DateSpool`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.DateSpool.html
+[`Checkbox`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.Checkbox.html
+[`Monoglyph`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.Monoglyph.html
+[`CornerClose`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.CornerClose.html
+[`DragHandle`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.DragHandle.html
+[`ForgePin`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.ForgePin.html
+[`NumberInput`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.NumberInput.html
+[`Section`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.Section.html
+[`MnemonicText`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.MnemonicText.html
+[`Keycap`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.Keycap.html
+[`MechanismSize`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/enum.MechanismSize.html
+[`Symbol`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/enum.Symbol.html
+[`CouplingGap`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.CouplingGap.html
+[`Coupled::horizontal`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.Coupled.html#method.horizontal
+[`Coupled::horizontal_with_gap`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.Coupled.html#method.horizontal_with_gap
