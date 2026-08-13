@@ -2,8 +2,6 @@
 
 #![deny(missing_docs)]
 
-use std::hash::Hash;
-
 use egui::{RichText, Sense, Stroke, WidgetInfo, WidgetType};
 
 use super::{EDGE, HOT, RAISED, SURFACE, section_title};
@@ -47,7 +45,7 @@ impl Section {
     pub fn show(
         self,
         ui: &mut egui::Ui,
-        id: impl Hash,
+        id: impl egui::AsIdSalt,
         add: impl FnOnce(&mut egui::Ui),
     ) -> SectionResponse {
         let Self {
@@ -181,7 +179,7 @@ impl Section {
 /// [`SectionResponse`].
 pub fn section(
     ui: &mut egui::Ui,
-    id: impl Hash,
+    id: impl egui::AsIdSalt,
     title: &'static str,
     default_open: bool,
     add: impl FnOnce(&mut egui::Ui),

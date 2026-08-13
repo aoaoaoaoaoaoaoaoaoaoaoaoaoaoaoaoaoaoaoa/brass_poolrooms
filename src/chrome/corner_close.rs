@@ -7,7 +7,7 @@
 
 #![deny(missing_docs)]
 
-use std::{hash::Hash, ops::Deref};
+use std::ops::Deref;
 
 use egui::{CursorIcon, Rect, Sense, Vec2, WidgetInfo, WidgetType};
 
@@ -132,7 +132,12 @@ impl CornerClose {
     /// `id_salt` must identify the pane stably when sibling panes may appear or
     /// disappear. The response dereferences to [`egui::Response`] and carries
     /// the signed swept volume for `water::Surface::corner_close`.
-    pub fn show(self, ui: &mut egui::Ui, pane: Rect, id_salt: impl Hash) -> CornerCloseResponse {
+    pub fn show(
+        self,
+        ui: &mut egui::Ui,
+        pane: Rect,
+        id_salt: impl egui::AsIdSalt,
+    ) -> CornerCloseResponse {
         let atlas = self.size.atlas_index();
         let gauge = baked::GAUGES[atlas];
         let law = foundry::law::momentary_gauge(gauge.side);

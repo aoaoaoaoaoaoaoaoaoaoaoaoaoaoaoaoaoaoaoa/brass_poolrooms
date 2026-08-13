@@ -13,10 +13,7 @@
 
 #![deny(missing_docs)]
 
-use std::{
-    hash::Hash,
-    ops::{BitOr, BitOrAssign, Deref, RangeInclusive},
-};
+use std::ops::{BitOr, BitOrAssign, Deref, RangeInclusive};
 
 use super::{
     self as chrome,
@@ -316,7 +313,7 @@ impl<'a, D: GregorianDay> DateSpool<'a, D> {
     /// # Panics
     ///
     /// Panics if the year range is descending.
-    pub fn show(self, ui: &mut egui::Ui, id: impl Hash) -> DateSpoolResponse {
+    pub fn show(self, ui: &mut egui::Ui, id: impl egui::AsIdSalt) -> DateSpoolResponse {
         date_spool(
             ui,
             id,
@@ -442,7 +439,7 @@ impl Drum {
 
 fn date_spool<D: GregorianDay>(
     ui: &mut egui::Ui,
-    id: impl Hash,
+    id: impl egui::AsIdSalt,
     label: Option<&str>,
     value: &mut D,
     years: RangeInclusive<i32>,

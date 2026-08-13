@@ -1,5 +1,3 @@
-use std::hash::Hash;
-
 use dwemer_poolrooms::{
     chrome::{
         self, Checkbox, CornerClose, Coupled, CouplingGap, DateReels, DateSpool, DragHandle,
@@ -563,7 +561,7 @@ impl Default for Dates {
 }
 
 impl Dates {
-    pub fn show(&mut self, ui: &mut egui::Ui, water: &mut Surface, id: impl Hash) {
+    pub fn show(&mut self, ui: &mut egui::Ui, water: &mut Surface, id: impl egui::AsIdSalt) {
         let _title = ui.label(chrome::title("DATE TRANSPORT"));
         let _law = ui.label(chrome::muted(
             "rigid reel banks · explicit width · optionality belongs to the application",

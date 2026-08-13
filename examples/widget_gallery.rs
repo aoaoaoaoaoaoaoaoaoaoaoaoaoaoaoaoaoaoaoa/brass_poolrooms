@@ -31,7 +31,7 @@ impl Exhibit for Menagerie {
     fn ui(&mut self, ui: &mut egui::Ui, water: &mut Surface) {
         let panel = egui::CentralPanel::default()
             .frame(egui::Frame::new().fill(chrome::PAGE).inner_margin(28))
-            .show_inside(ui, |ui| {
+            .show(ui, |ui| {
                 egui::ScrollArea::vertical()
                     .id_salt("crafted-widget-menagerie")
                     .auto_shrink([false; 2])

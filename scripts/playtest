@@ -185,7 +185,7 @@ case "$gallery" in
         xdotool click --repeat 10 5
         sleep 1.20
         import -window "$window" "$out/number-wheel-before.png"
-        xdotool mousemove --window "$window" 121 527
+        xdotool mousemove --window "$window" 121 597
         xdotool click 5
         sleep 1.20
         import -window "$window" "$out/contained-number-wheel.png"

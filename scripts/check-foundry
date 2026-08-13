@@ -2,7 +2,7 @@
 set -eu
 
 if ! command -v wasm-bindgen >/dev/null 2>&1 ||
-    [ "$(wasm-bindgen --version)" != 'wasm-bindgen 0.2.126' ]; then
-    cargo install wasm-bindgen-cli --version 0.2.126 --locked
+    [ "$(wasm-bindgen --version)" != 'wasm-bindgen 0.2.127' ]; then
+    cargo install wasm-bindgen-cli --version 0.2.127 --locked
 fi
 exec ./check.py verify

@@ -18,7 +18,7 @@ impl Exhibit for Closures {
     fn ui(&mut self, ui: &mut egui::Ui, water: &mut Surface) {
         let _panel = egui::CentralPanel::default()
             .frame(egui::Frame::new().fill(chrome::PAGE).inner_margin(28))
-            .show_inside(ui, |ui| self.show(ui, water));
+            .show(ui, |ui| self.show(ui, water));
     }
 }
 

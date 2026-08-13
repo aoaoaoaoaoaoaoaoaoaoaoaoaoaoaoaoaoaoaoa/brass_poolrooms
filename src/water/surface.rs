@@ -1,9 +1,6 @@
-use std::{
-    hash::Hash,
-    sync::{
-        Arc,
-        atomic::{AtomicU64, Ordering},
-    },
+use std::sync::{
+    Arc,
+    atomic::{AtomicU64, Ordering},
 };
 use web_time::{Duration, Instant};
 
@@ -576,7 +573,7 @@ impl Surface {
         self.epoch = now;
     }
 
-    pub fn hover(&mut self, id: impl Hash, rect: egui::Rect) {
+    pub fn hover(&mut self, id: impl egui::AsId, rect: egui::Rect) {
         self.active_lift = Some((egui::Id::new(id).value(), rect));
     }
 

@@ -53,7 +53,7 @@ impl Exhibit for MaterialStudy {
         water.set_wetness(Wetness::Dry);
         let _panel = egui::CentralPanel::default()
             .frame(egui::Frame::new().fill(chrome::PAGE).inner_margin(28))
-            .show_inside(ui, show_study);
+            .show(ui, show_study);
     }
 }
 
