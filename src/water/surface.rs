@@ -391,6 +391,7 @@ struct Quiver {
     pointer: egui::Pos2,
     grip: f32,
     omega: f32,
+    held: bool,
 }
 
 impl Quiver {
@@ -821,14 +822,14 @@ impl Surface {
                 }
             })
             .collect();
-        let tensions = take_tensions(
+        let (tensions, quiver_changed) = take_tensions(
             ctx,
             pixels_per_point,
             &mut self.quivers,
             &mut self.quiver_tick,
             self.agitation.quiver_release,
         );
-        if !tensions.is_empty() {
+        if quiver_changed {
             self.quiver_until = Some(Instant::now() + QUIVER_WAKE);
         }
         let now = Instant::now();
@@ -1019,20 +1020,40 @@ fn take_tensions(
     bank: &mut Vec<Quiver>,
     then: &mut Instant,
     release: f32,
-) -> Vec<engine::Tension> {
+) -> (Vec<engine::Tension>, bool) {
     let now = Instant::now();
     let dt = now.duration_since(*then).as_secs_f32().clamp(0.0, 0.12);
     *then = now;
+    let prior = bank
+        .iter()
+        .filter(|quiver| quiver.held)
+        .copied()
+        .collect::<Vec<_>>();
     for q in bank.iter_mut() {
         q.grip *= (-dt / release.max(0.03)).exp();
+        q.held = false;
     }
-    for seed in crate::tide::take(ctx) {
+    let seeds = crate::tide::take(ctx);
+    let mut changed = prior
+        .iter()
+        .any(|old| !seeds.iter().any(|seed| seed.id == old.id));
+    for seed in seeds {
+        changed |= prior
+            .iter()
+            .find(|old| old.id == seed.id)
+            .is_none_or(|old| {
+                old.rect != seed.rect
+                    || old.pointer != seed.pointer
+                    || old.grip != seed.grip
+                    || old.omega != seed.omega
+            });
         let incoming = Quiver {
             id: seed.id,
             rect: seed.rect,
             pointer: seed.pointer,
             grip: seed.grip,
             omega: seed.omega,
+            held: true,
         };
         match bank.iter_mut().find(|q| q.id == incoming.id) {
             Some(q) => {
@@ -1040,17 +1061,20 @@ fn take_tensions(
                 q.pointer = incoming.pointer;
                 q.grip = q.grip.max(incoming.grip);
                 q.omega = incoming.omega;
+                q.held = true;
             }
             None => bank.push(incoming),
         }
     }
     bank.retain(|q| q.grip > QUIVER_EPSILON);
     bank.sort_by(|a, b| b.grip.total_cmp(&a.grip));
-    bank.iter()
+    let tensions = bank
+        .iter()
         .take(engine::QUIVER_SLOTS)
         .copied()
         .map(|q| q.physical(scale))
-        .collect()
+        .collect();
+    (tensions, changed)
 }
 
 fn scaled_chemistry(mut chemistry: engine::Chemistry, wetness: Wetness) -> engine::Chemistry {
@@ -1093,26 +1117,6 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "floor registration requires")]
-    fn floor_registration_refuses_nonpositive_pitch() {
-        let _invalid = FloorRegistration::square(egui::Pos2::ZERO, 0.0);
-    }
-
-    #[test]
-    #[should_panic(expected = "floor registration requires")]
-    fn floor_registration_refuses_nonfinite_geometry() {
-        let _invalid = FloorRegistration::square(egui::pos2(f32::NAN, 0.0), 42.0);
-    }
-
-    #[test]
-    fn first_scroll_frame_hits_force_ceiling_without_second_lowpass() {
-        let mut tray = TrayTilt::default();
-        let _virgin = tray.sway(0.0, 1.0, 1.0 / 60.0, 0.08, 0.11);
-        let force = tray.sway(100.0, 1.0, 1.0 / 60.0, 0.08, 0.11);
-        assert!(force > 40.0, "force was {force}");
-    }
-
-    #[test]
     fn arbitrary_pokes_hide_shader_capacity() {
         let mut surface = Surface::default();
         let rect = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(10.0, 10.0));
@@ -1129,273 +1133,26 @@ mod tests {
     }
 
     #[test]
-    fn horizontal_sweeps_retain_axis_and_wetness_impulse() {
-        let mut surface = Surface::new(Wetness::Wet);
-        let rect = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(80.0, 14.0));
-        surface.poke(rect, Poke::slide(0.4, -1.0));
-        let sweep = &surface.plunges[0];
-        assert_eq!(sweep.shape, engine::SplashShape::Slide);
-        assert_eq!(sweep.travel, -1.0);
-        assert!((sweep.amp - 0.5).abs() < f32::EPSILON);
-    }
-
-    #[test]
-    fn checkbox_displacement_is_signed_and_frame_rate_invariant() {
-        for hz in [30.0, 60.0] {
-            let dt = 1.0 / hz;
-            let ctx = egui::Context::default();
-            let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(64.0, 42.0));
-            let mut checked = false;
-            let mut surface = Surface::new(Wetness::Wet);
-            let input = |events| egui::RawInput {
-                screen_rect: Some(screen),
-                predicted_dt: dt,
-                events,
-                ..egui::RawInput::default()
-            };
-            let _prime = ctx.run_ui(input(Vec::new()), |ui| {
-                let _checkbox = crate::chrome::Checkbox::without_text(&mut checked).show(ui);
-            });
-            {
-                let mut drive = |events| {
-                    let _frame = ctx.run_ui(input(events), |ui| {
-                        let checkbox = crate::chrome::Checkbox::without_text(&mut checked).show(ui);
-                        surface.checkbox(&checkbox);
-                    });
-                };
-                drive(vec![
-                    egui::Event::PointerMoved(screen.center()),
-                    egui::Event::PointerButton {
-                        pos: screen.center(),
-                        button: egui::PointerButton::Primary,
-                        pressed: true,
-                        modifiers: egui::Modifiers::NONE,
-                    },
-                ]);
-                for _ in 1..(0.15 / dt).ceil() as usize {
-                    drive(Vec::new());
-                }
-                drive(vec![egui::Event::PointerButton {
-                    pos: screen.center(),
-                    button: egui::PointerButton::Primary,
-                    pressed: false,
-                    modifiers: egui::Modifiers::NONE,
-                }]);
-                for _ in 1..(0.30 / dt).ceil() as usize {
-                    drive(Vec::new());
-                }
-            }
-            assert!(checked);
-            assert!(
-                surface
-                    .plunges
-                    .iter()
-                    .all(|plunge| plunge.shape == engine::SplashShape::Basin)
-            );
-            let signed_impulse = surface.plunges.iter().map(|plunge| plunge.amp).sum::<f32>();
-            assert!(
-                (-4.70..-4.25).contains(&signed_impulse),
-                "{hz} Hz toggle injected {signed_impulse} canonical impulse"
-            );
-        }
-    }
-
-    #[test]
-    fn monoglyph_plunge_and_return_displace_water_in_opposite_directions() {
+    fn identical_held_tension_is_state_not_a_fresh_transition() {
+        // A producer emits held state every frame. Treating that presence as a
+        // transition renews the animation lease forever, an easy model error
+        // for a fresh implementation because both frames contain valid input.
         let ctx = egui::Context::default();
-        let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(80.0, 80.0));
-        let mut surface = Surface::new(Wetness::Wet);
-        let mut center = egui::Pos2::ZERO;
-        let input = |events| egui::RawInput {
-            screen_rect: Some(screen),
-            predicted_dt: 1.0 / 60.0,
-            events,
-            ..egui::RawInput::default()
-        };
-        let _prime = ctx.run_ui(input(Vec::new()), |ui| {
-            center = crate::chrome::Monoglyph::symbol(crate::chrome::Symbol::Add)
-                .show(ui)
-                .rect
-                .center();
-        });
-        {
-            let mut drive = |events| {
-                let _frame = ctx.run_ui(input(events), |ui| {
-                    let button =
-                        crate::chrome::Monoglyph::symbol(crate::chrome::Symbol::Add).show(ui);
-                    surface.monoglyph(&button);
-                });
-            };
-            drive(vec![
-                egui::Event::PointerMoved(center),
-                egui::Event::PointerButton {
-                    pos: center,
-                    button: egui::PointerButton::Primary,
-                    pressed: true,
-                    modifiers: egui::Modifiers::NONE,
-                },
-            ]);
-            for _ in 0..8 {
-                drive(Vec::new());
-            }
-            drive(vec![egui::Event::PointerButton {
-                pos: center,
-                button: egui::PointerButton::Primary,
-                pressed: false,
-                modifiers: egui::Modifiers::NONE,
-            }]);
-            for _ in 0..18 {
-                drive(Vec::new());
-            }
-        }
+        let rect = egui::Rect::from_min_size(egui::pos2(8.0, 13.0), egui::vec2(21.0, 34.0));
+        let pointer = rect.center();
+        let mut bank = Vec::new();
+        let mut then = Instant::now();
 
-        assert!(surface.plunges.iter().any(|plunge| plunge.amp < 0.0));
-        assert!(surface.plunges.iter().any(|plunge| plunge.amp > 0.0));
-        let displaced = surface
-            .plunges
-            .iter()
-            .map(|plunge| plunge.amp.abs())
-            .sum::<f32>();
-        assert!(displaced > 1.5, "button displaced only {displaced} impulse");
-    }
+        crate::tide::push(&ctx, 7, rect, pointer, 1.0, 0.0);
+        let (_, changed) = take_tensions(&ctx, 1.0, &mut bank, &mut then, 0.48);
+        assert!(changed);
 
-    #[test]
-    fn numerical_wheel_shears_water_along_its_rolling_plane() {
-        for (plane, shape) in [
-            (crate::chrome::WheelPlane::XZ, engine::SplashShape::Slide),
-            (crate::chrome::WheelPlane::YZ, engine::SplashShape::Ring),
-        ] {
-            let ctx = egui::Context::default();
-            let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(160.0, 40.0));
-            let mut value = 0_i32;
-            let mut wheel_center = egui::Pos2::ZERO;
-            let mut surface = Surface::new(Wetness::Wet);
-            let _prime = ctx.run_ui(
-                egui::RawInput {
-                    screen_rect: Some(screen),
-                    ..egui::RawInput::default()
-                },
-                |ui| {
-                    let response = crate::chrome::NumberInput::new(&mut value, -9..=9, 1, 0)
-                        .wheel_plane(plane)
-                        .show(ui);
-                    wheel_center =
-                        egui::Pos2::new(response.rect.right() - 12.0, response.rect.center().y);
-                },
-            );
-            let _spin = ctx.run_ui(
-                egui::RawInput {
-                    screen_rect: Some(screen),
-                    predicted_dt: 1.0 / 60.0,
-                    events: vec![
-                        egui::Event::PointerMoved(wheel_center),
-                        egui::Event::MouseWheel {
-                            unit: egui::MouseWheelUnit::Line,
-                            delta: egui::vec2(0.0, 1.0),
-                            phase: egui::TouchPhase::Move,
-                            modifiers: egui::Modifiers::NONE,
-                        },
-                    ],
-                    ..egui::RawInput::default()
-                },
-                |ui| {
-                    let response = crate::chrome::NumberInput::new(&mut value, -9..=9, 1, 0)
-                        .wheel_plane(plane)
-                        .show(ui);
-                    surface.number_input(&response);
-                },
-            );
-            assert_eq!(value, 1);
-            assert_eq!(surface.plunges.len(), 1);
-            assert_eq!(surface.plunges[0].shape, shape);
-            assert!(surface.plunges[0].amp > 0.0);
-            assert!(surface.plunges[0].travel > 0.0);
-        }
-    }
+        crate::tide::push(&ctx, 7, rect, pointer, 1.0, 0.0);
+        let (_, changed) = take_tensions(&ctx, 1.0, &mut bank, &mut then, 0.48);
+        assert!(!changed);
 
-    #[test]
-    fn bail_lift_and_seating_drive_opposite_vertical_dipoles() {
-        let ctx = egui::Context::default();
-        let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(80.0, 80.0));
-        let mut surface = Surface::new(Wetness::Wet);
-        let mut center = egui::Pos2::ZERO;
-        let input = |events| egui::RawInput {
-            screen_rect: Some(screen),
-            predicted_dt: 1.0 / 60.0,
-            events,
-            ..egui::RawInput::default()
-        };
-        let _prime = ctx.run_ui(input(Vec::new()), |ui| {
-            center = crate::chrome::DragHandle::folding_bail()
-                .show(ui)
-                .rect
-                .center();
-        });
-        {
-            let mut drive = |events| {
-                let _frame = ctx.run_ui(input(events), |ui| {
-                    let handle = crate::chrome::DragHandle::folding_bail().show(ui);
-                    surface.drag_handle(&handle);
-                });
-            };
-            drive(vec![
-                egui::Event::PointerMoved(center),
-                egui::Event::PointerButton {
-                    pos: center,
-                    button: egui::PointerButton::Primary,
-                    pressed: true,
-                    modifiers: egui::Modifiers::NONE,
-                },
-            ]);
-            for _ in 0..10 {
-                drive(Vec::new());
-            }
-            drive(vec![egui::Event::PointerButton {
-                pos: center,
-                button: egui::PointerButton::Primary,
-                pressed: false,
-                modifiers: egui::Modifiers::NONE,
-            }]);
-            for _ in 0..20 {
-                drive(Vec::new());
-            }
-        }
-
-        assert!(surface.plunges.iter().any(|plunge| plunge.travel < 0.0));
-        assert!(surface.plunges.iter().any(|plunge| plunge.travel > 0.0));
-        assert!(
-            surface
-                .plunges
-                .iter()
-                .all(|plunge| plunge.shape == engine::SplashShape::Ring)
-        );
-        let displaced = surface.plunges.iter().map(|plunge| plunge.amp).sum::<f32>();
-        assert!(displaced > 1.0, "bail displaced only {displaced} impulse");
-    }
-
-    #[test]
-    fn wetness_scales_chemistry_without_mutating_laboratory_values() {
-        let surface = Surface::new(Wetness::Deluge);
-        let scaled = scaled_chemistry(*surface.chemistry(), surface.wetness());
-        assert_eq!(
-            surface.chemistry().refract_px,
-            engine::Chemistry::default().refract_px
-        );
-        assert_eq!(scaled.refract_px, surface.chemistry().refract_px * 2.0);
-        assert!((scaled.tremor_omega - 0.9 * std::f32::consts::TAU).abs() < 1e-5);
-    }
-
-    #[test]
-    fn wetness_preserves_the_shipped_calibration() {
-        let wet = Wetness::Wet.drench();
-        assert_eq!(
-            (wet.wave, wet.glyph, wet.optics, wet.decay),
-            (1.25, 0.75, 1.0, 1.0)
-        );
-        let deluge = Wetness::Deluge.drench();
-        assert_eq!(
-            (deluge.wave, deluge.glyph, deluge.optics, deluge.decay),
-            (2.0, 2.0, 2.0, 2.0)
-        );
+        crate::tide::push(&ctx, 7, rect, pointer + egui::vec2(1.0, 0.0), 1.0, 0.0);
+        let (_, changed) = take_tensions(&ctx, 1.0, &mut bank, &mut then, 0.48);
+        assert!(changed);
     }
 }

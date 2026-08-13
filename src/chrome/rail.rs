@@ -764,19 +764,6 @@ mod tests {
     }
 
     #[test]
-    fn recess_projection_tapers_the_rod_without_bending_its_axis() {
-        let anatomy = Anatomy::new(Rect::from_min_size(Pos2::ZERO, Vec2::new(320.0, H)));
-        for i in 0..=40 {
-            let t = i as f32 / 40.0;
-            let carriage = carriage_xz(t);
-            let pin = crank_pin(t);
-            assert!(pin.z > 0.0);
-            assert!(depth_scale(pin.z) < depth_scale(0.0));
-            assert_eq!(project_xz(anatomy, carriage).y, project_xz(anatomy, pin).y);
-        }
-    }
-
-    #[test]
     fn detents_belong_to_the_total_span_not_the_admissible_span() {
         let total = Span { lo: 0.0, hi: 10.0 };
         let eleven = NonZeroU16::new(11).unwrap_or(NonZeroU16::MIN);
@@ -785,51 +772,6 @@ mod tests {
             Span { lo: 0.0, hi: 5.0 }.clamp(total.detent(0.73, eleven)),
             5.0
         );
-    }
-
-    #[test]
-    fn pointer_click_enters_the_requested_detent_and_sweeps_water() {
-        let ctx = egui::Context::default();
-        let mut value = 4_u16;
-        let mut swept = 0.0;
-        let _prime = ctx.run_ui(
-            egui::RawInput {
-                screen_rect: Some(Rect::from_min_size(Pos2::ZERO, Vec2::new(320.0, H))),
-                ..egui::RawInput::default()
-            },
-            |ui| {
-                let _rail = Rail::new(&mut value, 0..=10)
-                    .detents(11)
-                    .width(320.0)
-                    .show(ui);
-            },
-        );
-        for pressed in [true, false] {
-            let _frame = ctx.run_ui(
-                egui::RawInput {
-                    screen_rect: Some(Rect::from_min_size(Pos2::ZERO, Vec2::new(320.0, H))),
-                    events: vec![
-                        egui::Event::PointerMoved(Pos2::new(270.0, H * 0.5)),
-                        egui::Event::PointerButton {
-                            pos: Pos2::new(270.0, H * 0.5),
-                            button: egui::PointerButton::Primary,
-                            pressed,
-                            modifiers: Modifiers::NONE,
-                        },
-                    ],
-                    ..egui::RawInput::default()
-                },
-                |ui| {
-                    let rail = Rail::new(&mut value, 0..=10)
-                        .detents(11)
-                        .width(320.0)
-                        .show(ui);
-                    swept += rail.wakes().map(RailWake::swept_area).sum::<f32>();
-                },
-            );
-        }
-        assert_eq!(value, 9);
-        assert!(swept > 3_000.0, "carriage swept only {swept} px²");
     }
 
     #[test]

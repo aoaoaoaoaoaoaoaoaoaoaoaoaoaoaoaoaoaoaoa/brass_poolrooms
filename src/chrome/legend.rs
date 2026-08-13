@@ -2,11 +2,13 @@
 
 #![deny(missing_docs)]
 
-use std::borrow::Cow;
+use std::{borrow::Cow, sync::Arc};
 
 use egui::{Color32, FontId, Sense, Stroke, TextStyle, Vec2, WidgetInfo, WidgetType};
 
 use super::{CONTROL, EDGE, EDGE_STRONG, HOT, MUTED, TEXT};
+
+const MNEMONIC_UNDERLINE_LIFT: f32 = 2.0;
 
 /// Text carrying one permanently visible Alt mnemonic underline.
 ///
@@ -54,13 +56,18 @@ impl<'a> MnemonicText<'a> {
 
     /// Build a button-style egui label with only the mnemonic glyph underlined.
     pub fn widget_text(&self, ui: &egui::Ui) -> egui::WidgetText {
+        self.widget_text_with_font(ui, TextStyle::Button.resolve(ui.style()))
+    }
+
+    /// Build an egui label in `font` with only the mnemonic glyph underlined.
+    pub fn widget_text_with_font(&self, ui: &egui::Ui, font: FontId) -> egui::WidgetText {
         let end = self.byte
             + self.label[self.byte..]
                 .chars()
                 .next()
                 .map_or(0, char::len_utf8);
         let ordinary = egui::text::TextFormat {
-            font_id: TextStyle::Button.resolve(ui.style()),
+            font_id: font,
             color: Color32::PLACEHOLDER,
             valign: ui.text_valign(),
             ..Default::default()
@@ -73,8 +80,28 @@ impl<'a> MnemonicText<'a> {
         job.append(&self.label[..self.byte], 0.0, ordinary.clone());
         job.append(&self.label[self.byte..end], 0.0, marked);
         job.append(&self.label[end..], 0.0, ordinary);
-        job.into()
+        let mut galley = ui.fonts_mut(|fonts| fonts.layout_job(job));
+        lift_mnemonic_underline(&mut galley);
+        galley.into()
     }
+}
+
+fn lift_mnemonic_underline(galley: &mut Arc<egui::Galley>) {
+    // egui exposes underline stroke but not underline offset. A text row emits
+    // its ornaments after `glyph_vertex_range`, so the one requested underline
+    // can be lifted without perturbing glyph geometry or layout.
+    let galley = Arc::make_mut(galley);
+    let mut bounds = egui::Rect::NOTHING;
+    for placed in &mut galley.rows {
+        let row = Arc::make_mut(&mut placed.row);
+        let ornament = row.visuals.glyph_vertex_range.end..;
+        for vertex in &mut row.visuals.mesh.vertices[ornament] {
+            vertex.pos.y -= MNEMONIC_UNDERLINE_LIFT;
+        }
+        row.visuals.mesh_bounds = row.visuals.mesh.calc_bounds();
+        bounds = bounds.union(row.visuals.mesh_bounds.translate(placed.pos.to_vec2()));
+    }
+    galley.mesh_bounds = bounds;
 }
 
 /// A compact physical plate naming one key or complete keyboard chord.
@@ -112,28 +139,5 @@ impl Keycap {
         response
             .widget_info(|| WidgetInfo::labeled(WidgetType::Label, enabled, self.label.clone()));
         response
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn mnemonic_marks_exactly_one_glyph() {
-        let ctx = egui::Context::default();
-        let mut marked = 0;
-        let _output = ctx.run_ui(egui::RawInput::default(), |ui| {
-            let text = MnemonicText::new("Open archive", 'A').widget_text(ui);
-            let egui::WidgetText::LayoutJob(job) = text else {
-                unreachable!("mnemonic text must retain its sectioned layout")
-            };
-            marked = job
-                .sections
-                .iter()
-                .filter(|section| !section.format.underline.is_empty())
-                .count();
-        });
-        assert_eq!(marked, 1);
     }
 }

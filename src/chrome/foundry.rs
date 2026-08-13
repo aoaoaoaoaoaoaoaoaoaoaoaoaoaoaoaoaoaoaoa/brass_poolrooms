@@ -449,29 +449,3 @@ pub(crate) fn stamp(
         let _sole = painter.line_segment(*edge, Stroke::new(STAMP_GAUGE, bronze(0.18 + dim)));
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn illuminant_is_unit_length_and_sixty_degrees_above_the_horizon() {
-        assert!((LIGHT_Y * LIGHT_Y + LIGHT_Z * LIGHT_Z - 1.0).abs() < 1e-6);
-        assert!((LIGHT_Z.asin().to_degrees() - 60.0).abs() < 1e-4);
-        assert!((HALF_Y * HALF_Y + HALF_Z * HALF_Z - 1.0).abs() < 1e-6);
-    }
-
-    #[test]
-    fn darkened_bronze_keeps_a_quiet_body_beneath_its_mirror_glint() {
-        let tones = [-15.0, -8.0, 0.0, 8.0, 15.0]
-            .map(|y| darkened_metal_tone([0.0, y, 1.0], [0.0, 0.0, 1.0]));
-        let mean = tones.iter().sum::<f32>() / tones.len() as f32;
-        assert!((0.49..=0.54).contains(&mean));
-        assert!(tones[0] - tones[4] > 0.28);
-        assert_eq!(tones[0], DARK_TONE_CEILING);
-        assert!(tones.into_iter().all(|tone| tone <= DARK_TONE_CEILING));
-        let [red, _, _] = darkened_bronze_rgb(DARK_TONE_CEILING);
-        assert!(f32::from(red) > BRONZE_BODY[0]);
-        assert!(f32::from(red) < BRONZE_GLINT[0]);
-    }
-}

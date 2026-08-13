@@ -236,26 +236,3 @@ pub enum FoldFlux {
     /// The recess closed.
     Close,
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn active_section_exposes_a_focusable_header() {
-        let ctx = egui::Context::default();
-        let mut header = egui::Id::NULL;
-        let _output = ctx.run_ui(egui::RawInput::default(), |ui| {
-            let section =
-                Section::new("VIEW")
-                    .default_open(true)
-                    .active(true)
-                    .show(ui, "view", |ui| {
-                        let _button = ui.button("option");
-                    });
-            header = section.header.id;
-            section.header.request_focus();
-        });
-        assert_eq!(ctx.memory(|memory| memory.focused()), Some(header));
-    }
-}

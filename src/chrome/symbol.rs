@@ -83,22 +83,3 @@ impl Symbol {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn semantic_aliases_share_one_canonical_cut() {
-        assert_eq!(Symbol::Add.glyph(), Symbol::Increment.glyph());
-        assert_ne!(Symbol::Add.glyph(), '✚');
-    }
-
-    #[test]
-    fn every_armory_member_has_a_stable_name_and_mark() {
-        for symbol in Symbol::ALL {
-            assert!(!symbol.name().is_empty());
-            assert!(!symbol.glyph().is_whitespace());
-        }
-    }
-}

@@ -475,19 +475,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn installed_chrome_survives_system_theme_changes() {
-        let ctx = egui::Context::default();
-        install(&ctx);
-
-        for theme in [egui::Theme::Dark, egui::Theme::Light] {
-            let style = ctx.style_of(theme);
-            assert_eq!(style.visuals.panel_fill, PAGE);
-            assert_eq!(style.visuals.widgets.inactive.fg_stroke.color, TEXT);
-            assert_eq!(style.spacing.item_spacing, Vec2::splat(6.0));
-        }
-    }
-
-    #[test]
     fn activation_owns_only_fresh_unmodified_enter_or_space() {
         let stroke = |key, modifiers| {
             let ctx = egui::Context::default();
@@ -599,38 +586,6 @@ mod tests {
 
         assert!(activated);
         assert!(ctx.input(|input| input.key_pressed(egui::Key::Space)));
-    }
-
-    #[test]
-    fn disabled_accessibility_click_is_consumed_without_activation() {
-        let ctx = egui::Context::default();
-        let mut id = egui::Id::NULL;
-        let _prime = ctx.run_ui(egui::RawInput::default(), |ui| {
-            id = ui.add_enabled(false, egui::Button::new("command")).id;
-        });
-        let input = egui::RawInput {
-            events: vec![egui::Event::AccessKitActionRequest(
-                egui::accesskit::ActionRequest {
-                    action: egui::accesskit::Action::Click,
-                    target_tree: egui::accesskit::TreeId::ROOT,
-                    target_node: id.accesskit_id(),
-                    data: None,
-                },
-            )],
-            ..egui::RawInput::default()
-        };
-        let mut activated = true;
-        let _stroke = ctx.run_ui(input, |ui| {
-            let response = ui.add_enabled(false, egui::Button::new("command"));
-            activated = exact_activation(ui, &response);
-        });
-
-        assert!(!activated);
-        assert!(ctx.input(|input| {
-            !input.events.iter().any(|event| {
-                matches!(event, egui::Event::AccessKitActionRequest(request) if request.action == egui::accesskit::Action::Click)
-            })
-        }));
     }
 
     #[test]

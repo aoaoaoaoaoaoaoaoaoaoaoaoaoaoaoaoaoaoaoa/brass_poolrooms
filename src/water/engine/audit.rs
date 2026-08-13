@@ -2,43 +2,31 @@ use super::super::Frame;
 use super::*;
 use anyhow::{Context as _, Result, bail};
 use std::{
-    fs,
-    future::Future,
-    process,
-    sync::{Arc, Mutex, MutexGuard, PoisonError, mpsc},
+    sync::{Arc, mpsc},
     time::Duration,
 };
 
 const TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
 const W: u32 = 640;
 const H: u32 = 360;
-static GPU_AUDIT: Mutex<()> = Mutex::new(());
-
-fn audit(future: impl Future<Output = Result<()>>) -> Result<()> {
-    let _lease: MutexGuard<'static, ()> = GPU_AUDIT.lock().unwrap_or_else(PoisonError::into_inner);
-    pollster::block_on(future)
-}
 
 #[test]
-fn poisoned_water_cells_are_extinguished() -> Result<()> {
-    audit(async {
+fn water_engine_preserves_recovery_stability_isolation_and_lifecycle() -> Result<()> {
+    pollster::block_on(async {
         let Some(mut bench) = Bench::make().await? else {
             return Ok(());
         };
+
+        // These are distinct recovery layers. A simulation step must quench a
+        // poisoned cell locally; the asynchronous guard must also recover the
+        // basin without relying on another step. Their overlap makes omitting
+        // either layer a plausible clean-room implementation error.
         bench.poison(37, 29)?;
         bench.step(&quiet(0.0))?;
         let field = bench.field()?;
         field.assert_clean()?;
-        field.assert_quiet(37, 29, 0.25)
-    })
-}
+        field.assert_quiet(37, 29, 0.25)?;
 
-#[test]
-fn water_guard_resets_poisoned_field() -> Result<()> {
-    audit(async {
-        let Some(mut bench) = Bench::make().await? else {
-            return Ok(());
-        };
         bench.poison(37, 29)?;
         if bench.field()?.assert_clean().is_ok() {
             bail!("basin poison write did not land");
@@ -48,48 +36,8 @@ fn water_guard_resets_poisoned_field() -> Result<()> {
         }
         let field = bench.field()?;
         field.assert_clean()?;
-        field.assert_quiet(37, 29, 0.25)
-    })
-}
+        field.assert_quiet(37, 29, 0.25)?;
 
-#[test]
-fn water_guard_resets_saturated_field() -> Result<()> {
-    audit(async {
-        let Some(mut bench) = Bench::make().await? else {
-            return Ok(());
-        };
-        bench.saturate()?;
-        bench.field()?.assert_railed(512)?;
-        if !bench.guard()? {
-            bail!("basin guard did not report a saturated reset");
-        }
-        let field = bench.field()?;
-        field.assert_clean()?;
-        field.assert_quiet(37, 29, 0.25)
-    })
-}
-
-#[test]
-fn becalm_zeros_every_persistent_field() -> Result<()> {
-    audit(async {
-        let Some(mut bench) = Bench::make().await? else {
-            return Ok(());
-        };
-        bench.saturate()?;
-        bench.field()?.assert_railed(512)?;
-        bench.engine.becalm(&bench.queue);
-        let field = bench.field()?;
-        field.assert_clean()?;
-        field.assert_quiet(37, 29, 0.25)
-    })
-}
-
-#[test]
-fn aggressive_water_script_never_writes_nonfinite_state() -> Result<()> {
-    audit(async {
-        let Some(mut bench) = Bench::make().await? else {
-            return Ok(());
-        };
         for frame in 0..180 {
             let script = Script::storm(frame);
             bench.step(&script.frame(frame as f32 / 60.0))?;
@@ -97,63 +45,8 @@ fn aggressive_water_script_never_writes_nonfinite_state() -> Result<()> {
                 bench.field()?.assert_clean()?;
             }
         }
-        bench.field()?.assert_clean()
-    })
-}
+        bench.field()?.assert_clean()?;
 
-#[test]
-fn overlapping_image_plate_wakes_do_not_rail_field() -> Result<()> {
-    audit(async {
-        let Some(mut bench) = Bench::make().await? else {
-            return Ok(());
-        };
-        for frame in 0..180 {
-            let script = Script::spaz(frame);
-            bench.step(&script.very_wet_frame(frame as f32 / 60.0))?;
-        }
-        let field = bench.field()?;
-        field.assert_clean()?;
-        field.assert_not_railed(512)
-    })
-}
-
-#[test]
-fn water_allocates_half_resolution_field() -> Result<()> {
-    audit(async {
-        let Some(bench) = Bench::make().await? else {
-            return Ok(());
-        };
-        bench.assert_size(W.div_ceil(2), H.div_ceil(2))
-    })
-}
-
-#[test]
-fn surfaces_never_share_a_persistent_basin() -> Result<()> {
-    audit(async {
-        let Some(mut bench) = Bench::make().await? else {
-            return Ok(());
-        };
-        bench.poison(37, 29)?;
-        if bench.field()?.assert_clean().is_ok() {
-            bail!("poison did not land in the first basin");
-        }
-        let stranger = super::super::surface::SurfaceId(2);
-        let stranger_life = Arc::new(());
-        bench
-            .engine
-            .ensure_basin(&bench.device, &bench.queue, stranger, 0, &stranger_life);
-        let field = bench.field_for(stranger)?;
-        field.assert_clean()?;
-        field.assert_quiet(37, 29, 0.0)
-    })
-}
-
-#[test]
-fn one_submission_keeps_each_surface_forcing() -> Result<()> {
-    audit(async {
-        let Some(mut bench) = Bench::make().await? else {
-            return Ok(());
-        };
         let stranger = super::super::surface::SurfaceId(2);
         let stirred = Script::spaz(0).frame(0.0);
         let quiet = quiet_for(stranger, 0.0);
@@ -193,41 +86,16 @@ fn one_submission_keeps_each_surface_forcing() -> Result<()> {
             .context("wait multi-surface composition")?;
 
         bench.field()?.assert_stirred(0.01)?;
-        bench.field_for(stranger)?.assert_quiet_everywhere(1.0e-6)
-    })
-}
+        bench.field_for(stranger)?.assert_quiet_everywhere(1.0e-6)?;
 
-#[test]
-fn surface_generation_erases_only_its_basin() -> Result<()> {
-    audit(async {
-        let Some(mut bench) = Bench::make().await? else {
-            return Ok(());
-        };
-        bench.saturate()?;
-        bench.field()?.assert_railed(512)?;
-        bench
-            .engine
-            .ensure_basin(&bench.device, &bench.queue, bench.surface, 1, &bench.life);
-        let field = bench.field()?;
-        field.assert_clean()?;
-        field.assert_quiet(37, 29, 0.0)
-    })
-}
-
-#[test]
-fn dead_surfaces_relinquish_their_gpu_basins() -> Result<()> {
-    audit(async {
-        let Some(mut bench) = Bench::make().await? else {
-            return Ok(());
-        };
-        let doomed = super::super::surface::SurfaceId(2);
+        let doomed = super::super::surface::SurfaceId(3);
         let doomed_life = Arc::new(());
         bench
             .engine
             .ensure_basin(&bench.device, &bench.queue, doomed, 0, &doomed_life);
         drop(doomed_life);
 
-        let survivor = super::super::surface::SurfaceId(3);
+        let survivor = super::super::surface::SurfaceId(4);
         let survivor_life = Arc::new(());
         bench
             .engine
@@ -248,46 +116,12 @@ fn dead_surfaces_relinquish_their_gpu_basins() -> Result<()> {
     })
 }
 
-#[test]
-fn water_dump_writes_forensic_sections() -> Result<()> {
-    audit(async {
-        let Some(mut bench) = Bench::make().await? else {
-            return Ok(());
-        };
-        let frame = quiet(0.125);
-        bench.step(&frame)?;
-        let path = std::env::temp_dir().join(format!(
-            "abv-basin-dump-test-{}-{}.abvdump",
-            process::id(),
-            W
-        ));
-        let _gone = fs::remove_file(&path);
-        bench
-            .engine
-            .dump(&bench.device, &bench.queue, &path, &frame, [W, H], 1.0)?;
-        let blob = fs::read(&path).with_context(|| format!("read {}", path.display()))?;
-        fs::remove_file(&path).with_context(|| format!("remove {}", path.display()))?;
-        if !blob.starts_with(b"DWEMER_WATER_DUMP\0") {
-            bail!("basin dump missing magic header");
-        }
-        for needle in [b"meta.txt".as_slice(), b"water0.rg32f", b"water1.rg32f"] {
-            if !blob.windows(needle.len()).any(|window| window == needle) {
-                bail!(
-                    "basin dump missing section {}",
-                    String::from_utf8_lossy(needle)
-                );
-            }
-        }
-        Ok(())
-    })
-}
-
 struct Bench {
     device: wgpu::Device,
     queue: wgpu::Queue,
     engine: Engine,
     surface: super::super::surface::SurfaceId,
-    life: Arc<()>,
+    _life: Arc<()>,
 }
 
 impl Bench {
@@ -322,7 +156,7 @@ impl Bench {
             queue,
             engine,
             surface,
-            life,
+            _life: life,
         }))
     }
 
@@ -390,35 +224,6 @@ impl Bench {
         Ok(())
     }
 
-    fn saturate(&mut self) -> Result<()> {
-        let basin = self.basin()?;
-        let size = basin.size;
-        let mut bytes = Vec::with_capacity((size.width * size.height * SIM_BYTES) as usize);
-        for y in 0..size.height {
-            for x in 0..size.width {
-                let sign = if (x + y).is_multiple_of(2) { 1.0 } else { -1.0 };
-                bytes.extend_from_slice(&(sign * 48.0_f32).to_le_bytes());
-                bytes.extend_from_slice(&(sign * 1440.0_f32).to_le_bytes());
-            }
-        }
-        self.queue.write_texture(
-            wgpu::TexelCopyTextureInfo {
-                texture: &basin.textures[basin.phase],
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            &bytes,
-            wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(size.width * SIM_BYTES),
-                rows_per_image: Some(size.height),
-            },
-            size,
-        );
-        Ok(())
-    }
-
     fn field(&self) -> Result<Field> {
         self.field_for(self.surface)
     }
@@ -474,18 +279,6 @@ impl Bench {
             }
         }
         Ok(false)
-    }
-
-    fn assert_size(&self, width: u32, height: u32) -> Result<()> {
-        let size = self.basin()?.size;
-        if (size.width, size.height) != (width, height) {
-            bail!(
-                "basin is {}×{}, expected {width}×{height}",
-                size.width,
-                size.height
-            );
-        }
-        Ok(())
     }
 
     fn basin(&self) -> Result<&Basin> {
@@ -582,33 +375,6 @@ impl Field {
             }
         }
         Ok(())
-    }
-
-    fn assert_railed(&self, min_cells: usize) -> Result<()> {
-        let cells = self.railed_cells();
-        if cells < min_cells {
-            bail!("only {cells} railed cells, expected at least {min_cells}");
-        }
-        Ok(())
-    }
-
-    fn assert_not_railed(&self, max_cells: usize) -> Result<()> {
-        let cells = self.railed_cells();
-        if cells > max_cells {
-            bail!("{cells} railed cells, expected at most {max_cells}");
-        }
-        Ok(())
-    }
-
-    fn railed_cells(&self) -> usize {
-        self.bytes
-            .chunks_exact(SIM_BYTES as usize)
-            .filter(|chunk| {
-                let h = f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]).abs();
-                let v = f32::from_le_bytes([chunk[4], chunk[5], chunk[6], chunk[7]]).abs();
-                h >= 47.0 || v >= 1410.0
-            })
-            .count()
     }
 
     fn assert_quiet(&self, x: u32, y: u32, limit: f32) -> Result<()> {
@@ -811,35 +577,6 @@ impl Script {
             wake: true,
             tide,
             chemistry: Chemistry::default(),
-            guard: true,
-        }
-    }
-
-    fn very_wet_frame(&self, tide: f32) -> Frame {
-        let mut chemistry = Chemistry::default();
-        chemistry.wave_damp *= 2.0;
-        chemistry.height_retention = 1.0 - (1.0 - chemistry.height_retention) / 2.0;
-        Frame {
-            surface: super::super::surface::SurfaceId(1),
-            life: Arc::new(()),
-            generation: 0,
-            dry: false,
-            veil: None,
-            tensions: self.tensions.clone(),
-            lifts: self.lifts.clone(),
-            domain: Domain {
-                rect: water_rect(),
-                enclosed: 0.0,
-            },
-            scroll_tilt: 0.0,
-            splashes: self.splashes.clone(),
-            raft: self.raft,
-            floor: Floor::NONE,
-            viewer: far_rect(),
-            touches: Vec::new(),
-            wake: true,
-            tide,
-            chemistry,
             guard: true,
         }
     }

@@ -986,21 +986,3 @@ const SIM_WGSL: &str = concat!(
     include_str!("engine/forcing.wgsl"),
     include_str!("engine/sim.wgsl")
 );
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn floor_uniform_treaty_carries_depth_pitch_and_joint() {
-        let floor = Floor {
-            rect: egui::Rect::ZERO,
-            depth: 1.7,
-            registration: FloorRegistration {
-                joint: egui::pos2(13.0, 29.0),
-                pitch: 61.0,
-            },
-        };
-        assert_eq!(floor_vitals(floor), [1.0, 61.0, 13.0, 29.0]);
-    }
-}

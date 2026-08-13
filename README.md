@@ -141,7 +141,7 @@ is deliberately a hardware WebGPU workload.
 
 ```toml
 [dependencies]
-dwemer_poolrooms = "0.10.0"
+dwemer_poolrooms = "0.10.1"
 ```
 
 Import egui through the crate to keep its public geometry types aligned with
@@ -157,7 +157,7 @@ chrome::install(&ctx);
 For chrome without GPU water:
 
 ```toml
-dwemer_poolrooms = { version = "0.10.0", default-features = false }
+dwemer_poolrooms = { version = "0.10.1", default-features = false }
 ```
 
 ## Water
@@ -169,6 +169,13 @@ requires a direct egui-wgpu render graph; an eframe paint callback is too late.
 2. Render egui into `Engine::scene_view()` while the surface is live.
 3. Call `Engine::compose()` into the swapchain before submitting.
 4. After submission, call `Engine::after_submit()` and honor its repaint request.
+
+Water repaint requests are finite leases, not a frame clock. A newly hovered,
+focused, moved, or released mechanism wakes its quiver; identical tension in a
+later frame does not renew that wake. Application hosts must likewise stop
+rendering concealed windows and suppress frame-originated continuation while
+unfocused. Domain progress must be driven by workers, events, or deadlines
+rather than by the water simulator.
 
 [`examples/support/mod.rs`](examples/support/mod.rs) is a complete minimal host,
 including input, resize, surface recovery, and repaint scheduling. `egui_wgpu`

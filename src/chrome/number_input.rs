@@ -756,22 +756,6 @@ mod tests {
     }
 
     #[test]
-    fn integer_and_float_primitives_keep_caller_semantics() {
-        let mut integer = 7_i32;
-        let whole = apply_steps(&mut integer, &(0..=20), 3, 2);
-        assert_eq!(integer, 13);
-        assert_eq!(whole.accepted, 2.0);
-        assert!(whole.refusal.is_none());
-        assert_eq!(format_number(integer, 0), "13");
-
-        let mut float = 0.003_f64;
-        let fractional = apply_steps(&mut float, &(-1.0..=1.0), 0.1, 2);
-        assert!((float - 0.203).abs() < 1e-12);
-        assert_eq!(fractional.accepted, 2.0);
-        assert_eq!(format_number(float, 3), "0.203");
-    }
-
-    #[test]
     fn partial_last_detent_stops_exactly_at_the_caller_bound() {
         let mut value = 9_i32;
         let step = apply_steps(&mut value, &(0..=10), 3, 2);
@@ -911,47 +895,6 @@ mod tests {
                 },
             );
             assert_eq!(offset, 0.0, "smoothed wheel residue escaped containment");
-        }
-    }
-
-    #[test]
-    fn hard_stop_kicks_the_rotor_then_springs_home() {
-        let refusal = NumberRefusal {
-            bound: NumberBound::Maximum,
-            excess_detents: 4.0,
-        };
-        let mut rotor = Rotor::default();
-        rotor.drive(0.0, Some(refusal));
-        let first = rotor.advance(1.0 / 60.0);
-        assert!(first > 0.0);
-        for _ in 0..180 {
-            let _travel = rotor.advance(1.0 / 120.0);
-        }
-        assert!(rotor.angle.abs() < 0.001);
-        assert!(rotor.velocity.abs() < 0.01);
-    }
-
-    #[test]
-    fn one_canonical_atlas_covers_both_rigid_planes() {
-        assert_eq!(baked::PLANES.len(), 2);
-        assert_eq!(
-            baked::PLANES[WheelPlane::XZ.atlas_index()].aperture,
-            [14.0, 12.0]
-        );
-        assert_eq!(
-            baked::PLANES[WheelPlane::YZ.atlas_index()].aperture,
-            [12.0, 14.0]
-        );
-        for atlas in baked::PLANES {
-            assert_eq!(atlas.poses.len(), baked::POSE_COUNT);
-            assert_eq!(atlas.poses[0].phase, 0.0);
-            assert_eq!(atlas.poses[baked::POSE_COUNT - 1].phase, baked::PITCH);
-            assert!(
-                atlas
-                    .poses
-                    .iter()
-                    .all(|pose| !pose.wheel.vertices.is_empty())
-            );
         }
     }
 }

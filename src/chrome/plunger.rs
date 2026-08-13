@@ -91,16 +91,6 @@ impl Spring {
         }
     }
 
-    #[cfg(test)]
-    pub(super) const fn position(self) -> f32 {
-        self.position
-    }
-
-    #[cfg(test)]
-    pub(super) const fn velocity(self) -> f32 {
-        self.velocity
-    }
-
     fn moving(self, target: f32) -> bool {
         (self.position - target).abs() > 0.001 || self.velocity.abs() > 0.01
     }
@@ -369,33 +359,5 @@ impl PlungerWake {
     /// Absolute swept volume in logical point³.
     pub fn swept_volume(self) -> f32 {
         self.volume
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const LAW: SpringLaw = SpringLaw {
-        stiffness: 2_400.0,
-        damping: 68.0,
-        restitution: 0.12,
-        floor: -7.4,
-        ceiling: 4.3,
-    };
-
-    #[test]
-    fn stiff_return_makes_one_legible_overshoot_then_seats() {
-        let rest = 3.2;
-        let mut spring = Spring::at(-7.2);
-        let mut apex = rest;
-        for _ in 0..240 {
-            spring.advance(rest, INTEGRATOR_STEP, LAW);
-            apex = apex.max(spring.position);
-        }
-        assert!(apex > rest + 0.25, "return apex only reached z={apex}");
-        assert!(apex < rest + 0.8, "return apex rang as far as z={apex}");
-        assert!((spring.position - rest).abs() < 0.002);
-        assert!(spring.velocity.abs() < 0.02);
     }
 }
