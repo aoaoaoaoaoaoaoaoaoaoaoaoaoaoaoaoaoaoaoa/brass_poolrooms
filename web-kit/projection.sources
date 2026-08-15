@@ -1,0 +1,30 @@
+# Deliberately broad source locks for projections that cannot yet share one IR.
+# Regeneration alone must never update this ledger: inspect the web projection
+# against the changed producer, then ratify the new digest explicitly.
+14073ce0fb090b10e960eceb7b674fec1235a970c57bd6a439090f9d6d0574ab  src/water/engine.rs
+600e4b95667e245acf0b20958384ec0dd6c0a800a3bfb447f01817f585d9e391  src/water/engine/forcing.wgsl
+6f605a8e8d6ec08c82d742e1b15054901d541edd36f2afebcf0443e893ad46ef  src/water/engine/composite.wgsl
+7693f9d05b069b01e0ce5698e911c7d97336cd3f2842d5cce85b2ba21abc6f12  src/water/surface.rs
+0a6b139431bb6342f9aedf6796e82658f95394a62fa3bd75319c37a830cef830  build/foundry_atlas.rs
+df961ae4d0aaaf7e15b001462090afaab9a5c07beda0d80a5ec912ce5455c0e3  src/chrome/foundry/law.rs
+0f8a8322cc1f55ce99f89ba708cc2c292e6aece5599bbc4116da05dcf5b2e41d  src/chrome/monoglyph.rs
+2e1aa2eedb2250f3499386b31df5c5f3d45dafed37d94ccfce508425e7c99df4  src/chrome.rs
+167edd26c9837a4cc374511e7d90d996a2270cf8692c8be4ee46552eb4e40a6e  web-kit/assemble.mjs
+5f4f87351adaa37166d699b8918775913078944477178e0936d923366078cd1b  web-kit/package.json.in
+2dabaa19a393b9bc9a5f69c32bcf948d8b021fb78c5429ebaded09bad5a24f1b  web-kit/src/riptide.js
+68cb21b3699eb8aa032ddf9ace7304baecb23834c74bc92a100461f84d99b203  web-kit/src/poolrooms.css
+0f35177e45e11cc4dd8901af3c3ef222daf05df3b9075abddb47e64a5e0d2b92  tools/web-floor-forge/Cargo.toml
+736c5f87533dfb631e9c69e788894fad3dad411c9dfbd6cef59e9a1daf2236f0  tools/web-floor-forge/Cargo.lock
+0198fa2d27a3c6af8bca84a9f4f54275564745e3e2004dde64e502de00cbbf1f  tools/web-floor-forge/src/main.rs
+28a5a69ef9e8daf6a20a9c8ff8fcf37aca34ab9d3361fabf427ebe91fd6c8c3e  tools/web-chrome-forge/Cargo.toml
+23248b7c2a1e0f152d050806c59d89efc3109bc0b3abbecd2da800806ec193db  tools/web-chrome-forge/Cargo.lock
+9cff820bfb4e823d0addca1f01d8f85d1f8e29540725d8bb28339c4ab369685f  tools/web-chrome-forge/src/main.rs
+32e79d1d57956b911291ac24db7829658f28a44ef73e53ea9bde05e31d4c605f  tools/web-platform-die-forge/main.rs
+973f270eb363f83a2c22e24d826c0f60959983b1998c83d98709668341cbdca3  tools/web-platform-die-forge/dies.rs
+a26d5dcb57bb0bbe9c7b93ca536caf4fcb874d8b15307dcd4e58d0ab85c34812  tools/web-platform-die-forge/contours/chromium.svg
+5b53723a125c18dbdba8026079b302f9886d7f87cfe31dbe8bfaa6d515a5e9f1  tools/web-platform-die-forge/contours/linux.svg
+a5c0ab1705f3f9ed175996cdfa177765b1aa265949a2d7df9b1d55eb38aeb4ba  tools/web-platform-die-forge/contours/macos.svg
+115f93333757d1a2735e02d7ce093c30600fac6de6d1380a02a9b52e8bb7793e  tools/web-platform-die-forge/contours/native-egui.svg
+0aa3237b5b19a54862067760a0f522e1290f127202e86ac24486900e89061b55  tools/web-platform-die-forge/contours/rust.svg
+e099a1b36d8548eb1112379046d18eedd36c5dbd5ad71249c9883b74fad2b35e  tools/web-platform-die-forge/contours/webgpu.svg
+7232d8dd70ad3fe520614daf64323ad4c8f43000dbd34e99b34023bb3ec8ee9b  tools/web-platform-die-forge/contours/windows.svg

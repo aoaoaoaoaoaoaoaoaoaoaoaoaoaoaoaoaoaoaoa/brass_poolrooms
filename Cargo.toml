@@ -20,7 +20,7 @@ include = [
   "scripts/web-gallery",
   "assets/**",
   "LICENSE*",
-  "README.md",
+  "/README.md",
 ]
 
 [package.metadata.docs.rs]
@@ -63,14 +63,18 @@ name = "widget_gallery"
 required-features = ["water"]
 
 [workspace]
-exclude = ["vendor/egui-winit-0.36.1"]
+exclude = [
+  "tools/web-chrome-forge",
+  "tools/web-floor-forge",
+  "vendor/egui-winit-0.36.1",
+]
 resolver = "3"
 
 [workspace.package]
 edition = "2024"
 license = "MIT"
 rust-version = "1.96"
-version = "0.12.1"
+version = "0.13.0"
 
 [features]
 default = ["water"]
@@ -202,7 +206,7 @@ clippy_command = [
 ]
 test_command = ["cargo", "test", "--workspace", "--all-targets", "--all-features"]
 doc_command = ["cargo", "doc", "--workspace", "--all-features", "--no-deps"]
-web_command = ["scripts/web-gallery", "check"]
+web_command = ["scripts/check-web"]
 canonicalize_commands = [
   [
     "cargo",

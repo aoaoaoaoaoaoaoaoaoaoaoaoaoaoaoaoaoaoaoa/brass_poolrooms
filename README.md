@@ -109,6 +109,22 @@ builds and binds this exact release-mode Wasm example, so native-only drift
 fails the gate. The server also uses that optimized artifact; debug Wasm is not
 representative enough to serve.
 
+For sites that cannot justify the full WebGPU renderer, Poolrooms also owns a
+private, versioned lightweight Web Kit:
+
+```sh
+scripts/web-kit check       # rebuild and compare every projection
+scripts/web-kit package     # assemble the exact-version private npm tarball
+```
+
+It contains static floor and chrome witnesses, a finite analytic WebGL2 water
+projection, and generic CSS. The floor is rendered directly from the native
+WGSL; chrome is rendered through the current Rust API. Deliberate source locks
+stop changes to governing Rust or WGSL until the hand-maintained browser
+projection has been reviewed. Consumers pin an exact package and copy selected
+assets during their build or synchronization step; no public CDN or runtime
+package dependency is required. See [web-kit/README.md](web-kit/README.md).
+
 Pass a port as `scripts/web-gallery serve 8080` or through `PORT=8080`. If that
 port is occupied, the server binds an available ephemeral port and prints its
 actual URL instead of dying.
@@ -141,7 +157,7 @@ is deliberately a hardware WebGPU workload.
 
 ```toml
 [dependencies]
-brass_poolrooms = "0.12.1"
+brass_poolrooms = "0.13.0"
 ```
 
 Import egui through the crate to keep its public geometry types aligned with
@@ -157,7 +173,7 @@ chrome::install(&ctx);
 For chrome without GPU water:
 
 ```toml
-brass_poolrooms = { version = "0.12.1", default-features = false }
+brass_poolrooms = { version = "0.13.0", default-features = false }
 ```
 
 ## Water

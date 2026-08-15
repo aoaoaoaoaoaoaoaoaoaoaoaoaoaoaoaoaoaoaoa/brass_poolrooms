@@ -1,0 +1,77 @@
+.poolrooms-field {
+  background-color: #0c0b09;
+  background-image: url("brass-tiles.png");
+  background-image: image-set(
+    url("brass-tiles.png") 1x,
+    url("brass-tiles@2x.png") 2x,
+    url("brass-tiles@3x.png") 3x
+  );
+  background-position: 0 0;
+  background-repeat: repeat;
+  background-size: 252px 252px;
+}
+
+.poolrooms-field > :not(.riptide) {
+  position: relative;
+  z-index: 1;
+}
+
+.poolrooms-frame {
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  border-image-repeat: stretch;
+  border-image-slice: 3;
+  border-image-width: 3px;
+}
+
+.poolrooms-frame-compact {
+  background-color: #241e16;
+  border-image-source: url("chrome/frame-compact.png");
+}
+
+.poolrooms-frame-feature {
+  background-color: #110f0c;
+  border-image-source: url("chrome/frame-feature.png");
+}
+
+.poolrooms-frame-masthead {
+  background-color: #241e16;
+  border-image-source: url("chrome/frame-masthead.png");
+}
+
+.poolrooms-monoglyph {
+  width: 32px;
+  height: 32px;
+  background: url("chrome/monoglyph-atlas.png") 0 0 / 192px 32px no-repeat;
+}
+
+.poolrooms-monoglyph[aria-pressed="true"] {
+  background-position: -32px 0;
+}
+
+.poolrooms-monoglyph-recoil {
+  animation: poolrooms-monoglyph-recoil 240ms steps(1, end) both;
+}
+
+.poolrooms-platform-die {
+  display: block;
+  width: 28px;
+  height: 28px;
+  background: url("chrome/platform-die-atlas.png") 0 0 / 196px 28px no-repeat;
+}
+
+.poolrooms-platform-die-windows { background-position: -28px 0; }
+.poolrooms-platform-die-macos { background-position: -56px 0; }
+.poolrooms-platform-die-chromium { background-position: -84px 0; }
+.poolrooms-platform-die-webgpu { background-position: -112px 0; }
+.poolrooms-platform-die-rust { background-position: -140px 0; }
+.poolrooms-platform-die-native-egui { background-position: -168px 0; }
+
+@keyframes poolrooms-monoglyph-recoil {
+  0% { background-position: 0 0; }
+  16% { background-position: -64px 0; }
+  32% { background-position: -96px 0; }
+  48% { background-position: -128px 0; }
+  72% { background-position: -160px 0; }
+  100% { background-position: 0 0; }
+}

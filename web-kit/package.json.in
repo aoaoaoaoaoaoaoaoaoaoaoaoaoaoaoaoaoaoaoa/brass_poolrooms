@@ -1,0 +1,17 @@
+{
+  "name": "@aoaoaoaoaoaoaoaoaoaoaoaoaoaoaoaoaoaoaoa/brass-poolrooms-web",
+  "version": "@VERSION@",
+  "description": "Private lightweight browser projections of Brass Poolrooms",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aoaoaoaoaoaoaoaoaoaoaoaoaoaoaoaoaoaoaoa/brass_poolrooms.git"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "restricted",
+    "registry": "https://npm.pkg.github.com"
+  }
+}

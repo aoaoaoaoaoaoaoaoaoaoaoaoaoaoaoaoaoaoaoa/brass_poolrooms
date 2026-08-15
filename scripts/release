@@ -17,7 +17,7 @@ case "$mode" in
     *) die "invalid mode: $mode" ;;
 esac
 
-root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$root"
 
 [ "$(git branch --show-current)" = main ] || die 'release checkout is not main'
@@ -32,9 +32,11 @@ grep -Fqx "version = \"$version\"" Cargo.toml ||
 ./check.py verify
 scripts/audit
 cargo package --locked
+scripts/web-kit package
 
 if [ "$mode" = publish ]; then
     cargo publish --locked
+    scripts/web-kit publish
 else
     printf 'release candidate v%s is clean and packaged; publication was not requested\n' "$version"
 fi

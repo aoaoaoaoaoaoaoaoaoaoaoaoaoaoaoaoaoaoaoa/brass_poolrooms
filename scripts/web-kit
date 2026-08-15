@@ -1,0 +1,206 @@
+#!/bin/sh
+set -eu
+
+usage() {
+    printf 'usage: scripts/web-kit [forge|verify|check|package|publish]\n' >&2
+}
+
+action=${1:-check}
+case "$action" in
+    forge|verify|check|package|publish) [ "$#" -eq 1 ] || { usage; exit 2; } ;;
+    *) usage; exit 2 ;;
+esac
+
+root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$root"
+target=$(cargo metadata --format-version 1 --no-deps | jq -r .target_directory)
+arena="$target/web-kit"
+floor_manifest="$root/tools/web-floor-forge/Cargo.toml"
+chrome_manifest="$root/tools/web-chrome-forge/Cargo.toml"
+die_forge="$root/tools/web-platform-die-forge"
+dist="$root/web-kit/dist"
+
+fail() {
+    printf 'Web Kit refused: %s\n' "$*" >&2
+    exit 1
+}
+
+verify_seals() {
+    node --check web-kit/src/riptide.js
+    node --check web-kit/assemble.mjs
+    node --check web-kit/dist/riptide.js
+    sha256sum -c web-kit/projection.sources
+    sha256sum -c web-kit/projection.outputs
+    [ "$(wc -c <web-kit/dist/riptide.js)" -lt 10000 ] ||
+        fail 'riptide exceeds 10,000 raw bytes'
+    if rg -n 'WebAssembly|Worker|serviceWorker|fetch\(|XMLHttpRequest|WebSocket|EventSource|localStorage|sessionStorage|indexedDB|eval\(|new Function|console\.' web-kit/dist/riptide.js; then
+        fail 'riptide escaped its static finite-runtime charter'
+    fi
+}
+
+verify_seals
+if [ "$action" = verify ]; then
+    cmp -s web-kit/src/poolrooms.css web-kit/dist/poolrooms.css ||
+        fail 'dist/poolrooms.css is stale'
+    exit 0
+fi
+
+[ "$(uname -s):$(uname -m)" = Linux:x86_64 ] ||
+    fail 'deterministic forging requires an x86_64 Linux host'
+[ -f /usr/share/glvnd/egl_vendor.d/50_mesa.json ] ||
+    fail 'deterministic forging requires the Mesa EGL vendor manifest'
+
+need_tool() {
+    actual=$($1 --version 2>&1 | head -1)
+    [ "$actual" = "$2" ] || fail "$1 must be $2, found $actual"
+}
+
+need_tool esbuild 0.28.2
+need_tool oxipng 'oxipng 10.2.0'
+case $(magick -version | head -1) in
+    'Version: ImageMagick 7.1.2-29 '*) ;;
+    *) fail 'ImageMagick must be 7.1.2-29' ;;
+esac
+mkdir -p "$arena"
+work=$(mktemp -d "$arena/forge.XXXXXXXX")
+cleanup() { rm -rf "$work"; }
+trap cleanup EXIT HUP INT TERM
+
+esbuild web-kit/src/riptide.js \
+    --charset=utf8 \
+    --legal-comments=none \
+    --log-level=warning \
+    --minify \
+    --outfile="$work/riptide.js" \
+    >/dev/null
+install -Dm644 web-kit/src/poolrooms.css "$work/poolrooms.css"
+
+floor="$work/floor"
+mkdir -p "$floor"
+LIBGL_ALWAYS_SOFTWARE=true \
+__EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json \
+CARGO_TARGET_DIR="$target/web-floor-forge-target" \
+    cargo run --quiet --release --locked --manifest-path "$floor_manifest" -- "$root" "$floor"
+for density in 1 2 3; do
+    source="$floor/brass-tiles@${density}x.ppm"
+    forged="$work/brass-tiles@${density}x.png"
+    [ -s "$source" ] || fail "floor forge omitted density $density"
+    magick "$source" -strip "PNG24:$forged"
+    oxipng -q -o max --strip safe "$forged"
+done
+
+chrome_raw="$work/chrome-raw"
+chrome="$work/chrome"
+mkdir -p "$chrome_raw" "$chrome"
+LIBGL_ALWAYS_SOFTWARE=true \
+__EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json \
+CARGO_TARGET_DIR="$target/web-chrome-forge-target" \
+    cargo run --quiet --release --locked --manifest-path "$chrome_manifest" -- "$chrome_raw"
+for name in frame-compact frame-feature frame-masthead; do
+    magick "$chrome_raw/$name.png" -strip "PNG24:$chrome/$name.png"
+    oxipng -q -o max --strip safe "$chrome/$name.png"
+done
+magick "$chrome_raw/monoglyph-atlas.png" -strip "PNG32:$chrome/monoglyph-atlas.png"
+oxipng -q -o max --strip safe "$chrome/monoglyph-atlas.png"
+
+die_work="$work/platform-dies"
+mkdir -p "$die_work/masks" "$die_work/poolrooms/build" \
+    "$die_work/poolrooms/src/chrome/foundry"
+# `include!` rejects inner module documentation. The executable Rust remains
+# byte-for-byte sourced from the locked Poolrooms foundry inputs.
+sed 's|^//!|//|' build/foundry_atlas.rs >"$die_work/poolrooms/build/foundry_atlas.rs"
+sed 's|^//!|//|' src/chrome/foundry/law.rs \
+    >"$die_work/poolrooms/src/chrome/foundry/law.rs"
+for platform in linux windows macos chromium webgpu rust native-egui; do
+    magick \
+        -background none \
+        "$die_forge/contours/$platform.svg" \
+        -resize '512x512!' \
+        -alpha extract \
+        -depth 8 \
+        "gray:$die_work/masks/$platform.gray"
+done
+POOLROOMS_SOURCE="$die_work/poolrooms" rustc \
+    --edition 2024 \
+    -D warnings \
+    -C opt-level=3 \
+    -C target-cpu=x86-64 \
+    -o "$die_work/forge" \
+    "$die_forge/main.rs"
+"$die_work/forge" "$die_work/masks" "$die_work/atlas.pam"
+magick "$die_work/atlas.pam" -dither None -colors 256 -strip \
+    "$chrome/platform-die-atlas.png"
+oxipng -q -o max --strip safe "$chrome/platform-die-atlas.png"
+
+cargo clippy --quiet --locked --manifest-path "$floor_manifest" --all-targets
+cargo clippy --quiet --locked --manifest-path "$chrome_manifest" --all-targets
+node --check "$work/riptide.js"
+[ "$(wc -c <"$work/riptide.js")" -lt 10000 ] || fail 'riptide exceeds 10,000 raw bytes'
+[ "$(brotli -q 11 -c "$work/riptide.js" | wc -c)" -lt 3500 ] ||
+    fail 'riptide exceeds 3,500 Brotli bytes'
+if rg -n 'WebAssembly|Worker|serviceWorker|fetch\(|XMLHttpRequest|WebSocket|EventSource|localStorage|sessionStorage|indexedDB|eval\(|new Function|console\.' "$work/riptide.js"; then
+    fail 'riptide escaped its static finite-runtime charter'
+fi
+
+verify_dist() {
+    cmp -s "$work/riptide.js" "$dist/riptide.js" || fail 'dist/riptide.js is stale'
+    cmp -s "$work/poolrooms.css" "$dist/poolrooms.css" || fail 'dist/poolrooms.css is stale'
+    cmp -s "$work/brass-tiles@1x.png" "$dist/brass-tiles.png" || fail '1x floor is stale'
+    cmp -s "$work/brass-tiles@2x.png" "$dist/brass-tiles@2x.png" || fail '2x floor is stale'
+    cmp -s "$work/brass-tiles@3x.png" "$dist/brass-tiles@3x.png" || fail '3x floor is stale'
+    for name in frame-compact frame-feature frame-masthead monoglyph-atlas platform-die-atlas; do
+        cmp -s "$chrome/$name.png" "$dist/chrome/$name.png" ||
+            fail "dist/chrome/$name.png is stale"
+    done
+    [ "$(identify -format '%wx%h:%[type]' "$dist/brass-tiles.png")" = '252x252:Palette' ]
+    [ "$(identify -format '%wx%h:%[type]' "$dist/brass-tiles@2x.png")" = '504x504:Palette' ]
+    [ "$(identify -format '%wx%h:%[type]' "$dist/brass-tiles@3x.png")" = '756x756:Palette' ]
+    [ "$(identify -format '%wx%h' "$dist/chrome/frame-compact.png")" = '357x110' ]
+    [ "$(identify -format '%wx%h' "$dist/chrome/frame-feature.png")" = '720x132' ]
+    [ "$(identify -format '%wx%h' "$dist/chrome/frame-masthead.png")" = '720x89' ]
+    [ "$(identify -format '%wx%h' "$dist/chrome/monoglyph-atlas.png")" = '192x32' ]
+    [ "$(identify -format '%wx%h' "$dist/chrome/platform-die-atlas.png")" = '392x56' ]
+}
+
+case "$action" in
+    forge)
+        install -Dm644 "$work/riptide.js" "$dist/riptide.js"
+        install -Dm644 "$work/poolrooms.css" "$dist/poolrooms.css"
+        install -Dm644 "$work/brass-tiles@1x.png" "$dist/brass-tiles.png"
+        install -Dm644 "$work/brass-tiles@2x.png" "$dist/brass-tiles@2x.png"
+        install -Dm644 "$work/brass-tiles@3x.png" "$dist/brass-tiles@3x.png"
+        for name in frame-compact frame-feature frame-masthead monoglyph-atlas platform-die-atlas; do
+            install -Dm644 "$chrome/$name.png" "$dist/chrome/$name.png"
+        done
+        printf 'Forged Poolrooms Web Kit in %s\n' "$dist"
+        ;;
+    check|package|publish)
+        verify_dist
+        version=$(cargo metadata --format-version 1 --no-deps |
+            jq -r '.packages[] | select(.name == "brass_poolrooms") | .version')
+        revision=$(git rev-parse HEAD)
+        dirty=true
+        [ -n "$(git status --porcelain)" ] || dirty=false
+        stage="$work/package"
+        node web-kit/assemble.mjs "$version" "$revision" "$dirty" "$dist" "$stage" >/dev/null
+        [ "$(jq -r .version "$stage/dist/manifest.json")" = "$version" ]
+        [ "$(jq -r .web_abi "$stage/dist/manifest.json")" = 1 ]
+        package="$arena/package"
+        rm -rf "$package"
+        mkdir -p "$package"
+        tarball=$(npm_config_cache="$target/npm-cache" \
+            npm pack "$stage" --pack-destination "$package" --json |
+            jq -r '.[0].filename')
+        [ -s "$package/$tarball" ] || fail 'npm omitted the package tarball'
+        printf 'Poolrooms Web Kit: %s\n' "$package/$tarball"
+        if [ "$action" = publish ]; then
+            [ "$dirty" = false ] || fail 'publication requires a clean worktree'
+            [ "$(git branch --show-current)" = main ] || fail 'publication requires main'
+            [ "$(git tag --points-at HEAD)" = "v$version" ] ||
+                fail "publication requires v$version at HEAD"
+            npm_config_cache="$target/npm-cache" npm publish "$package/$tarball" \
+                --access restricted \
+                --registry https://npm.pkg.github.com
+        fi
+        ;;
+esac

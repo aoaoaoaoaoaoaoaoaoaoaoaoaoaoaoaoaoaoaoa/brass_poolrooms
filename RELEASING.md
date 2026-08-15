@@ -9,10 +9,11 @@ cut only from `main` after the complete native and WebGPU gate passes.
    then run `cargo package --locked` from that clean commit.
 4. Push `main`, create the annotated `v<version>` tag on that exact commit, and
    push the tag.
-5. Run `scripts/release <version>` to repeat the package gate without
-   publication.
-6. Run `scripts/release <version> publish` to publish the already tagged source.
-7. Verify the registry version, then advance Eternalist Apps and application
+5. Run `scripts/release <version>` to repeat the crate gate and assemble the
+   exact-version private Web Kit without publication.
+6. Run `scripts/release <version> publish` to publish the crate and private Web
+   Kit from the already tagged source.
+7. Verify both registry versions, then advance Eternalist Apps and application
    lockfiles in dependency order.
 
 The release command rejects a dirty checkout, a detached or non-`main` branch,
