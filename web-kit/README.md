@@ -51,7 +51,7 @@ For the generic projection, copy `dist/` intact, load `poolrooms.css`, put
 frame-material classes. Load `riptide.js` at the end of `body` only when the
 optional water response is wanted. The script resolves the density tiles
 relative to its own URL, so the kit can inhabit any same-origin directory.
-Prefer a versioned deployment directory such as `/poolrooms/0.13.0/`. A site
+Prefer a versioned deployment directory such as `/poolrooms/0.13.1/`. A site
 that keeps stable asset paths must replace the document, SRI seal, asset, and
 edge cache atomically.
 
