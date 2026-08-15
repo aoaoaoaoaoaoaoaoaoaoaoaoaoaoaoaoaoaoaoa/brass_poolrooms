@@ -110,18 +110,18 @@ fails the gate. The server also uses that optimized artifact; debug Wasm is not
 representative enough to serve.
 
 For sites that cannot justify the full WebGPU renderer, Poolrooms also owns a
-private, versioned lightweight Web Kit:
+versioned lightweight Web Kit:
 
 ```sh
 scripts/web-kit check       # rebuild and compare every projection
-scripts/web-kit package     # assemble the exact-version private npm tarball
+scripts/web-kit package     # assemble the deterministic release archive
 ```
 
 It contains static floor and chrome witnesses, a finite analytic WebGL2 water
 projection, and generic CSS. The floor is rendered directly from the native
 WGSL; chrome is rendered through the current Rust API. Deliberate source locks
 stop changes to governing Rust or WGSL until the hand-maintained browser
-projection has been reviewed. Consumers pin an exact package and copy selected
+projection has been reviewed. Consumers pin an exact release and copy selected
 assets during their build or synchronization step; no public CDN or runtime
 package dependency is required. See [web-kit/README.md](web-kit/README.md).
 

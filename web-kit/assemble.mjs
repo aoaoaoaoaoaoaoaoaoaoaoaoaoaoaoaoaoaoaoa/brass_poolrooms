@@ -11,7 +11,6 @@ if (dirty !== "true" && dirty !== "false") {
 }
 
 const root = new URL(".", import.meta.url);
-const packageTemplate = readFileSync(new URL("package.json.in", root), "utf8");
 mkdirSync(output, { recursive: true });
 cpSync(source, join(output, "dist"), { recursive: true });
 cpSync(new URL("README.md", root), join(output, "README.md"));
@@ -51,5 +50,4 @@ const manifest = {
   files,
 };
 writeFileSync(join(output, "dist", "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
-writeFileSync(join(output, "package.json"), packageTemplate.replace("@VERSION@", version));
 process.stdout.write(`${basename(output)} ${Object.keys(files).length} files\n`);

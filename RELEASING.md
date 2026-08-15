@@ -10,11 +10,11 @@ cut only from `main` after the complete native and WebGPU gate passes.
 4. Push `main`, create the annotated `v<version>` tag on that exact commit, and
    push the tag.
 5. Run `scripts/release <version>` to repeat the crate gate and assemble the
-   exact-version private Web Kit without publication.
-6. Run `scripts/release <version> publish` to publish the crate and private Web
-   Kit from the already tagged source.
-7. Verify both registry versions, then advance Eternalist Apps and application
-   lockfiles in dependency order.
+   exact-version Web Kit without publication.
+6. Run `scripts/release <version> publish` to publish the crate and the signed
+   Web Kit GitHub Release assets from the already tagged source.
+7. Verify the registry version and release assets, then advance Eternalist Apps
+   and application lockfiles in dependency order.
 
 The release command rejects a dirty checkout, a detached or non-`main` branch,
 an unpushed commit, a missing or misplaced tag, and a manifest-version mismatch.

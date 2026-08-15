@@ -188,19 +188,49 @@ case "$action" in
         package="$arena/package"
         rm -rf "$package"
         mkdir -p "$package"
-        tarball=$(npm_config_cache="$target/npm-cache" \
-            npm pack "$stage" --pack-destination "$package" --json |
-            jq -r '.[0].filename')
-        [ -s "$package/$tarball" ] || fail 'npm omitted the package tarball'
-        printf 'Poolrooms Web Kit: %s\n' "$package/$tarball"
+        tarball="$package/brass-poolrooms-web-$version.tar.gz"
+        archive="$work/brass-poolrooms-web-$version.tar"
+        LC_ALL=C tar \
+            --sort=name \
+            --format=ustar \
+            --mtime=@0 \
+            --owner=0 \
+            --group=0 \
+            --numeric-owner \
+            -C "$work" \
+            -cf "$archive" \
+            package
+        gzip -n -9 -c "$archive" >"$tarball"
+        [ -s "$tarball" ] || fail 'tar omitted the Web Kit archive'
+        checksum="$tarball.sha256"
+        (cd "$package" && sha256sum "$(basename "$tarball")") >"$checksum"
+        printf 'Poolrooms Web Kit: %s\n' "$tarball"
         if [ "$action" = publish ]; then
             [ "$dirty" = false ] || fail 'publication requires a clean worktree'
             [ "$(git branch --show-current)" = main ] || fail 'publication requires main'
             [ "$(git tag --points-at HEAD)" = "v$version" ] ||
                 fail "publication requires v$version at HEAD"
-            npm_config_cache="$target/npm-cache" npm publish "$package/$tarball" \
-                --access restricted \
-                --registry https://npm.pkg.github.com
+            signing_program=$(git config --get gpg.program) ||
+                fail 'publication requires the configured Git signing program'
+            signing_key=$(git config --get user.signingkey) ||
+                fail 'publication requires the configured Git signing key'
+            [ "$signing_key" = '4BE39752DF2F0639C8C4DC9ACA38C24698462CA3!' ] ||
+                fail 'publication requires the Eternalist signing subkey'
+            signature="$tarball.asc"
+            "$signing_program" \
+                --batch \
+                --yes \
+                --armor \
+                --detach-sign \
+                --output "$signature" \
+                "$tarball"
+            gh release create "v$version" \
+                --verify-tag \
+                --title "Brass Poolrooms $version" \
+                --notes "Deterministic lightweight Web Kit from the signed v$version source tag." \
+                "$tarball#Poolrooms Web Kit" \
+                "$checksum#SHA-256 checksum" \
+                "$signature#OpenPGP signature"
         fi
         ;;
 esac
