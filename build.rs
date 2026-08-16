@@ -32,6 +32,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         &output.join("corner_close_atlas.rs"),
         &output.join("drag_handle_atlas.rs"),
         &output.join("number_input_atlas.rs"),
+        &output.join("sort_toggle_atlas.rs"),
         &output.join("material_study_atlas.rs"),
     )?;
     Ok(())

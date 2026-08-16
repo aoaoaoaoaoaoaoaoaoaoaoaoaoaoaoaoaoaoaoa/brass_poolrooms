@@ -8,13 +8,16 @@ mod support;
 
 use anyhow::Result;
 use brass_poolrooms::{chrome, egui, water::Surface};
-use exhibits::{Checkboxes, Closures, Dates, Handles, Legends, Numbers, Pins, Sliders, Symbols};
+use exhibits::{
+    Checkboxes, Closures, Dates, Handles, Legends, Numbers, Pins, Sliders, Sorts, Symbols,
+};
 use support::Exhibit;
 
 #[derive(Default)]
 struct Menagerie {
     closures: Closures,
     handles: Handles,
+    sorts: Sorts,
     symbols: Symbols,
     legends: Legends,
     pins: Pins,
@@ -45,6 +48,8 @@ impl Exhibit for Menagerie {
                         self.closures.show(ui, water);
                         ui.add_space(42.0);
                         self.handles.show(ui, water);
+                        ui.add_space(42.0);
+                        self.sorts.show(ui, water);
                         ui.add_space(42.0);
                         self.symbols.show(ui, water);
                         ui.add_space(42.0);

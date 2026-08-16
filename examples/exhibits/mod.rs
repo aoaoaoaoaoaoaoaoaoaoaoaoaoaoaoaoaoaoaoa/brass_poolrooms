@@ -2,7 +2,7 @@ use brass_poolrooms::{
     chrome::{
         self, Checkbox, CornerClose, Coupled, CouplingGap, DateReels, DateSpool, DragHandle,
         ForgePin, GregorianDay, Keycap, LabelSide, MechanismSize, MnemonicText, Monoglyph,
-        NumberInput, Rail, Section, Symbol, WheelPlane,
+        NumberInput, Rail, Section, SortDetent, SortToggle, Symbol, WheelPlane,
     },
     egui,
     water::Surface,
@@ -227,6 +227,48 @@ impl Symbols {
             });
             ui.add_space(8.0);
         }
+    }
+}
+
+pub struct Sorts {
+    detents: [SortDetent; 3],
+}
+
+impl Default for Sorts {
+    fn default() -> Self {
+        Self {
+            detents: [
+                SortDetent::Off,
+                SortDetent::Ascending,
+                SortDetent::Descending,
+            ],
+        }
+    }
+}
+
+impl Sorts {
+    pub fn show(&mut self, ui: &mut egui::Ui, water: &mut Surface) {
+        let _title = ui.label(chrome::title("SORTING DETENTS"));
+        let _law = ui.label(chrome::muted(
+            "hollow casing · ascending pointer · descending pointer · sprung water displacement",
+        ));
+        ui.add_space(16.0);
+
+        let _gauges = ui.horizontal(|ui| {
+            for (size, detent) in MechanismSize::ALL.into_iter().zip(&mut self.detents) {
+                let _gauge = ui.vertical_centered(|ui| {
+                    let name = match size {
+                        MechanismSize::Small => "SMALL",
+                        MechanismSize::Medium => "MEDIUM",
+                        MechanismSize::Large => "LARGE",
+                    };
+                    let _name = ui.label(chrome::eyebrow(name));
+                    let toggle = SortToggle::new(detent).size(size).show(ui);
+                    water.sort_toggle(&toggle);
+                });
+                ui.add_space(30.0);
+            }
+        });
     }
 }
 

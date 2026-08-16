@@ -16,6 +16,7 @@ include = [
   "build.rs",
   "examples/**",
   "web/**",
+  "docs/**",
   "scripts/gallery-service",
   "scripts/web-gallery",
   "assets/**",
@@ -74,7 +75,7 @@ resolver = "3"
 edition = "2024"
 license = "MIT"
 rust-version = "1.96"
-version = "0.13.1"
+version = "0.13.2"
 
 [features]
 default = ["water"]

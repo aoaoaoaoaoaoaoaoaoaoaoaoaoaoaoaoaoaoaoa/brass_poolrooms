@@ -10,8 +10,9 @@ The corner-mounted [`CornerClose`] uses that same plunger stock with a fixed,
 deeply recessed X. [`DragHandle`] supplies fixed friction pads and rigid or
 folding bails for reorder gestures. The map-anchored [`ForgePin`] unifies its
 shaft, spherical grip, hit region, and optional inscription. [`NumberInput`]
-couples an exact scalar register to a scalloped thumbwheel. All are machined in
-one fixed projection, material, and lighting model.
+couples an exact scalar register to a scalloped thumbwheel. [`SortToggle`]
+provides hollow, ascending, and descending detents. All are machined in one
+fixed projection, material, and lighting model.
 
 ## Scope
 
@@ -39,8 +40,9 @@ composition.
 | [`DragHandle`] | Rigid half-width friction pad, rigid square bail, or sprung folding bail on a riveted crosshatched plate | `Surface::drag_handle` |
 | [`ForgePin`] | Three-gauge coordinate pin with one coherent shaft, bulb, grip region, and medium/large inscription API | application-defined |
 | [`NumberInput`] | Bounded integer or floating register with an explicit quantum, precision, exact-entry override, two wheel planes, and sprung limit refusal | `Surface::number_input` |
+| [`SortToggle`] | Three-gauge sorting index with hollow, ascending, and descending detents | `Surface::sort_toggle` |
 
-These eight types are the complete inventory of authored foundry mechanisms:
+These nine types are the complete inventory of authored foundry mechanisms:
 their projected geometry, dynamics, material response, and displaced-water
 contract live here. The other `chrome` exports are shared typography, frames,
 layout, and interaction assemblies rather than custom projected mechanisms.
@@ -59,9 +61,10 @@ layer cannot activate. These parts state a common physical interaction language
 without introducing commands, menus, or navigation policy.
 
 [`MechanismSize`] gives compatible `Checkbox`, `Monoglyph`, `CornerClose`,
-`DragHandle`, and `ForgePin` dies three named gauges. Cased mechanisms use the
-20-point `Small`, 24-point `Medium`, and 32-point `Large` values as their
-nominal casing and interaction height, not as a transparent layout envelope.
+`DragHandle`, `ForgePin`, and `SortToggle` dies three named gauges. Cased
+mechanisms use the 20-point `Small`, 24-point `Medium`, and 32-point `Large`
+values as their nominal casing and interaction height, not as a transparent
+layout envelope.
 Monoglyphs and bails are square; friction pads are half-width. Checkbox guards
 retain one wire gauge while their lattices step from 2×2 through 3×3 to 4×4,
 and their full protective envelopes are allocated explicitly. Forge pins have
@@ -157,7 +160,7 @@ is deliberately a hardware WebGPU workload.
 
 ```toml
 [dependencies]
-brass_poolrooms = "0.13.1"
+brass_poolrooms = "0.13.2"
 ```
 
 Import egui through the crate to keep its public geometry types aligned with
@@ -173,7 +176,7 @@ chrome::install(&ctx);
 For chrome without GPU water:
 
 ```toml
-brass_poolrooms = { version = "0.13.1", default-features = false }
+brass_poolrooms = { version = "0.13.2", default-features = false }
 ```
 
 ## Water
@@ -222,6 +225,8 @@ surface.set_floor(Some(floor));
 Registration changes only the mosaic's geometry. Poolrooms retains its
 material, mortar, deterministic tile variation, and refractive law.
 
+Physical terms are fixed in the [Poolrooms glossary](docs/glossary.md).
+
 [`Rail`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.Rail.html
 [`DateSpool`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.DateSpool.html
 [`Checkbox`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.Checkbox.html
@@ -230,6 +235,7 @@ material, mortar, deterministic tile variation, and refractive law.
 [`DragHandle`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.DragHandle.html
 [`ForgePin`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.ForgePin.html
 [`NumberInput`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.NumberInput.html
+[`SortToggle`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.SortToggle.html
 [`Section`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.Section.html
 [`MnemonicText`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.MnemonicText.html
 [`Keycap`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.Keycap.html

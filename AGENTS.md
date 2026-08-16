@@ -21,6 +21,10 @@ logical managers, menus, storage surfaces, and other application-scale state
 machines. Eternalist may depend on Poolrooms; Poolrooms must never depend on
 Eternalist.
 
+[`docs/glossary.md`](docs/glossary.md) owns the rectified names of visible
+Poolrooms objects. Reuse those nouns exactly; do not mint near-synonyms for an
+existing physical kind.
+
 ## Physical chrome
 
 Authored widgets are miniature mechanisms submerged in the same world as the

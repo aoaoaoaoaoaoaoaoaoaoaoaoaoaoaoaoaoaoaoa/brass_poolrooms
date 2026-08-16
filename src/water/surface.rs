@@ -650,6 +650,14 @@ impl Surface {
     pub fn monoglyph(&mut self, button: &crate::chrome::MonoglyphResponse) {
         self.plunger(button.wake());
     }
+    /// Couple a sorting pointer's sprung rise and withdrawal into this water world.
+    pub fn sort_toggle(&mut self, toggle: &crate::chrome::SortToggleResponse) {
+        let Some(wake) = toggle.wake() else {
+            return;
+        };
+        let impulse = wake.swept_volume() / PLUNGER_VOLUME_PER_IMPULSE * wake.travel().signum();
+        self.poke(wake.rect(), Poke::basin(impulse));
+    }
     /// Couple a corner-close plunger's downward stroke and sprung return into
     /// this water world using the moving crown's signed swept volume.
     pub fn corner_close(&mut self, close: &crate::chrome::CornerCloseResponse) {
