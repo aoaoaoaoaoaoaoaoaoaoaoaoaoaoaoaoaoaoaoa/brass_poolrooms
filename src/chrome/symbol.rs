@@ -2,6 +2,8 @@
 
 #![deny(missing_docs)]
 
+use super::MonoglyphFinish;
+
 /// A common action mark admitted by the Poolrooms symbology armory.
 ///
 /// The enum owns the semantic-action-to-glyph decision. Passing it through
@@ -18,6 +20,8 @@ pub enum Symbol {
     Confirm,
     /// Decrease a scalar by one application-defined quantum.
     Decrement,
+    /// Permanently delete the targeted durable member.
+    Delete,
     /// Duplicate an existing member.
     Duplicate,
     /// Expand a closed disclosure.
@@ -36,9 +40,10 @@ pub enum Symbol {
 
 impl Symbol {
     /// Complete armory in stable presentation order.
-    pub const ALL: [Self; 11] = [
+    pub const ALL: [Self; 12] = [
         Self::Add,
         Self::Remove,
+        Self::Delete,
         Self::Duplicate,
         Self::Rename,
         Self::Confirm,
@@ -57,12 +62,35 @@ impl Symbol {
             Self::Collapse => '▾',
             Self::Confirm => '✓',
             Self::Decrement => '−',
+            Self::Delete => '🗑',
             Self::Duplicate => '⧉',
             Self::Expand => '▸',
             Self::Help => '?',
             Self::Remove => '×',
             Self::Rename => '✎',
             Self::Restore => '↺',
+        }
+    }
+
+    /// Default physical finish selected by this action's semantics.
+    ///
+    /// Consumers may override the result through
+    /// [`super::Monoglyph::finish`]. Raw Unicode monoglyphs do not consult
+    /// this table and remain bright-cut by default.
+    pub const fn default_finish(self) -> MonoglyphFinish {
+        match self {
+            Self::Delete => MonoglyphFinish::Danger,
+            Self::Add
+            | Self::Collapse
+            | Self::Confirm
+            | Self::Decrement
+            | Self::Duplicate
+            | Self::Expand
+            | Self::Help
+            | Self::Increment
+            | Self::Remove
+            | Self::Rename
+            | Self::Restore => MonoglyphFinish::BrightCut,
         }
     }
 
@@ -73,6 +101,7 @@ impl Symbol {
             Self::Collapse => "COLLAPSE",
             Self::Confirm => "CONFIRM",
             Self::Decrement => "DECREMENT",
+            Self::Delete => "DELETE",
             Self::Duplicate => "DUPLICATE",
             Self::Expand => "EXPAND",
             Self::Help => "HELP",

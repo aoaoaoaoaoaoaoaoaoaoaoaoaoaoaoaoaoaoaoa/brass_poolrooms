@@ -53,7 +53,7 @@ pub use mechanism::{
     Coupled, CoupledResponse, CouplingGap, CouplingPort, CouplingPorts, CouplingTarget,
     MechanismSize,
 };
-pub use monoglyph::{Monoglyph, MonoglyphResponse, MonoglyphWake};
+pub use monoglyph::{Monoglyph, MonoglyphFinish, MonoglyphResponse, MonoglyphWake};
 pub use number_input::{
     NumberBound, NumberInput, NumberInputResponse, NumberInputWake, NumberRefusal, WheelPlane,
 };

@@ -2,7 +2,7 @@ use brass_poolrooms::{
     chrome::{
         self, Checkbox, CornerClose, Coupled, CouplingGap, DateReels, DateSpool, DragHandle,
         ForgePin, GregorianDay, Keycap, LabelSide, MechanismSize, MnemonicText, Monoglyph,
-        NumberInput, Rail, Section, SortDetent, SortToggle, Symbol, WheelPlane,
+        MonoglyphFinish, NumberInput, Rail, Section, SortDetent, SortToggle, Symbol, WheelPlane,
     },
     egui,
     water::Surface,
@@ -230,6 +230,24 @@ impl Symbols {
             });
             ui.add_space(8.0);
         }
+
+        ui.add_space(8.0);
+        let _finishes = ui.horizontal(|ui| {
+            let _name = ui.add_sized(
+                [74.0, MechanismSize::Medium.side()],
+                egui::Label::new(chrome::eyebrow("FINISH")),
+            );
+            for finish in MonoglyphFinish::ALL {
+                let button = Monoglyph::symbol(Symbol::Delete)
+                    .finish(finish)
+                    .size(MechanismSize::Medium)
+                    .show(ui)
+                    .on_hover_text(finish.name());
+                water.monoglyph(&button);
+                let _finish = ui.label(chrome::eyebrow(finish.name()));
+                ui.add_space(8.0);
+            }
+        });
     }
 }
 

@@ -6,7 +6,7 @@
 
 use std::{f32::consts::FRAC_1_SQRT_2, sync::Arc};
 
-use egui::{Color32, Galley, Pos2, Rect, Shape, Stroke, Vec2};
+use egui::{Color32, Galley, Mesh, Pos2, Rect, Shape, Stroke, Vec2, epaint::Vertex};
 
 use super::mechanism::CouplingPort;
 pub(super) mod law;
@@ -24,6 +24,8 @@ const PLAQUE_BEVEL_RUN: f32 = PLAQUE_RISE;
 const PLAQUE_TEXT_PAD_X: f32 = 6.0;
 const PLAQUE_ETCH_DEPTH: f32 = 0.96;
 const PLAQUE_ETCH_BEVEL_RUN: f32 = 0.42;
+const FLAT_CUT_BEVEL_RUN: f32 = 0.42;
+const DANGER_GRAIN_PITCH: f32 = 1.6;
 const _: () =
     assert!(PLAQUE_ETCH_DEPTH < PLAQUE_RISE && PLAQUE_ETCH_DEPTH / PLAQUE_ETCH_BEVEL_RUN > 2.0);
 const COUPLING_TIE_DIAMETER: f32 = 1.55;
@@ -66,6 +68,12 @@ pub(crate) fn turned_bronze(ny: f32, nz: f32) -> Color32 {
 fn fresh_cut_bronze(ny: f32, nz: f32) -> Color32 {
     let (diffuse, specular) = yz_lumen(ny, nz, METAL_SHINE);
     bronze(0.24 + 0.68 * diffuse + specular)
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum EngravingFloor {
+    Void,
+    Danger(u32),
 }
 
 /// Perspective magnification at a faceplate-normal elevation in the common
@@ -137,6 +145,147 @@ pub(crate) fn bright_cut_etch(
     );
 }
 
+/// A steep engraving with a narrow bronze wall and a flat material floor.
+///
+/// The relief is derived from the same dynamic glyph mask as the floor, so it
+/// remains available to every scalar admitted by the font chain. Paint grain
+/// changes the floor material only; it never perturbs the cutter geometry or
+/// the glyph's typographic outline.
+pub(crate) fn flat_cut_etch(
+    painter: &egui::Painter,
+    clip: Rect,
+    pos: Pos2,
+    galley: Arc<Galley>,
+    surface_z: f32,
+    depth: f32,
+    floor: EngravingFloor,
+) {
+    let incision = painter.with_clip_rect(clip);
+    let wall_run = FLAT_CUT_BEVEL_RUN * perspective_scale(surface_z);
+    let normalizer = depth.hypot(FLAT_CUT_BEVEL_RUN);
+    incision.galley_with_override_text_color(
+        pos - Vec2::new(0.0, wall_run * 0.18),
+        galley.clone(),
+        bronze(0.04),
+    );
+    incision.galley_with_override_text_color(
+        pos + Vec2::new(0.0, wall_run),
+        galley.clone(),
+        fresh_cut_bronze(-depth / normalizer, FLAT_CUT_BEVEL_RUN / normalizer),
+    );
+    match floor {
+        EngravingFloor::Void => {
+            incision.galley_with_override_text_color(pos, galley, Color32::BLACK);
+        }
+        EngravingFloor::Danger(seed) => {
+            let _floor = incision.add(Shape::galley(
+                pos,
+                danger_painted_galley(galley, seed),
+                danger_paint(seed, 0, 0),
+            ));
+        }
+    }
+}
+
+fn danger_painted_galley(mut galley: Arc<Galley>, seed: u32) -> Arc<Galley> {
+    let galley_mut = Arc::make_mut(&mut galley);
+    galley_mut.mesh_bounds = Rect::NOTHING;
+    galley_mut.num_vertices = 0;
+    galley_mut.num_indices = 0;
+
+    for (row_index, placed_row) in galley_mut.rows.iter_mut().enumerate() {
+        let row = Arc::make_mut(&mut placed_row.row);
+        let source = &row.visuals.mesh;
+        let glyph_vertices = &source.vertices[row.visuals.glyph_vertex_range.clone()];
+        let mut painted = Mesh::with_texture(source.texture_id);
+
+        if glyph_vertices.len() % 4 == 0 {
+            for (glyph_index, quad) in glyph_vertices.chunks_exact(4).enumerate() {
+                subdivide_painted_quad(
+                    &mut painted,
+                    quad,
+                    seed ^ (row_index as u32).wrapping_mul(0x9e37_79b9)
+                        ^ (glyph_index as u32).wrapping_mul(0x85eb_ca6b),
+                );
+            }
+        } else {
+            painted = source.clone();
+            for (index, vertex) in painted.vertices.iter_mut().enumerate() {
+                vertex.color = danger_paint(seed, index, 0);
+            }
+        }
+
+        row.visuals.mesh = painted;
+        row.visuals.mesh_bounds = row.visuals.mesh.calc_bounds();
+        row.visuals.glyph_index_start = 0;
+        row.visuals.glyph_vertex_range = 0..row.visuals.mesh.vertices.len();
+        galley_mut.mesh_bounds |= row.visuals.mesh_bounds.translate(placed_row.pos.to_vec2());
+        galley_mut.num_vertices += row.visuals.mesh.vertices.len();
+        galley_mut.num_indices += row.visuals.mesh.indices.len();
+    }
+    galley
+}
+
+fn subdivide_painted_quad(mesh: &mut Mesh, quad: &[Vertex], seed: u32) {
+    let [top_left, top_right, bottom_left, _bottom_right] = quad else {
+        unreachable!("glyph meshes are partitioned into four-vertex quads");
+    };
+    let width = top_left.pos.distance(top_right.pos);
+    let height = top_left.pos.distance(bottom_left.pos);
+    let columns = (width / DANGER_GRAIN_PITCH).ceil().clamp(1.0, 12.0) as usize;
+    let rows = (height / DANGER_GRAIN_PITCH).ceil().clamp(1.0, 12.0) as usize;
+    let base = mesh.vertices.len() as u32;
+
+    for y in 0..=rows {
+        let fy = y as f32 / rows as f32;
+        for x in 0..=columns {
+            let fx = x as f32 / columns as f32;
+            mesh.vertices.push(Vertex {
+                pos: Pos2::new(
+                    egui::lerp(top_left.pos.x..=top_right.pos.x, fx),
+                    egui::lerp(top_left.pos.y..=bottom_left.pos.y, fy),
+                ),
+                uv: Pos2::new(
+                    egui::lerp(top_left.uv.x..=top_right.uv.x, fx),
+                    egui::lerp(top_left.uv.y..=bottom_left.uv.y, fy),
+                ),
+                color: danger_paint(seed, x, y),
+            });
+        }
+    }
+    for y in 0..rows {
+        for x in 0..columns {
+            let stride = columns + 1;
+            let top_left = base + (y * stride + x) as u32;
+            let top_right = top_left + 1;
+            let bottom_left = top_left + stride as u32;
+            let bottom_right = bottom_left + 1;
+            mesh.indices.extend_from_slice(&[
+                top_left,
+                top_right,
+                bottom_left,
+                bottom_left,
+                top_right,
+                bottom_right,
+            ]);
+        }
+    }
+}
+
+fn danger_paint(seed: u32, x: usize, y: usize) -> Color32 {
+    let mut grain =
+        seed ^ (x as u32).wrapping_mul(0x9e37_79b9) ^ (y as u32).wrapping_mul(0x85eb_ca6b);
+    grain ^= grain >> 16;
+    grain = grain.wrapping_mul(0x7feb_352d);
+    grain ^= grain >> 15;
+    let light = (grain & 0x1f) as i16 - 15;
+    Color32::from_rgb(
+        (139_i16 + light).clamp(0, 255) as u8,
+        (49_i16 + light / 2).clamp(0, 255) as u8,
+        (13_i16 + light / 4).clamp(0, 255) as u8,
+    )
+}
+
 /// A casing-height bronze identification plate with a dynamically etched face.
 /// Its 2 pt rise and 2 pt run form literal 45° edge facets; runtime varies only
 /// the extrusion's width and its text mask.
@@ -199,7 +348,7 @@ impl Plaque {
         ];
         let columns = (self.face_size.x / DARK_REFLECTION_CELL).ceil() as usize;
         let rows = (self.face_size.y / DARK_REFLECTION_CELL).ceil() as usize;
-        let mut metal = egui::Mesh::default();
+        let mut metal = Mesh::default();
         metal.vertices.reserve(16 + 4 * columns * rows);
         metal.indices.reserve(24 + 6 * columns * rows);
         let mut facet = |corners: [[f32; 3]; 4], normal| {
@@ -268,7 +417,7 @@ pub(crate) fn darkened_sheet(painter: &egui::Painter, rect: Rect) {
             0.0,
         ]
     };
-    let mut mesh = egui::Mesh::default();
+    let mut mesh = Mesh::default();
     mesh.vertices.reserve(4 * columns * rows);
     mesh.indices.reserve(6 * columns * rows);
     for y in 0..rows {
@@ -322,7 +471,7 @@ pub(crate) fn tie_pair(left: CouplingPort, right: CouplingPort) -> Shape {
 }
 
 /// Replay an already projected and illuminated 2D foundry artifact.
-pub(crate) fn paint_compiled(painter: &egui::Painter, clip: Rect, mesh: &Arc<egui::Mesh>) {
+pub(crate) fn paint_compiled(painter: &egui::Painter, clip: Rect, mesh: &Arc<Mesh>) {
     let _shape = painter.with_clip_rect(clip).add(Shape::mesh(mesh.clone()));
 }
 
@@ -350,7 +499,7 @@ fn cylinder_between(start: Pos2, end: Pos2, diameter: f32) -> Shape {
     let axis = (end - start).normalized();
     let wing = Vec2::new(-axis.y, axis.x);
     let radius = diameter * 0.5;
-    let mut mesh = egui::Mesh::default();
+    let mut mesh = Mesh::default();
     for band in 0..=BANDS {
         let f = band as f32 / BANDS as f32;
         let s = f * 2.0 - 1.0;

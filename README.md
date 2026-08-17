@@ -37,7 +37,7 @@ composition.
 | [`Rail`] | Bounded linear transport with explicit total and admissible spans, detents, focused Left/Right/Home/End input, and hovered wheel input by default | `Surface::rail` |
 | [`DateSpool`] | One-to-three Gregorian tape reels with explicit width and a reel-derived rigid minimum | `Surface::date_spool` |
 | [`Checkbox`] | Three-gauge latching plunger with an optional side-selectable etched plaque and a state-transparent fixed-stock guard | `Surface::checkbox` |
-| [`Monoglyph`] | Three-gauge momentary square plunger carrying one etched scalar; [`Symbol`] supplies the canonical common-action armory | `Surface::monoglyph` |
+| [`Monoglyph`] | Three-gauge momentary square plunger carrying one engraved scalar; [`Symbol`] supplies semantic marks and their default [`MonoglyphFinish`] | `Surface::monoglyph` |
 | [`CornerClose`] | Three-gauge momentary close plunger centered on a pane corner, with a build-time modelled and self-shadowed X trench | `Surface::corner_close` |
 | [`DragHandle`] | Rigid half-width friction pad, rigid square bail, or sprung folding bail on a riveted crosshatched plate | `Surface::drag_handle` |
 | [`ForgePin`] | Three-gauge coordinate pin with one coherent shaft, bulb, grip region, medium/large inscription API, and native large-pin cursor | application-defined |
@@ -75,8 +75,11 @@ their own map-anchored gauge geometry; medium and large bulbs admit native
 centered text while small remains unlettered. Each admitted cased gauge is
 independently projected and illuminated at build time.
 `Monoglyph::symbol(Symbol::Add)` and the other armory constructors bind a
-common action to one scalar and the selected foundry gauge's typography. A
-product-specific mark may still use `Monoglyph::new(char)`; common add, remove,
+common action to one scalar, one semantic finish default, and the selected
+foundry gauge's typography. `Symbol::Delete` therefore selects the rough
+blood-ochre `MonoglyphFinish::Danger`; `.finish(...)` may override that lookup
+without re-authoring the glyph. A product-specific mark may still use
+`Monoglyph::new(char)` and defaults to `BrightCut`. Common add, remove, delete,
 duplicate, rename, confirm, disclosure, restore, help, and increment/decrement
 marks must not be re-authored at application call sites.
 [`Coupled::horizontal`] places any two coupling-capable foundry responses at the
@@ -164,7 +167,7 @@ is deliberately a hardware WebGPU workload.
 
 ```toml
 [dependencies]
-brass_poolrooms = "0.13.4"
+brass_poolrooms = "0.13.5"
 ```
 
 Import egui through the crate to keep its public geometry types aligned with
@@ -180,7 +183,7 @@ chrome::install(&ctx);
 For chrome without GPU water:
 
 ```toml
-brass_poolrooms = { version = "0.13.4", default-features = false }
+brass_poolrooms = { version = "0.13.5", default-features = false }
 ```
 
 ## Water
@@ -235,6 +238,7 @@ Physical terms are fixed in the [Poolrooms glossary](docs/glossary.md).
 [`DateSpool`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.DateSpool.html
 [`Checkbox`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.Checkbox.html
 [`Monoglyph`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.Monoglyph.html
+[`MonoglyphFinish`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/enum.MonoglyphFinish.html
 [`CornerClose`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.CornerClose.html
 [`DragHandle`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.DragHandle.html
 [`ForgePin`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.ForgePin.html

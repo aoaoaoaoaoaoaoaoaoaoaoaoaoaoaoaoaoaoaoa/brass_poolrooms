@@ -1,4 +1,4 @@
-//! A momentary square plunger whose one etched glyph is its entire label.
+//! A momentary square plunger whose one engraved glyph is its entire label.
 //! Crown, bevel, skirt, projection, illumination, and directional shadow are
 //! compiled from a three-dimensional foundry model; runtime selects a pose and
 //! integrates the stiff return spring.
@@ -15,7 +15,8 @@ use super::mechanism::{CouplingPorts, CouplingTarget, sealed};
 use super::plunger::{self, BakedGauge, BakedMesh, BakedPose, BakedVertex, PlungerWake, SpringLaw};
 
 const ETCH_EM_PER_CROWN: f32 = 13.5 / (8.9 * 2.0);
-const ETCH_DEPTH: f32 = 0.72;
+const BRIGHT_CUT_DEPTH: f32 = 0.72;
+const FLAT_CUT_DEPTH: f32 = 0.96;
 const SPRING_LAW: SpringLaw = SpringLaw {
     stiffness: 2_400.0,
     damping: 68.0,
@@ -30,7 +31,40 @@ mod baked {
     include!(concat!(env!("OUT_DIR"), "/monoglyph_atlas.rs"));
 }
 
-/// A square, momentary Poolrooms button carrying exactly one etched glyph.
+/// Material and cutter treatment applied to a monoglyph's mark.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum MonoglyphFinish {
+    /// A shallow action cut dominated by its illuminated fresh-bronze wall.
+    #[default]
+    BrightCut,
+    /// A steep, flat-bottomed engraving whose floor is soot black.
+    Void,
+    /// A steep, flat-bottomed engraving filled with rough blood-ochre paint.
+    Danger,
+}
+
+impl MonoglyphFinish {
+    /// Complete finish register in stable gallery order.
+    pub const ALL: [Self; 3] = [Self::BrightCut, Self::Void, Self::Danger];
+
+    /// Stable material name for galleries and instrumentation.
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::BrightCut => "BRIGHT CUT",
+            Self::Void => "VOID",
+            Self::Danger => "DANGER",
+        }
+    }
+
+    const fn depth(self) -> f32 {
+        match self {
+            Self::BrightCut => BRIGHT_CUT_DEPTH,
+            Self::Void | Self::Danger => FLAT_CUT_DEPTH,
+        }
+    }
+}
+
+/// A square, momentary Poolrooms button carrying exactly one engraved glyph.
 ///
 /// The `char` constructor makes the one-glyph boundary structural: text labels
 /// and rectangular actions cannot accidentally enter this mechanism.
@@ -55,6 +89,8 @@ mod baked {
 pub struct Monoglyph {
     glyph: char,
     size: MechanismSize,
+    finish: MonoglyphFinish,
+    symbol: Option<Symbol>,
 }
 
 impl Monoglyph {
@@ -63,6 +99,8 @@ impl Monoglyph {
         Self {
             glyph,
             size: MechanismSize::Large,
+            finish: MonoglyphFinish::BrightCut,
+            symbol: None,
         }
     }
 
@@ -70,14 +108,30 @@ impl Monoglyph {
     ///
     /// The selected [`MechanismSize`] remains the sole typographic gauge:
     /// equal symbols at equal sizes therefore have identical glyph, font,
-    /// crown, relief, and motion.
+    /// crown, relief, and motion. The symbol's semantic finish default is
+    /// selected from the armory's closed lookup table.
     pub const fn symbol(symbol: Symbol) -> Self {
-        Self::new(symbol.glyph())
+        Self {
+            glyph: symbol.glyph(),
+            size: MechanismSize::Large,
+            finish: symbol.default_finish(),
+            symbol: Some(symbol),
+        }
     }
 
     /// Select a build-time forged square footprint.
     pub const fn size(mut self, size: MechanismSize) -> Self {
         self.size = size;
+        self
+    }
+
+    /// Override the raw-glyph or semantic-symbol finish.
+    ///
+    /// This is deliberately applied after [`Monoglyph::symbol`] resolves the
+    /// armory default, so a destructive symbol may be rendered in another
+    /// material when its local meaning demands it.
+    pub const fn finish(mut self, finish: MonoglyphFinish) -> Self {
+        self.finish = finish;
         self
     }
 
@@ -101,7 +155,14 @@ impl Monoglyph {
         if enabled {
             response = response.on_hover_cursor(CursorIcon::PointingHand);
         }
-        response.widget_info(|| WidgetInfo::labeled(WidgetType::Button, enabled, self.glyph));
+        response.widget_info(|| {
+            WidgetInfo::labeled(
+                WidgetType::Button,
+                enabled,
+                self.symbol
+                    .map_or_else(|| self.glyph.to_string(), |symbol| symbol.name().to_owned()),
+            )
+        });
         let activated = super::exact_activation(ui, &response);
 
         let motion = plunger::momentary_motion(
@@ -139,6 +200,7 @@ impl Monoglyph {
                     aperture,
                     origin,
                     self.glyph,
+                    self.finish,
                     motion.position,
                     gauge.top_half,
                 );
@@ -218,12 +280,40 @@ fn etch(
     clip: Rect,
     origin: Pos2,
     glyph: char,
+    finish: MonoglyphFinish,
     elevation: f32,
     top_half: f32,
 ) {
-    let floor_scale = foundry::perspective_scale(elevation - ETCH_DEPTH);
+    let depth = finish.depth();
+    let floor_scale = foundry::perspective_scale(elevation - depth);
     let font = FontId::monospace(top_half * 2.0 * ETCH_EM_PER_CROWN * floor_scale);
     let galley = painter.layout_no_wrap(glyph.to_string(), font, egui::Color32::PLACEHOLDER);
     let pos = origin - galley.size() * 0.5;
-    foundry::bright_cut_etch(painter, clip, pos, galley, elevation, ETCH_DEPTH);
+    match finish {
+        MonoglyphFinish::BrightCut => {
+            foundry::bright_cut_etch(painter, clip, pos, galley, elevation, depth);
+        }
+        MonoglyphFinish::Void => {
+            foundry::flat_cut_etch(
+                painter,
+                clip,
+                pos,
+                galley,
+                elevation,
+                depth,
+                foundry::EngravingFloor::Void,
+            );
+        }
+        MonoglyphFinish::Danger => {
+            foundry::flat_cut_etch(
+                painter,
+                clip,
+                pos,
+                galley,
+                elevation,
+                depth,
+                foundry::EngravingFloor::Danger(glyph as u32),
+            );
+        }
+    }
 }
