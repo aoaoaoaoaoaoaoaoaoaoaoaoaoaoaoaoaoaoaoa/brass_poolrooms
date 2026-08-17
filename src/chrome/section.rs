@@ -169,6 +169,7 @@ impl Section {
             response: frame.response,
             header: header_response.unwrap_or(frame.inner),
             activated: header_activated,
+            open: state.is_open(),
         }
     }
 }
@@ -201,6 +202,8 @@ pub struct SectionResponse {
     pub header: egui::Response,
     /// Whether the disclosure accepted a pointer, accessibility, or exact key activation.
     pub activated: bool,
+    /// Whether the disclosure body is open after this pass.
+    pub open: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
