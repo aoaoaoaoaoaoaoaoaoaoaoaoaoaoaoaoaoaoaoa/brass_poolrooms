@@ -149,7 +149,7 @@ dependencies = [
 
 [[package]]
 name = "brass_poolrooms"
-version = "0.13.5"
+version = "0.13.6"
 dependencies = [
  "anyhow",
  "bytemuck",
