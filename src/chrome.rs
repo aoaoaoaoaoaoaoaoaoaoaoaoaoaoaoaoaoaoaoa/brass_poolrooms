@@ -27,6 +27,7 @@ mod corner_close;
 mod date_spool;
 mod drag_handle;
 mod forge_pin;
+mod forged;
 mod foundry;
 mod legend;
 mod longinus_cursor;
@@ -47,6 +48,7 @@ pub use date_spool::{
 };
 pub use drag_handle::{DragHandle, DragHandleResponse, DragHandleWake};
 pub use forge_pin::ForgePin;
+pub use forged::{ForgedMesh, ForgedVertex};
 pub use legend::{Keycap, MnemonicText};
 pub use longinus_cursor::LonginusCursor;
 pub use mechanism::{

@@ -5,16 +5,21 @@ use std::{
     f32::consts::{FRAC_PI_2, PI, TAU},
     fs::File,
     io::{self, BufWriter, Write},
-    ops::{Add, Div, Mul, Sub},
     path::Path,
+};
+
+use brass_foundry::{
+    Charge, Mesh as Compiled, Model, Pixel, RustDialect, RustReach, Vec3 as V3, Vertex,
+    compile_with as compile_bronze_with, darkened_lit_with_key, depth, emit_rust_as,
+    forge as forge_bronze, lit_with_key, project, shadow as compile_shadow,
+    shadow_source as compile_shadow_source, visible,
 };
 
 use crate::foundry_law::{
     DARK_AMBIENT, DARK_BROAD_SHINE, DARK_BROAD_WEIGHT, DARK_DIFFUSE_WEIGHT, DARK_EXPOSURE,
     DARK_GLINT_SHINE, DARK_GLINT_WEIGHT, DARK_REFLECTION_CELL, DARK_TONE_CEILING, EYE_Z, HALF_Y,
     HALF_Z, LIGHT_Y, LIGHT_Z, MECHANISM_SIDE_LARGE, MECHANISM_SIDE_MEDIUM, MECHANISM_SIDE_SMALL,
-    MECHANISM_SIDES, MomentaryGauge, bronze_rgb, darkened_bronze_rgb, darkened_metal_tone,
-    darkened_metal_tone_with_key, material_terms, metal_tone, metal_tone_with_key, momentary_gauge,
+    MECHANISM_SIDES, MomentaryGauge, bronze_rgb, material_terms, momentary_gauge,
     polished_metal_tone,
 };
 
@@ -336,141 +341,6 @@ fn friction_gauge(side: u8) -> FrictionGauge {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default)]
-struct V3 {
-    x: f32,
-    y: f32,
-    z: f32,
-}
-
-impl V3 {
-    const ZERO: Self = Self::new(0.0, 0.0, 0.0);
-
-    const fn new(x: f32, y: f32, z: f32) -> Self {
-        Self { x, y, z }
-    }
-
-    fn dot(self, rhs: Self) -> f32 {
-        self.x * rhs.x + self.y * rhs.y + self.z * rhs.z
-    }
-
-    fn cross(self, rhs: Self) -> Self {
-        Self::new(
-            self.y * rhs.z - self.z * rhs.y,
-            self.z * rhs.x - self.x * rhs.z,
-            self.x * rhs.y - self.y * rhs.x,
-        )
-    }
-
-    fn length(self) -> f32 {
-        self.dot(self).sqrt()
-    }
-
-    fn normalized(self) -> Self {
-        self / self.length().max(f32::EPSILON)
-    }
-
-    fn rotate_z(self, angle: f32) -> Self {
-        let (sin, cos) = angle.sin_cos();
-        Self::new(
-            self.x * cos - self.y * sin,
-            self.x * sin + self.y * cos,
-            self.z,
-        )
-    }
-
-    fn wheel_plane(self, plane: WheelPlane) -> Self {
-        match plane {
-            // Rᵧ(+π/2): the canonical Z axle becomes screen X.
-            WheelPlane::YZ => Self::new(self.z, self.y, -self.x),
-            // Rₓ(−π/2): the canonical Z axle becomes screen Y.
-            WheelPlane::XZ => Self::new(self.x, self.z, -self.y),
-        }
-    }
-}
-
-impl Add for V3 {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        Self::new(self.x + rhs.x, self.y + rhs.y, self.z + rhs.z)
-    }
-}
-
-impl Sub for V3 {
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        Self::new(self.x - rhs.x, self.y - rhs.y, self.z - rhs.z)
-    }
-}
-
-impl Mul<f32> for V3 {
-    type Output = Self;
-
-    fn mul(self, rhs: f32) -> Self::Output {
-        Self::new(self.x * rhs, self.y * rhs, self.z * rhs)
-    }
-}
-
-impl Div<f32> for V3 {
-    type Output = Self;
-
-    fn div(self, rhs: f32) -> Self::Output {
-        Self::new(self.x / rhs, self.y / rhs, self.z / rhs)
-    }
-}
-
-#[derive(Clone, Copy)]
-struct Vertex {
-    position: V3,
-    normal: V3,
-}
-
-impl Vertex {
-    fn new(position: V3, normal: V3) -> Self {
-        Self { position, normal }
-    }
-}
-
-#[derive(Clone, Default)]
-struct Model {
-    triangles: Vec<[Vertex; 3]>,
-}
-
-impl Model {
-    fn triangle(&mut self, a: Vertex, b: Vertex, c: Vertex) {
-        self.triangles.push([a, b, c]);
-    }
-
-    fn quad(&mut self, vertices: [Vertex; 4]) {
-        let [a, b, c, d] = vertices;
-        self.triangle(a, b, c);
-        self.triangle(a, c, d);
-    }
-
-    fn append(&mut self, mut rhs: Self) {
-        self.triangles.append(&mut rhs.triangles);
-    }
-
-    fn wheel_pose(&self, phase: f32, plane: WheelPlane) -> Self {
-        Self {
-            triangles: self
-                .triangles
-                .iter()
-                .map(|triangle| {
-                    triangle.map(|vertex| {
-                        Vertex::new(
-                            vertex.position.rotate_z(phase).wheel_plane(plane),
-                            vertex.normal.rotate_z(phase).wheel_plane(plane),
-                        )
-                    })
-                })
-                .collect(),
-        }
-    }
-}
-
 #[derive(Clone, Copy)]
 enum WheelPlane {
     XZ,
@@ -495,37 +365,19 @@ impl WheelPlane {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-struct Pixel {
-    position: [f32; 2],
-    color: [u8; 4],
+fn wheel_pose(model: &Model, phase: f32, plane: WheelPlane) -> Model {
+    model.transformed(
+        |point| wheel_plane(point.rotate_z(phase), plane),
+        |normal| wheel_plane(normal.rotate_z(phase), plane),
+    )
 }
 
-#[derive(Default)]
-struct Compiled {
-    vertices: Vec<Pixel>,
-    indices: Vec<u32>,
-    intern: HashMap<([u32; 2], [u8; 4]), u32>,
-}
-
-impl Compiled {
-    fn vertex(&mut self, pixel: Pixel) -> u32 {
-        let key = (
-            [pixel.position[0].to_bits(), pixel.position[1].to_bits()],
-            pixel.color,
-        );
-        if let Some(index) = self.intern.get(&key) {
-            return *index;
-        }
-        let index = self.vertices.len() as u32;
-        self.vertices.push(pixel);
-        let _prior = self.intern.insert(key, index);
-        index
-    }
-
-    fn triangle(&mut self, pixels: [Pixel; 3]) {
-        let indices = pixels.map(|pixel| self.vertex(pixel));
-        self.indices.extend(indices);
+const fn wheel_plane(point: V3, plane: WheelPlane) -> V3 {
+    match plane {
+        // Rᵧ(+π/2): the canonical Z axle becomes screen X.
+        WheelPlane::YZ => V3::new(point.z, point.y, -point.x),
+        // Rₓ(−π/2): the canonical Z axle becomes screen Y.
+        WheelPlane::XZ => V3::new(point.x, point.z, -point.y),
     }
 }
 
@@ -1013,7 +865,7 @@ fn bake_number_input(path: &Path) -> io::Result<()> {
         let name = plane.name();
         for index in 0..WHEEL_POSE_COUNT {
             let phase = wheel_pose_phase(index);
-            let model = blank.wheel_pose(phase, plane);
+            let model = wheel_pose(&blank, phase, plane);
             let wheel = compile_wheel(&model, phase, plane);
             emit_mesh(&mut out, &format!("{name}_WHEEL_{index:02}"), &wheel)?;
         }
@@ -1102,10 +954,10 @@ fn bake_material_study(path: &Path) -> io::Result<()> {
             if row_index == MATERIAL_STUDY_PRODUCTION_ROW
                 && column_index == MATERIAL_STUDY_PRODUCTION_COLUMN
             {
-                assert_eq!(button.vertices, production_button.vertices);
-                assert_eq!(button.indices, production_button.indices);
-                assert_eq!(plate.vertices, production_plate.vertices);
-                assert_eq!(plate.indices, production_plate.indices);
+                assert_eq!(button.vertices(), production_button.vertices());
+                assert_eq!(button.indices(), production_button.indices());
+                assert_eq!(plate.vertices(), production_plate.vertices());
+                assert_eq!(plate.indices(), production_plate.indices());
             }
             emit_mesh(
                 &mut out,
@@ -1171,21 +1023,21 @@ fn polished_lit(vertex: Vertex) -> [u8; 4] {
 
 fn raster_cursor(mesh: &Compiled, hotspot: [f32; 2]) -> (Vec<u8>, [u16; 2]) {
     let min = [
-        mesh.vertices
+        mesh.vertices()
             .iter()
             .map(|vertex| vertex.position[0])
             .fold(f32::INFINITY, f32::min),
-        mesh.vertices
+        mesh.vertices()
             .iter()
             .map(|vertex| vertex.position[1])
             .fold(f32::INFINITY, f32::min),
     ];
     let max = [
-        mesh.vertices
+        mesh.vertices()
             .iter()
             .map(|vertex| vertex.position[0])
             .fold(f32::NEG_INFINITY, f32::max),
-        mesh.vertices
+        mesh.vertices()
             .iter()
             .map(|vertex| vertex.position[1])
             .fold(f32::NEG_INFINITY, f32::max),
@@ -1205,7 +1057,7 @@ fn raster_cursor(mesh: &Compiled, hotspot: [f32; 2]) -> (Vec<u8>, [u16; 2]) {
         ]
     };
     let vertices = mesh
-        .vertices
+        .vertices()
         .iter()
         .map(|vertex| Pixel {
             position: map(vertex.position),
@@ -1214,7 +1066,7 @@ fn raster_cursor(mesh: &Compiled, hotspot: [f32; 2]) -> (Vec<u8>, [u16; 2]) {
         .collect::<Vec<_>>();
     let sample_side = CURSOR_SIDE * CURSOR_SAMPLES;
     let mut samples = vec![[0_u8; 4]; sample_side * sample_side];
-    for triangle in mesh.indices.chunks_exact(3) {
+    for triangle in mesh.indices().chunks_exact(3) {
         let tri = [
             vertices[triangle[0] as usize],
             vertices[triangle[1] as usize],
@@ -1311,29 +1163,12 @@ fn barycentric(triangle: [[f32; 2]; 3], point: [f32; 2]) -> Option<[f32; 3]> {
 }
 
 fn emit_mesh(out: &mut impl Write, name: &str, mesh: &Compiled) -> io::Result<()> {
-    writeln!(out, "static {name}_VERTICES: &[BakedVertex] = &[")?;
-    for vertex in &mesh.vertices {
-        let [x, y] = vertex.position;
-        let [r, g, b, a] = vertex.color;
-        writeln!(
-            out,
-            "BakedVertex {{ position: [{}, {}], color: [{r}, {g}, {b}, {a}] }},",
-            scalar(x),
-            scalar(y)
-        )?;
-    }
-    writeln!(out, "];")?;
-    writeln!(out, "static {name}_INDICES: &[u32] = &[")?;
-    for chunk in mesh.indices.chunks(24) {
-        for index in chunk {
-            write!(out, "{index},")?;
-        }
-        writeln!(out)?;
-    }
-    writeln!(out, "];")?;
-    writeln!(
+    emit_rust_as(
         out,
-        "pub(super) static {name}: BakedMesh = BakedMesh {{ vertices: {name}_VERTICES, indices: {name}_INDICES }};"
+        name,
+        mesh,
+        RustReach::Module,
+        RustDialect::new("BakedVertex", "BakedMesh"),
     )
 }
 
@@ -1397,75 +1232,6 @@ fn wheel_pose_phase(index: usize) -> f32 {
     }
 }
 
-fn project(point: V3) -> [f32; 2] {
-    let scale = EYE_Z / (EYE_Z - point.z).max(1.0);
-    [point.x * scale, point.y * scale]
-}
-
-fn view(point: V3) -> V3 {
-    (V3::new(0.0, 0.0, EYE_Z) - point).normalized()
-}
-
-fn visible(triangle: &[Vertex; 3]) -> bool {
-    let center = triangle
-        .iter()
-        .fold(V3::ZERO, |sum, vertex| sum + vertex.position)
-        / 3.0;
-    let normal = triangle
-        .iter()
-        .fold(V3::ZERO, |sum, vertex| sum + vertex.normal)
-        .normalized();
-    normal.dot(view(center)) > 0.0
-}
-
-fn depth(triangle: &[Vertex; 3]) -> f32 {
-    triangle.iter().map(|vertex| vertex.position.z).sum::<f32>() / 3.0
-}
-
-fn lit(vertex: Vertex, exposure: f32) -> [u8; 4] {
-    let position = vertex.position;
-    let normal = vertex.normal;
-    let rgb = bronze_rgb(metal_tone(
-        [position.x, position.y, position.z],
-        [normal.x, normal.y, normal.z],
-    ));
-    let channel = |value: u8| (f32::from(value) * exposure).round().clamp(0.0, 255.0) as u8;
-    [channel(rgb[0]), channel(rgb[1]), channel(rgb[2]), 255]
-}
-
-fn lit_with_key(vertex: Vertex, visibility: f32) -> [u8; 4] {
-    let position = vertex.position;
-    let normal = vertex.normal;
-    let rgb = bronze_rgb(metal_tone_with_key(
-        [position.x, position.y, position.z],
-        [normal.x, normal.y, normal.z],
-        visibility,
-    ));
-    [rgb[0], rgb[1], rgb[2], 255]
-}
-
-fn darkened_lit(vertex: Vertex, exposure: f32) -> [u8; 4] {
-    let position = vertex.position;
-    let normal = vertex.normal;
-    let rgb = darkened_bronze_rgb(darkened_metal_tone(
-        [position.x, position.y, position.z],
-        [normal.x, normal.y, normal.z],
-    ));
-    let channel = |value: u8| (f32::from(value) * exposure).round().clamp(0.0, 255.0) as u8;
-    [channel(rgb[0]), channel(rgb[1]), channel(rgb[2]), 255]
-}
-
-fn darkened_lit_with_key(vertex: Vertex, visibility: f32) -> [u8; 4] {
-    let position = vertex.position;
-    let normal = vertex.normal;
-    let rgb = darkened_bronze_rgb(darkened_metal_tone_with_key(
-        [position.x, position.y, position.z],
-        [normal.x, normal.y, normal.z],
-        visibility,
-    ));
-    [rgb[0], rgb[1], rgb[2], 255]
-}
-
 fn material_study_lit(vertex: Vertex, law: StudyReflection, exposure: f32) -> [u8; 4] {
     let position = [vertex.position.x, vertex.position.y, vertex.position.z];
     let normal = [vertex.normal.x, vertex.normal.y, vertex.normal.z];
@@ -1481,28 +1247,11 @@ fn material_study_lit(vertex: Vertex, law: StudyReflection, exposure: f32) -> [u
 }
 
 fn compile_bronze(model: &Model, exposure: f32) -> Compiled {
-    compile_bronze_with(model, |vertex| lit(vertex, exposure))
+    forge_bronze(model, Charge::Bronze(exposure))
 }
 
 fn compile_darkened_bronze(model: &Model, exposure: f32) -> Compiled {
-    compile_bronze_with(model, |vertex| darkened_lit(vertex, exposure))
-}
-
-fn compile_bronze_with(model: &Model, illuminate: impl Fn(Vertex) -> [u8; 4]) -> Compiled {
-    let mut facets = model
-        .triangles
-        .iter()
-        .filter(|triangle| visible(triangle))
-        .collect::<Vec<_>>();
-    facets.sort_by(|a, b| depth(a).total_cmp(&depth(b)));
-    let mut compiled = Compiled::default();
-    for triangle in facets {
-        compiled.triangle(triangle.map(|vertex| Pixel {
-            position: project(vertex.position),
-            color: illuminate(vertex),
-        }));
-    }
-    compiled
+    forge_bronze(model, Charge::Darkened(exposure))
 }
 
 fn compile_wheel(model: &Model, phase: f32, plane: WheelPlane) -> Compiled {
@@ -1557,61 +1306,6 @@ fn compile_close_crown(model: &Model, elevation: f32, gauge: CloseGauge) -> Comp
             close_key_visibility(vertex.position, elevation, gauge),
         )
     })
-}
-
-fn compile_shadow(model: &Model, receiver_z: f32, alpha: u8) -> Compiled {
-    let light = V3::new(0.0, LIGHT_Y, LIGHT_Z);
-    let mut compiled = Compiled::default();
-    for triangle in &model.triangles {
-        let normal = triangle
-            .iter()
-            .fold(V3::ZERO, |sum, vertex| sum + vertex.normal)
-            .normalized();
-        if normal.dot(light) <= 0.0
-            || triangle
-                .iter()
-                .any(|vertex| vertex.position.z <= receiver_z)
-        {
-            continue;
-        }
-        compiled.triangle(triangle.map(|vertex| {
-            let distance = (vertex.position.z - receiver_z) / LIGHT_Z;
-            Pixel {
-                position: project(vertex.position - light * distance),
-                color: [0, 0, 0, alpha],
-            }
-        }));
-    }
-    compiled
-}
-
-/// Receiver-independent directional shadow coordinates. A runtime receiver at
-/// z=r applies s=eye/(eye-r), then (x, y+kz) ↦ s·(x, y+kz-kr).
-fn compile_shadow_source(model: &Model, receiver_ceiling: f32, alpha: u8) -> Compiled {
-    let light = V3::new(0.0, LIGHT_Y, LIGHT_Z);
-    let slope = -LIGHT_Y / LIGHT_Z;
-    let mut compiled = Compiled::default();
-    for triangle in &model.triangles {
-        let normal = triangle
-            .iter()
-            .fold(V3::ZERO, |sum, vertex| sum + vertex.normal)
-            .normalized();
-        if normal.dot(light) <= 0.0
-            || triangle
-                .iter()
-                .any(|vertex| vertex.position.z <= receiver_ceiling)
-        {
-            continue;
-        }
-        compiled.triangle(triangle.map(|vertex| Pixel {
-            position: [
-                vertex.position.x,
-                vertex.position.y + slope * vertex.position.z,
-            ],
-            color: [0, 0, 0, alpha],
-        }));
-    }
-    compiled
 }
 
 fn plunger(elevation: f32, gauge: CheckboxGauge) -> Model {
@@ -2617,8 +2311,7 @@ fn verify_geometry() {
         .map(|vertex| vertex.position.length())
         .fold(0.0_f32, f32::max);
     for plane in WheelPlane::ALL {
-        let oriented_span = blank
-            .wheel_pose(0.37, plane)
+        let oriented_span = wheel_pose(&blank, 0.37, plane)
             .triangles
             .iter()
             .flatten()

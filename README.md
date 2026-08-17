@@ -167,7 +167,7 @@ is deliberately a hardware WebGPU workload.
 
 ```toml
 [dependencies]
-brass_poolrooms = "0.13.6"
+brass_poolrooms = "0.13.7"
 ```
 
 Import egui through the crate to keep its public geometry types aligned with
@@ -183,8 +183,32 @@ chrome::install(&ctx);
 For chrome without GPU water:
 
 ```toml
-brass_poolrooms = { version = "0.13.6", default-features = false }
+brass_poolrooms = { version = "0.13.7", default-features = false }
 ```
+
+## Forge App Assets
+
+`brass_foundry` is the build-time compiler behind Poolrooms' own fixed-camera
+assets. Applications can give it an application-owned 3D [`Model`], select a
+canonical bronze [`Charge`], and emit allocation-free Rust mesh data. The
+generated mesh is included by the application and stamped through
+`chrome::ForgedMesh`; lighting and projection therefore remain identical to
+Poolrooms chrome without moving application-specific dies into Poolrooms.
+
+```toml
+[dependencies]
+brass_poolrooms = "0.13.7"
+
+[build-dependencies]
+brass_foundry = "0.13.7"
+```
+
+The normal build boundary is `forge` followed by `emit_rust` in `build.rs`.
+Bring `chrome::ForgedMesh` and `chrome::ForgedVertex` into the module that
+`include!`s the emitted file, then call `ForgedMesh::stamp` for each instance.
+The compiler has no third-party dependencies and performs no work at runtime.
+An application die can later migrate into Poolrooms by moving its model and
+bake loop; the emitted transport and paint path do not change.
 
 ## Water
 
@@ -242,6 +266,7 @@ Physical terms are fixed in the [Poolrooms glossary](docs/glossary.md).
 [`CornerClose`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.CornerClose.html
 [`DragHandle`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.DragHandle.html
 [`ForgePin`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.ForgePin.html
+[`LonginusCursor`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.LonginusCursor.html
 [`NumberInput`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.NumberInput.html
 [`SortToggle`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.SortToggle.html
 [`Section`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.Section.html
@@ -252,3 +277,5 @@ Physical terms are fixed in the [Poolrooms glossary](docs/glossary.md).
 [`CouplingGap`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.CouplingGap.html
 [`Coupled::horizontal`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.Coupled.html#method.horizontal
 [`Coupled::horizontal_with_gap`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.Coupled.html#method.horizontal_with_gap
+[`Model`]: https://docs.rs/brass_foundry/latest/brass_foundry/struct.Model.html
+[`Charge`]: https://docs.rs/brass_foundry/latest/brass_foundry/enum.Charge.html

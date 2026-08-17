@@ -1,0 +1,15 @@
+[package]
+name = "brass_foundry"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Build-time compiler for the Brass Poolrooms fixed-camera visual foundry"
+documentation = "https://docs.rs/brass_foundry"
+repository = "https://github.com/aoaoaoaoaoaoaoaoaoaoaoaoaoaoaoaoaoaoaoa/brass_poolrooms"
+homepage = "https://github.com/aoaoaoaoaoaoaoaoaoaoaoaoaoaoaoaoaoaoaoa/brass_poolrooms"
+keywords = ["graphics", "geometry", "gui", "rendering"]
+categories = ["graphics", "rendering", "development-tools::build-utils"]
+
+[lints]
+workspace = true

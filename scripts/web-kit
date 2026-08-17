@@ -105,12 +105,13 @@ oxipng -q -o max --strip safe "$chrome/monoglyph-atlas.png"
 
 die_work="$work/platform-dies"
 mkdir -p "$die_work/masks" "$die_work/poolrooms/build" \
-    "$die_work/poolrooms/src/chrome/foundry"
+    "$die_work/poolrooms/foundry/src" "$die_work/poolrooms/src/chrome/foundry"
 # `include!` rejects inner module documentation. The executable Rust remains
 # byte-for-byte sourced from the locked Poolrooms foundry inputs.
 sed 's|^//!|//|' build/foundry_atlas.rs >"$die_work/poolrooms/build/foundry_atlas.rs"
 sed 's|^//!|//|' src/chrome/foundry/law.rs \
     >"$die_work/poolrooms/src/chrome/foundry/law.rs"
+install -Dm644 foundry/src/lib.rs "$die_work/poolrooms/foundry/src/lib.rs"
 for platform in linux windows macos chromium webgpu rust native-egui; do
     magick \
         -background none \
@@ -120,11 +121,21 @@ for platform in linux windows macos chromium webgpu rust native-egui; do
         -depth 8 \
         "gray:$die_work/masks/$platform.gray"
 done
+rustc \
+    --crate-name brass_foundry \
+    --crate-type rlib \
+    --edition 2024 \
+    -D warnings \
+    -C opt-level=3 \
+    -C target-cpu=x86-64 \
+    -o "$die_work/libbrass_foundry.rlib" \
+    "$die_work/poolrooms/foundry/src/lib.rs"
 POOLROOMS_SOURCE="$die_work/poolrooms" rustc \
     --edition 2024 \
     -D warnings \
     -C opt-level=3 \
     -C target-cpu=x86-64 \
+    --extern brass_foundry="$die_work/libbrass_foundry.rlib" \
     -o "$die_work/forge" \
     "$die_forge/main.rs"
 "$die_work/forge" "$die_work/masks" "$die_work/atlas.pam"

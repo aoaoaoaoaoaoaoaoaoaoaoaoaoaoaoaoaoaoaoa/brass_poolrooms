@@ -5,22 +5,13 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use egui::{Color32, Pos2, Rect, Stroke, Vec2};
 
-use super::{HOT, foundry};
+use super::{ForgedMesh, ForgedVertex, HOT, foundry};
 
 const INTEGRATOR_STEP: f32 = 1.0 / 240.0;
 const SYNTHETIC_PRESS_TIME: f32 = 0.065;
 
-#[derive(Clone, Copy)]
-pub(super) struct BakedVertex {
-    pub(super) position: [f32; 2],
-    pub(super) color: [u8; 4],
-}
-
-#[derive(Clone, Copy)]
-pub(super) struct BakedMesh {
-    pub(super) vertices: &'static [BakedVertex],
-    pub(super) indices: &'static [u32],
-}
+pub(super) type BakedVertex = ForgedVertex;
+pub(super) type BakedMesh = ForgedMesh;
 
 #[derive(Clone, Copy)]
 pub(super) struct BakedShadow {

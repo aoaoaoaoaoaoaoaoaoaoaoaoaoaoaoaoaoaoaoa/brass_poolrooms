@@ -148,10 +148,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "brass_foundry"
+version = "0.13.7"
+
+[[package]]
 name = "brass_poolrooms"
-version = "0.13.6"
+version = "0.13.7"
 dependencies = [
  "anyhow",
+ "brass_foundry",
  "bytemuck",
  "console_error_panic_hook",
  "egui",

@@ -6,6 +6,35 @@ die() {
     exit 1
 }
 
+is_published() {
+    package=$1
+    package_version=$2
+    (cd / && cargo info --registry crates-io "$package@$package_version" >/dev/null 2>&1)
+}
+
+wait_for_registry() {
+    package=$1
+    package_version=$2
+    attempts=0
+    until is_published "$package" "$package_version"; do
+        attempts=$((attempts + 1))
+        [ "$attempts" -lt 90 ] ||
+            die "$package@$package_version did not reach the registry"
+        sleep 2
+    done
+}
+
+publish_once() {
+    package=$1
+    package_version=$2
+    if is_published "$package" "$package_version"; then
+        printf '%s\n' "$package@$package_version is already published"
+        return
+    fi
+    cargo publish --locked --package "$package"
+    wait_for_registry "$package" "$package_version"
+}
+
 version=${1:-}
 mode=${2:-check}
 [ -n "$version" ] || die 'usage: scripts/release VERSION [check|publish]'
@@ -26,16 +55,23 @@ cd "$root"
     die 'HEAD is not the pushed origin/main commit'
 grep -Fqx "version = \"$version\"" Cargo.toml ||
     die "Cargo.toml does not declare workspace version $version"
-[ "$(git tag --points-at HEAD)" = "v$version" ] ||
-    die "v$version does not uniquely tag HEAD"
+git tag --points-at HEAD | grep -Fqx "v$version" ||
+    die "v$version does not tag HEAD"
+git tag -v "v$version" >/dev/null 2>&1 || die "v$version is not a valid signed tag"
 
 ./check.py verify
 scripts/audit
-cargo package --locked
+cargo package --locked --package brass_foundry
+if [ "$mode" = publish ]; then
+    publish_once brass_foundry "$version"
+elif ! is_published brass_foundry "$version"; then
+    die "brass_foundry@$version must be published before brass_poolrooms can be packaged"
+fi
+cargo package --locked --package brass_poolrooms
 scripts/web-kit package
 
 if [ "$mode" = publish ]; then
-    cargo publish --locked
+    publish_once brass_poolrooms "$version"
     scripts/web-kit publish
 else
     printf 'release candidate v%s is clean and packaged; publication was not requested\n' "$version"

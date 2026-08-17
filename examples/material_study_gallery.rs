@@ -9,23 +9,14 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use brass_poolrooms::{
-    chrome,
+    chrome::{self, ForgedMesh, ForgedVertex},
     egui::{self, Align2, Color32, FontId, Pos2, Rect, Sense, Shape, Stroke, StrokeKind, Vec2},
     water::{Surface, Wetness},
 };
 use support::Exhibit;
 
-#[derive(Clone, Copy)]
-struct BakedVertex {
-    position: [f32; 2],
-    color: [u8; 4],
-}
-
-#[derive(Clone, Copy)]
-struct BakedMesh {
-    vertices: &'static [BakedVertex],
-    indices: &'static [u32],
-}
+type BakedVertex = ForgedVertex;
+type BakedMesh = ForgedMesh;
 
 #[derive(Clone, Copy)]
 struct BakedStudyCell {
@@ -231,17 +222,7 @@ fn cell_coordinate(row: usize, column: usize) -> String {
 
 fn paint_mesh(painter: &egui::Painter, clip: Rect, baked: BakedMesh, origin: Pos2) {
     let mut mesh = egui::Mesh::default();
-    mesh.vertices.reserve(baked.vertices.len());
-    mesh.indices.reserve(baked.indices.len());
-    for vertex in baked.vertices {
-        let [x, y] = vertex.position;
-        let [r, g, b, a] = vertex.color;
-        mesh.colored_vertex(
-            origin + Vec2::new(x, y),
-            Color32::from_rgba_unmultiplied(r, g, b, a),
-        );
-    }
-    mesh.indices.extend_from_slice(baked.indices);
+    baked.stamp(&mut mesh, origin);
     let _mesh = painter
         .with_clip_rect(clip)
         .add(Shape::mesh(Arc::new(mesh)));

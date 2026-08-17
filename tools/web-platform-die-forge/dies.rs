@@ -458,7 +458,7 @@ fn antiqued_lit(vertex: Vertex, key_visibility: f32, sky_visibility: f32) -> [u8
                 + DARK_BROAD_WEIGHT * attenuation(0.30) * reflection.powf(DARK_BROAD_SHINE)
                 + DARK_GLINT_WEIGHT * attenuation(0.12) * reflection.powf(DARK_GLINT_SHINE)))
     .min(DARK_TONE_CEILING);
-    let rgb = darkened_bronze_rgb(tone);
+    let rgb = brass_foundry::darkened_bronze_rgb(tone);
     let stain = [attenuation(0.07), attenuation(0.11), attenuation(0.16)];
     let channel = |index: usize| {
         (f32::from(rgb[index]) * stain[index])
@@ -505,11 +505,11 @@ impl Canvas {
             (cell as f32 * DIE_CELL as f32 + DIE_CELL as f32 * 0.5) * RASTER_SCALE as f32,
             DIE_CELL as f32 * 0.5 * RASTER_SCALE as f32,
         ];
-        for triangle in mesh.indices.chunks_exact(3) {
+        for triangle in mesh.indices().chunks_exact(3) {
             let pixels = [
-                mesh.vertices[triangle[0] as usize],
-                mesh.vertices[triangle[1] as usize],
-                mesh.vertices[triangle[2] as usize],
+                mesh.vertices()[triangle[0] as usize],
+                mesh.vertices()[triangle[1] as usize],
+                mesh.vertices()[triangle[2] as usize],
             ];
             self.triangle(origin, pixels);
         }
