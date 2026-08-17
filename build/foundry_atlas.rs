@@ -986,7 +986,7 @@ fn bake_material_study(path: &Path) -> io::Result<()> {
     writeln!(out, "];")
 }
 
-const CURSOR_SIDE: usize = 64;
+const CURSOR_SIDE: usize = 84;
 const CURSOR_MARGIN: f32 = 2.5;
 const CURSOR_SAMPLES: usize = 4;
 

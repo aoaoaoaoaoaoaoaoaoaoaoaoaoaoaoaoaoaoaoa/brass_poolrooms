@@ -43,7 +43,7 @@ composition.
 | [`ForgePin`] | Three-gauge coordinate pin with one coherent shaft, bulb, grip region, medium/large inscription API, and native large-pin cursor | application-defined |
 | [`NumberInput`] | Bounded integer or floating register with an explicit quantum, precision, exact-entry override, two wheel planes, and sprung limit refusal | `Surface::number_input` |
 | [`SortToggle`] | Three-gauge sorting index with hollow, ascending, and descending detents | `Surface::sort_toggle` |
-| [`LonginusCursor`] | Native 64-pixel fork cursor baked from the fixed-view Lance of Longinus model | application-defined |
+| [`LonginusCursor`] | Native 84-pixel fork cursor baked from the fixed-view Lance of Longinus model | application-defined |
 
 These ten types are the complete inventory of authored foundry mechanisms:
 their projected geometry, dynamics, material response, and displaced-water
@@ -167,7 +167,7 @@ is deliberately a hardware WebGPU workload.
 
 ```toml
 [dependencies]
-brass_poolrooms = "0.13.7"
+brass_poolrooms = "0.13.8"
 ```
 
 Import egui through the crate to keep its public geometry types aligned with
@@ -183,7 +183,7 @@ chrome::install(&ctx);
 For chrome without GPU water:
 
 ```toml
-brass_poolrooms = { version = "0.13.7", default-features = false }
+brass_poolrooms = { version = "0.13.8", default-features = false }
 ```
 
 ## Forge App Assets
@@ -197,10 +197,10 @@ Poolrooms chrome without moving application-specific dies into Poolrooms.
 
 ```toml
 [dependencies]
-brass_poolrooms = "0.13.7"
+brass_poolrooms = "0.13.8"
 
 [build-dependencies]
-brass_foundry = "0.13.7"
+brass_foundry = "0.13.8"
 ```
 
 The normal build boundary is `forge` followed by `emit_rust` in `build.rs`.

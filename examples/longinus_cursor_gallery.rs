@@ -27,7 +27,7 @@ impl Exhibit for LonginusForge {
             .show(ui, |ui| {
                 let _title = ui.label(chrome::title("NATIVE CURSOR FORGE"));
                 let _law = ui.label(chrome::muted(
-                    "shared bronze law · native 64 px projections · exact physical hotspots",
+                    "shared bronze law · native foundry projections · exact physical hotspots",
                 ));
                 ui.add_space(28.0);
 
