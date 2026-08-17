@@ -117,7 +117,7 @@ impl<A: Exhibit> Boiler<A> {
             return;
         };
         let raw_input = rig.input.take_egui_input(&rig.window);
-        let output = self.ctx.run_ui(raw_input, |ui| {
+        let mut output = self.ctx.run_ui(raw_input, |ui| {
             let basin = ui.max_rect();
             self.water.begin(Domain::basin(basin));
             self.water.set_floor(Some(Floor::shallow(basin)));
@@ -134,7 +134,7 @@ impl<A: Exhibit> Boiler<A> {
         }
         let _presented = rig.render(
             &primitives,
-            &output.textures_delta,
+            &mut output.textures_delta,
             output.pixels_per_point,
             &water,
         );
@@ -407,7 +407,7 @@ impl Rig {
     fn render(
         &mut self,
         primitives: &[egui::ClippedPrimitive],
-        delta: &egui::TexturesDelta,
+        delta: &mut egui::TexturesDelta,
         pixels_per_point: f32,
         water: &brass_poolrooms::water::Frame,
     ) -> bool {
@@ -441,16 +441,22 @@ impl Rig {
             | wgpu::CurrentSurfaceTexture::Suboptimal(frame) => frame,
             wgpu::CurrentSurfaceTexture::Timeout => {
                 self.window.request_redraw();
+                delta.clear();
                 return false;
             }
-            wgpu::CurrentSurfaceTexture::Occluded => return false,
+            wgpu::CurrentSurfaceTexture::Occluded => {
+                delta.clear();
+                return false;
+            }
             wgpu::CurrentSurfaceTexture::Outdated | wgpu::CurrentSurfaceTexture::Lost => {
                 self.surface.configure(&self.gpu.device, &self.config);
                 self.window.request_redraw();
+                delta.clear();
                 return false;
             }
             wgpu::CurrentSurfaceTexture::Validation => {
                 eprintln!("gallery surface texture validation failure");
+                delta.clear();
                 return false;
             }
         };
@@ -515,6 +521,7 @@ impl Rig {
         for id in &delta.free {
             renderer.free_texture(id);
         }
+        delta.clear();
         true
     }
 }

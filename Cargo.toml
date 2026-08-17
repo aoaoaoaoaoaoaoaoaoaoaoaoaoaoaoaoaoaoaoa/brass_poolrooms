@@ -60,6 +60,10 @@ name = "material_study_gallery"
 required-features = ["water"]
 
 [[example]]
+name = "longinus_cursor_gallery"
+required-features = ["water"]
+
+[[example]]
 name = "widget_gallery"
 required-features = ["water"]
 
@@ -75,7 +79,7 @@ resolver = "3"
 edition = "2024"
 license = "MIT"
 rust-version = "1.96"
-version = "0.13.3"
+version = "0.13.4"
 
 [features]
 default = ["water"]

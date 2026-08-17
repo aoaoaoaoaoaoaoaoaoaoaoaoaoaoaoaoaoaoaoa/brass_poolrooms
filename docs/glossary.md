@@ -7,3 +7,5 @@
 - **Detent**: one discrete stable position of a mechanism.
 - **Hollow casing**: a bronze casing and rim around visible black interior,
   with no occupant or fill across its aperture.
+- **Lance of Longinus**: the mirror-polished bronze bident forged as the
+  Poolrooms' native cursor for conversational forks.

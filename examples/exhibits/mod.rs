@@ -157,7 +157,7 @@ impl Pins {
     pub fn show(&mut self, ui: &mut egui::Ui) {
         let _title = ui.label(chrome::title("FORGE PINS"));
         let _law = ui.label(chrome::muted(
-            "coordinate-fixed shaft · raised spherical grip · inscribable medium and large dies",
+            "coordinate-fixed shaft · raised spherical grip · large die owns the native pin cursor",
         ));
         ui.add_space(16.0);
 
@@ -182,6 +182,9 @@ impl Pins {
                         let hot = ui
                             .input(|input| input.pointer.hover_pos())
                             .is_some_and(|pointer| pin.grip().contains(pointer));
+                        if hot && size == MechanismSize::Large {
+                            ui.ctx().set_cursor_image(Some(ForgePin::cursor_image()));
+                        }
                         pin.paint(ui.painter(), seized || hot);
                         let name = match size {
                             MechanismSize::Small => "SMALL · BLANK",

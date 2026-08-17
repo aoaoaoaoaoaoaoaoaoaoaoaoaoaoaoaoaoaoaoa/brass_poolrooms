@@ -11,6 +11,7 @@ case "$gallery" in
     drag_handle_gallery) ;;
     number_input_gallery) ;;
     material_study_gallery) ;;
+    longinus_cursor_gallery) ;;
     widget_gallery) ;;
     *) printf 'unknown gallery: %s\n' "$gallery" >&2; exit 2 ;;
 esac
@@ -55,6 +56,11 @@ if [ "$ready" -ne 1 ]; then
 fi
 
 case "$gallery" in
+    longinus_cursor_gallery)
+        xdotool mousemove --sync --window "$window" 210 235
+        sleep 0.20
+        import -window "$window" "$out/armed.png"
+        ;;
     slider_gallery)
         xdotool mousemove --window "$window" 131 295 mousedown 1
         xdotool mousemove --sync --window "$window" 132 295

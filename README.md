@@ -13,6 +13,8 @@ shaft, spherical grip, hit region, and optional inscription. [`NumberInput`]
 couples an exact scalar register to a scalloped thumbwheel. [`SortToggle`]
 provides hollow, ascending, and descending detents. All are machined in one
 fixed projection, material, and lighting model.
+The [`LonginusCursor`] is the same foundry's mirror-polished bronze bident,
+compiled from coherent 3D geometry into a native cursor projection.
 
 ## Scope
 
@@ -38,11 +40,12 @@ composition.
 | [`Monoglyph`] | Three-gauge momentary square plunger carrying one etched scalar; [`Symbol`] supplies the canonical common-action armory | `Surface::monoglyph` |
 | [`CornerClose`] | Three-gauge momentary close plunger centered on a pane corner, with a build-time modelled and self-shadowed X trench | `Surface::corner_close` |
 | [`DragHandle`] | Rigid half-width friction pad, rigid square bail, or sprung folding bail on a riveted crosshatched plate | `Surface::drag_handle` |
-| [`ForgePin`] | Three-gauge coordinate pin with one coherent shaft, bulb, grip region, and medium/large inscription API | application-defined |
+| [`ForgePin`] | Three-gauge coordinate pin with one coherent shaft, bulb, grip region, medium/large inscription API, and native large-pin cursor | application-defined |
 | [`NumberInput`] | Bounded integer or floating register with an explicit quantum, precision, exact-entry override, two wheel planes, and sprung limit refusal | `Surface::number_input` |
 | [`SortToggle`] | Three-gauge sorting index with hollow, ascending, and descending detents | `Surface::sort_toggle` |
+| [`LonginusCursor`] | Native 64-pixel fork cursor baked from the fixed-view Lance of Longinus model | application-defined |
 
-These nine types are the complete inventory of authored foundry mechanisms:
+These ten types are the complete inventory of authored foundry mechanisms:
 their projected geometry, dynamics, material response, and displaced-water
 contract live here. The other `chrome` exports are shared typography, frames,
 layout, and interaction assemblies rather than custom projected mechanisms.
@@ -98,6 +101,7 @@ cargo run --example checkbox_gallery
 cargo run --example corner_close_gallery
 cargo run --example drag_handle_gallery
 cargo run --example number_input_gallery
+cargo run --example longinus_cursor_gallery
 ```
 
 The combined gallery is also the browser contract:
@@ -160,7 +164,7 @@ is deliberately a hardware WebGPU workload.
 
 ```toml
 [dependencies]
-brass_poolrooms = "0.13.3"
+brass_poolrooms = "0.13.4"
 ```
 
 Import egui through the crate to keep its public geometry types aligned with
@@ -176,7 +180,7 @@ chrome::install(&ctx);
 For chrome without GPU water:
 
 ```toml
-brass_poolrooms = { version = "0.13.3", default-features = false }
+brass_poolrooms = { version = "0.13.4", default-features = false }
 ```
 
 ## Water

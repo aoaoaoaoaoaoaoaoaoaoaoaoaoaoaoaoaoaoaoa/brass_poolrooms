@@ -13,6 +13,7 @@ pub(crate) const LIGHT_Z: f32 = 0.866_025_4;
 pub(crate) const HALF_Y: f32 = -0.258_819_04;
 pub(crate) const HALF_Z: f32 = 0.965_925_8;
 pub(crate) const METAL_SHINE: f32 = 14.0;
+pub(crate) const MIRROR_SHINE: f32 = 72.0;
 pub(crate) const DARK_AMBIENT: f32 = 0.13;
 pub(crate) const DARK_DIFFUSE_WEIGHT: f32 = 0.32;
 pub(crate) const DARK_BROAD_WEIGHT: f32 = 0.01;
@@ -92,6 +93,16 @@ pub(crate) fn darkened_bronze_rgb(tone: f32) -> [u8; 3] {
 )]
 pub(crate) fn metal_tone(position: [f32; 3], normal: [f32; 3]) -> f32 {
     metal_tone_with_key(position, normal, 1.0)
+}
+
+/// Bare bronze brought to a mirror polish for ceremonial edge tools.
+#[allow(
+    dead_code,
+    reason = "ceremonial polished response is consumed only by the build-time geometry compiler"
+)]
+pub(crate) fn polished_metal_tone(position: [f32; 3], normal: [f32; 3]) -> f32 {
+    let (diffuse, reflection) = material_terms(position, normal);
+    (0.13 + 0.43 * diffuse + 1.85 * reflection.powf(MIRROR_SHINE)).min(1.0)
 }
 
 /// The same bronze charge beneath a work-darkened oxide film.

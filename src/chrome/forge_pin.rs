@@ -2,9 +2,12 @@
 
 #![deny(missing_docs)]
 
-use std::f32::consts::TAU;
+use std::{
+    f32::consts::TAU,
+    sync::{Arc, OnceLock},
+};
 
-use egui::{Align2, Color32, FontId, Mesh, Painter, Pos2, Rect, Stroke, Vec2};
+use egui::{Align2, Color32, CustomCursorImage, FontId, Mesh, Painter, Pos2, Rect, Stroke, Vec2};
 
 use super::{MechanismSize, TEXT, foundry};
 
@@ -113,6 +116,19 @@ impl ForgePin {
             anchor,
             size: MechanismSize::Large,
             inscription: None,
+        }
+    }
+
+    /// Return the standard large pin as an immutable native cursor image.
+    ///
+    /// The point is the cursor hotspot. The raster shares this mechanism's
+    /// gauge, silhouette, sphere illumination, rim, and edge register.
+    pub fn cursor_image() -> CustomCursorImage {
+        static RGBA: OnceLock<Arc<[u8]>> = OnceLock::new();
+        CustomCursorImage {
+            rgba: Arc::clone(RGBA.get_or_init(|| Arc::from(raster_cursor()))),
+            size: [PIN_CURSOR_SIDE; 2],
+            hotspot: PIN_CURSOR_HOTSPOT,
         }
     }
 
@@ -232,6 +248,96 @@ impl ForgePin {
             );
         }
     }
+}
+
+const PIN_CURSOR_SIDE: u16 = 64;
+const PIN_CURSOR_HOTSPOT: [u16; 2] = [32, 61];
+const PIN_CURSOR_SAMPLES: usize = 4;
+
+fn raster_cursor() -> Vec<u8> {
+    let side = usize::from(PIN_CURSOR_SIDE);
+    let mut rgba = vec![0_u8; side * side * 4];
+    for y in 0..side {
+        for x in 0..side {
+            let mut alpha = 0_u32;
+            let mut premultiplied = [0_u32; 3];
+            for sy in 0..PIN_CURSOR_SAMPLES {
+                for sx in 0..PIN_CURSOR_SAMPLES {
+                    let point = Pos2::new(
+                        x as f32 + (sx as f32 + 0.5) / PIN_CURSOR_SAMPLES as f32,
+                        y as f32 + (sy as f32 + 0.5) / PIN_CURSOR_SAMPLES as f32,
+                    );
+                    let color = cursor_sample(point);
+                    alpha += u32::from(color.a());
+                    for (sum, channel) in
+                        premultiplied
+                            .iter_mut()
+                            .zip([color.r(), color.g(), color.b()])
+                    {
+                        *sum += u32::from(channel) * u32::from(color.a());
+                    }
+                }
+            }
+            let samples = (PIN_CURSOR_SAMPLES * PIN_CURSOR_SAMPLES) as u32;
+            let pixel = &mut rgba[(y * side + x) * 4..][..4];
+            pixel[3] = (alpha / samples) as u8;
+            for (slot, sum) in pixel[..3].iter_mut().zip(premultiplied) {
+                *slot = sum.checked_div(alpha).unwrap_or(0) as u8;
+            }
+        }
+    }
+    rgba
+}
+
+fn cursor_sample(point: Pos2) -> Color32 {
+    let gauge = LARGE;
+    let anchor = Pos2::new(
+        f32::from(PIN_CURSOR_HOTSPOT[0]),
+        f32::from(PIN_CURSOR_HOTSPOT[1]),
+    );
+    let bulb = anchor - Vec2::new(0.0, gauge.rise);
+    let left = bulb + Vec2::new(-gauge.shoulder_half, gauge.shoulder_drop);
+    let right = bulb + Vec2::new(gauge.shoulder_half, gauge.shoulder_drop);
+    let shadow_offset = Vec2::splat(gauge.shadow_offset);
+    let shadow = triangle_weights(
+        point,
+        left + shadow_offset,
+        right + shadow_offset,
+        anchor + Vec2::new(0.0, 1.0),
+    )
+    .is_some()
+    .then_some(Color32::from_black_alpha(96));
+    let shaft =
+        triangle_weights(point, left, right, anchor).map(|[left_weight, right_weight, _]| {
+            if left_weight < 0.055 {
+                foundry::bronze(0.80)
+            } else if right_weight < 0.055 {
+                foundry::bronze(0.18)
+            } else {
+                foundry::bronze(0.56)
+            }
+        });
+    let radial = (point - bulb) / gauge.bulb_radius;
+    let sphere = (radial.length_sq() <= 1.0).then(|| {
+        if radial.length_sq() >= 0.86 {
+            foundry::bronze(0.16)
+        } else {
+            sphere_bronze(
+                radial.y,
+                radial.length_sq().mul_add(-1.0, 1.0).max(0.0).sqrt(),
+                0.0,
+            )
+        }
+    });
+    sphere.or(shaft).or(shadow).unwrap_or(Color32::TRANSPARENT)
+}
+
+fn triangle_weights(point: Pos2, a: Pos2, b: Pos2, c: Pos2) -> Option<[f32; 3]> {
+    let denominator = (b.y - c.y) * (a.x - c.x) + (c.x - b.x) * (a.y - c.y);
+    let u = ((b.y - c.y) * (point.x - c.x) + (c.x - b.x) * (point.y - c.y)) / denominator;
+    let v = ((c.y - a.y) * (point.x - c.x) + (a.x - c.x) * (point.y - c.y)) / denominator;
+    let w = 1.0 - u - v;
+    (u >= 0.0 && v >= 0.0 && w >= 0.0).then_some([u, v, w])
 }
 
 fn stamp(
