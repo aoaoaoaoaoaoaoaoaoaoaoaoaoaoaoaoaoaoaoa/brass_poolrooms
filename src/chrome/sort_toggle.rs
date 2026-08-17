@@ -1,6 +1,6 @@
 //! A three-detent sorting index: hollow, ascending, or descending.
-//! The bronze pointer rises through one black aperture and settles on a
-//! sprung cam; deactivation withdraws it below the casing.
+//! The fixed casing admits a sprung bronze pointer from below; the pointer
+//! turns in place between its active detents.
 
 #![deny(missing_docs)]
 
@@ -54,11 +54,11 @@ pub enum SortDetent {
 }
 
 impl SortDetent {
-    const fn next(self) -> Self {
+    const fn advance(self) -> (Self, SortTransition) {
         match self {
-            Self::Off => Self::Ascending,
-            Self::Ascending => Self::Descending,
-            Self::Descending => Self::Off,
+            Self::Off => (Self::Ascending, SortTransition::Rise),
+            Self::Ascending => (Self::Descending, SortTransition::Turn),
+            Self::Descending => (Self::Off, SortTransition::Withdraw),
         }
     }
 
@@ -77,6 +77,13 @@ impl SortDetent {
             Self::Descending => "Sort descending",
         }
     }
+}
+
+#[derive(Clone, Copy)]
+enum SortTransition {
+    Rise,
+    Turn,
+    Withdraw,
 }
 
 /// A three-state Poolrooms sorting mechanism.
@@ -116,10 +123,12 @@ impl<'a> SortToggle<'a> {
             response = response.on_hover_cursor(CursorIcon::PointingHand);
         }
         let activated = super::exact_activation(ui, &response);
-        if enabled && activated {
-            *self.detent = self.detent.next();
+        let transition = (enabled && activated).then(|| {
+            let (next, transition) = self.detent.advance();
+            *self.detent = next;
             response.mark_changed();
-        }
+            transition
+        });
         response.widget_info(|| {
             WidgetInfo::labeled(WidgetType::Button, enabled, self.detent.accessible_name())
         });
@@ -136,10 +145,10 @@ impl<'a> SortToggle<'a> {
         } else {
             baked::REST
         };
-        let strike = (enabled && activated).then_some(if *self.detent == SortDetent::Off {
-            -24.0
-        } else {
-            24.0
+        let strike = transition.and_then(|transition| match transition {
+            SortTransition::Rise => Some(24.0),
+            SortTransition::Turn => None,
+            SortTransition::Withdraw => Some(-24.0),
         });
         let dt = ui
             .input(|input| input.stable_dt)
@@ -174,10 +183,10 @@ impl<'a> SortToggle<'a> {
                 egui::StrokeKind::Inside,
             );
         }
-        super::tension(ui, &response);
 
         SortToggleResponse {
             wake: SortToggleWake::new(socket, motion.travel, gauge.pointer_area),
+            shear: matches!(transition, Some(SortTransition::Turn)).then_some(socket),
             response,
             activated: enabled && activated,
         }
@@ -189,6 +198,7 @@ impl<'a> SortToggle<'a> {
 pub struct SortToggleResponse {
     response: egui::Response,
     wake: Option<SortToggleWake>,
+    shear: Option<Rect>,
     activated: bool,
 }
 
@@ -201,6 +211,10 @@ impl SortToggleResponse {
     /// The indicator volume swept since the preceding frame, if it moved.
     pub const fn wake(&self) -> Option<SortToggleWake> {
         self.wake
+    }
+
+    pub(crate) const fn shear(&self) -> Option<Rect> {
+        self.shear
     }
 }
 

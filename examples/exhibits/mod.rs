@@ -250,7 +250,7 @@ impl Sorts {
     pub fn show(&mut self, ui: &mut egui::Ui, water: &mut Surface) {
         let _title = ui.label(chrome::title("SORTING DETENTS"));
         let _law = ui.label(chrome::muted(
-            "hollow casing · ascending pointer · descending pointer · sprung water displacement",
+            "fixed hollow casing · signed pointer pressure · turning shear",
         ));
         ui.add_space(16.0);
 

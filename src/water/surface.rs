@@ -29,6 +29,7 @@ const BAIL_IMPULSE_CEIL: f32 = 1.25;
 /// Tangential point² swept by a thumbwheel that produces one canonical impulse.
 const WHEEL_AREA_PER_IMPULSE: f32 = 140.0;
 const WHEEL_IMPULSE_CEIL: f32 = 1.45;
+const SORT_TURN_IMPULSE: f32 = 0.055;
 static NEXT_SURFACE_ID: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -650,13 +651,17 @@ impl Surface {
     pub fn monoglyph(&mut self, button: &crate::chrome::MonoglyphResponse) {
         self.plunger(button.wake());
     }
-    /// Couple a sorting pointer's sprung rise and withdrawal into this water world.
+    /// Couple a sorting pointer's rise, turn, and withdrawal into this water world.
+    /// Normal travel generates signed pressure; the in-plane turn generates a
+    /// small shear. The embedded casing itself never moves or grips the water.
     pub fn sort_toggle(&mut self, toggle: &crate::chrome::SortToggleResponse) {
-        let Some(wake) = toggle.wake() else {
-            return;
-        };
-        let impulse = wake.swept_volume() / PLUNGER_VOLUME_PER_IMPULSE * wake.travel().signum();
-        self.poke(wake.rect(), Poke::basin(impulse));
+        if let Some(wake) = toggle.wake() {
+            let impulse = wake.swept_volume() / PLUNGER_VOLUME_PER_IMPULSE * wake.travel().signum();
+            self.poke(wake.rect(), Poke::basin(impulse));
+        }
+        if let Some(rect) = toggle.shear() {
+            self.poke(rect, Poke::slide(SORT_TURN_IMPULSE, 0.7));
+        }
     }
     /// Couple a corner-close plunger's downward stroke and sprung return into
     /// this water world using the moving crown's signed swept volume.
