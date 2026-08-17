@@ -160,7 +160,7 @@ is deliberately a hardware WebGPU workload.
 
 ```toml
 [dependencies]
-brass_poolrooms = "0.13.2"
+brass_poolrooms = "0.13.3"
 ```
 
 Import egui through the crate to keep its public geometry types aligned with
@@ -176,7 +176,7 @@ chrome::install(&ctx);
 For chrome without GPU water:
 
 ```toml
-brass_poolrooms = { version = "0.13.2", default-features = false }
+brass_poolrooms = { version = "0.13.3", default-features = false }
 ```
 
 ## Water
