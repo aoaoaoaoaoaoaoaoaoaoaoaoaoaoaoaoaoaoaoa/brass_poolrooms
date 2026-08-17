@@ -112,7 +112,7 @@ struct Boiler<A> {
 }
 
 impl<A: Exhibit> Boiler<A> {
-    fn paint(&mut self) {
+    fn paint(&mut self, event_loop: &ActiveEventLoop) {
         let Some(rig) = self.rig.as_mut() else {
             return;
         };
@@ -123,8 +123,11 @@ impl<A: Exhibit> Boiler<A> {
             self.water.set_floor(Some(Floor::shallow(basin)));
             self.app.ui(ui, &mut self.water);
         });
-        rig.input
-            .handle_platform_output(&rig.window, output.platform_output);
+        rig.input.handle_platform_output_with_event_loop(
+            &rig.window,
+            event_loop,
+            output.platform_output,
+        );
         let primitives = self.ctx.tessellate(output.shapes, output.pixels_per_point);
         let water = self
             .water
@@ -245,7 +248,7 @@ impl<A: Exhibit> ApplicationHandler<Spark> for Boiler<A> {
                 return;
             }
             WindowEvent::RedrawRequested => {
-                self.paint();
+                self.paint(event_loop);
                 return;
             }
             WindowEvent::Resized(size) => {
