@@ -94,6 +94,7 @@ pub struct Monoglyph {
     size: MechanismSize,
     finish: MonoglyphFinish,
     symbol: Option<Symbol>,
+    focusable: bool,
 }
 
 impl Monoglyph {
@@ -104,6 +105,7 @@ impl Monoglyph {
             size: MechanismSize::Large,
             finish: MonoglyphFinish::BrightCut,
             symbol: None,
+            focusable: true,
         }
     }
 
@@ -119,6 +121,7 @@ impl Monoglyph {
             size: MechanismSize::Large,
             finish: symbol.default_finish(),
             symbol: Some(symbol),
+            focusable: true,
         }
     }
 
@@ -138,6 +141,17 @@ impl Monoglyph {
         self
     }
 
+    /// Include or omit this actuator from keyboard focus traversal.
+    ///
+    /// Pointer activation remains available when focus is omitted. This is
+    /// intended for redundant boundary actuators whose command already has a
+    /// keyboard binding and whose presence must not perturb application
+    /// navigation.
+    pub const fn focusable(mut self, focusable: bool) -> Self {
+        self.focusable = focusable;
+        self
+    }
+
     /// Lay out, actuate, and paint the complete square mechanism.
     ///
     /// The response dereferences to [`egui::Response`] and carries the signed
@@ -152,8 +166,12 @@ impl Monoglyph {
         debug_assert_eq!(gauge.socket_half, law.socket_half);
         debug_assert_eq!(gauge.top_half, law.top_half);
         debug_assert_eq!(gauge.body_half, law.body_half);
-        let (rect, mut response) =
-            ui.allocate_exact_size(Vec2::splat(self.size.side()), Sense::click());
+        let sense = if self.focusable {
+            Sense::click()
+        } else {
+            Sense::CLICK
+        };
+        let (rect, mut response) = ui.allocate_exact_size(Vec2::splat(self.size.side()), sense);
         let enabled = ui.is_enabled();
         if enabled {
             response = response.on_hover_cursor(CursorIcon::PointingHand);
