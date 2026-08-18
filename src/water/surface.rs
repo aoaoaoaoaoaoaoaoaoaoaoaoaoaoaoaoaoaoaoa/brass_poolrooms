@@ -1,3 +1,4 @@
+use std::f32::consts::TAU;
 use std::sync::{
     Arc,
     atomic::{AtomicU64, Ordering},
@@ -10,6 +11,7 @@ use super::{
 };
 
 const SOURCE_LIFE: f32 = 0.24;
+const POINT_RADIATOR_DIAMETER: f32 = 2.0;
 const TOOLTIP_GRIP: f32 = 0.72;
 const WATER_WAKE: Duration = Duration::from_secs(14);
 const QUIVER_WAKE: Duration = Duration::from_secs(8);
@@ -169,6 +171,57 @@ impl Poke {
             Self::Drag { impulse, travel } => (impulse, engine::SplashShape::Ring, travel),
             Self::Slide { impulse, travel } => (impulse, engine::SplashShape::Slide, travel),
             Self::Jitter { impulse } => (impulse, engine::SplashShape::Jitter, 0.0),
+        }
+    }
+}
+
+/// A held local source that continuously radiates waves into the persistent basin.
+///
+/// Consumers must submit the radiator during every UI pass in which it remains
+/// held. Omission releases it through the surface's ordinary quiver envelope.
+#[derive(Clone, Copy, Debug)]
+pub struct Radiator {
+    seed: crate::tide::Tension,
+}
+
+impl Radiator {
+    /// Forge a point radiator in logical egui coordinates.
+    ///
+    /// `strength` lies in `(0, 1]`; `frequency_hz` is strictly positive.
+    ///
+    /// # Panics
+    ///
+    /// Panics for a non-finite center, strength, or frequency, or for values
+    /// outside their declared domains.
+    pub fn point(
+        id: impl egui::AsId,
+        center: egui::Pos2,
+        strength: f32,
+        frequency_hz: f32,
+    ) -> Self {
+        assert!(
+            center.x.is_finite() && center.y.is_finite(),
+            "radiator center must be finite"
+        );
+        assert!(
+            strength.is_finite() && strength > 0.0 && strength <= 1.0,
+            "radiator strength must lie in (0, 1]"
+        );
+        assert!(
+            frequency_hz.is_finite() && frequency_hz > 0.0,
+            "radiator frequency must be positive and finite"
+        );
+        Self {
+            seed: crate::tide::Tension {
+                id: egui::Id::new(id).value(),
+                rect: egui::Rect::from_center_size(
+                    center,
+                    egui::Vec2::splat(POINT_RADIATOR_DIAMETER),
+                ),
+                pointer: center,
+                grip: strength,
+                omega: frequency_hz * TAU,
+            },
         }
     }
 }
@@ -466,6 +519,7 @@ pub struct Surface {
     scroll: TrayTilt,
     scroll_tilt: f32,
     water_until: Option<Instant>,
+    radiator_seeds: Vec<crate::tide::Tension>,
     quivers: Vec<Quiver>,
     quiver_tick: Instant,
     quiver_until: Option<Instant>,
@@ -502,6 +556,7 @@ impl Surface {
             scroll: TrayTilt::default(),
             scroll_tilt: 0.0,
             water_until: None,
+            radiator_seeds: Vec::new(),
             quivers: Vec::new(),
             quiver_tick: now,
             quiver_until: None,
@@ -568,6 +623,7 @@ impl Surface {
         self.scroll = TrayTilt::default();
         self.scroll_tilt = 0.0;
         self.water_until = None;
+        self.radiator_seeds.clear();
         self.quivers.clear();
         self.quiver_tick = now;
         self.quiver_until = None;
@@ -618,6 +674,11 @@ impl Surface {
     pub fn poke(&mut self, rect: egui::Rect, poke: Poke) {
         let (amp, shape, travel) = poke.vitals();
         self.poke_scaled(rect, amp * self.wetness.drench().wave, shape, travel);
+    }
+
+    /// Hold one local oscillator for this UI pass.
+    pub fn radiate(&mut self, radiator: Radiator) {
+        self.radiator_seeds.push(radiator.seed);
     }
 
     pub fn bump(&mut self, rect: egui::Rect) {
@@ -832,12 +893,14 @@ impl Surface {
                 }
             })
             .collect();
+        let mut tension_seeds = crate::tide::take(ctx);
+        tension_seeds.append(&mut self.radiator_seeds);
         let (tensions, quiver_changed) = take_tensions(
-            ctx,
             pixels_per_point,
             &mut self.quivers,
             &mut self.quiver_tick,
             self.agitation.quiver_release,
+            tension_seeds,
         );
         if quiver_changed {
             self.quiver_until = Some(Instant::now() + QUIVER_WAKE);
@@ -1025,11 +1088,11 @@ impl Frame {
 }
 
 fn take_tensions(
-    ctx: &egui::Context,
     scale: f32,
     bank: &mut Vec<Quiver>,
     then: &mut Instant,
     release: f32,
+    seeds: Vec<crate::tide::Tension>,
 ) -> (Vec<engine::Tension>, bool) {
     let now = Instant::now();
     let dt = now.duration_since(*then).as_secs_f32().clamp(0.0, 0.12);
@@ -1043,7 +1106,6 @@ fn take_tensions(
         q.grip *= (-dt / release.max(0.03)).exp();
         q.held = false;
     }
-    let seeds = crate::tide::take(ctx);
     let mut changed = prior
         .iter()
         .any(|old| !seeds.iter().any(|seed| seed.id == old.id));
@@ -1154,15 +1216,15 @@ mod tests {
         let mut then = Instant::now();
 
         crate::tide::push(&ctx, 7, rect, pointer, 1.0, 0.0);
-        let (_, changed) = take_tensions(&ctx, 1.0, &mut bank, &mut then, 0.48);
+        let (_, changed) = take_tensions(1.0, &mut bank, &mut then, 0.48, crate::tide::take(&ctx));
         assert!(changed);
 
         crate::tide::push(&ctx, 7, rect, pointer, 1.0, 0.0);
-        let (_, changed) = take_tensions(&ctx, 1.0, &mut bank, &mut then, 0.48);
+        let (_, changed) = take_tensions(1.0, &mut bank, &mut then, 0.48, crate::tide::take(&ctx));
         assert!(!changed);
 
         crate::tide::push(&ctx, 7, rect, pointer + egui::vec2(1.0, 0.0), 1.0, 0.0);
-        let (_, changed) = take_tensions(&ctx, 1.0, &mut bank, &mut then, 0.48);
+        let (_, changed) = take_tensions(1.0, &mut bank, &mut then, 0.48, crate::tide::take(&ctx));
         assert!(changed);
     }
 }

@@ -168,7 +168,7 @@ is deliberately a hardware WebGPU workload.
 
 ```toml
 [dependencies]
-brass_poolrooms = "0.13.9"
+brass_poolrooms = "0.13.10"
 ```
 
 Import egui through the crate to keep its public geometry types aligned with
@@ -184,7 +184,7 @@ chrome::install(&ctx);
 For chrome without GPU water:
 
 ```toml
-brass_poolrooms = { version = "0.13.9", default-features = false }
+brass_poolrooms = { version = "0.13.10", default-features = false }
 ```
 
 ## Forge App Assets
@@ -198,10 +198,10 @@ Poolrooms chrome without moving application-specific dies into Poolrooms.
 
 ```toml
 [dependencies]
-brass_poolrooms = "0.13.9"
+brass_poolrooms = "0.13.10"
 
 [build-dependencies]
-brass_foundry = "0.13.9"
+brass_foundry = "0.13.10"
 ```
 
 The normal build boundary is `forge` followed by `emit_rust` in `build.rs`.
@@ -227,6 +227,10 @@ later frame does not renew that wake. Application hosts must likewise stop
 rendering concealed windows and suppress frame-originated continuation while
 unfocused. Domain progress must be driven by workers, events, or deadlines
 rather than by the water simulator.
+
+Held local oscillators use `Surface::radiate(Radiator::point(...))`. Submit the
+radiator on every UI pass while held; omission releases it through the ordinary
+quiver envelope.
 
 [`examples/support/mod.rs`](examples/support/mod.rs) is a complete minimal host,
 including input, resize, surface recovery, and repaint scheduling. `egui_wgpu`

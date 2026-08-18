@@ -15,3 +15,5 @@
   steep engraving; it changes no cutter geometry.
 - **Monoglyph finish**: the cutter and floor treatment of a monoglyph's mark:
   bright cut, void, danger, or love.
+- **Radiator**: a held local source that emits periodic waves into the water
+  without displacing visible hardware.

@@ -6,7 +6,7 @@ mod surface;
 
 pub use engine::{Chemistry, Engine};
 pub use surface::{
-    Agitation, Cut, Domain, Floor, FloorRegistration, Frame, Poke, Surface, Veil, Wetness,
+    Agitation, Cut, Domain, Floor, FloorRegistration, Frame, Poke, Radiator, Surface, Veil, Wetness,
 };
 
 pub const BULGE_CEIL: f32 = engine::BULGE_CEIL;
