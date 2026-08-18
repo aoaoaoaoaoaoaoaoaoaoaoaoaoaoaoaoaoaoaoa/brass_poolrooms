@@ -11,5 +11,7 @@
   with no occupant or fill across its aperture.
 - **Lance of Longinus**: the mirror-polished bronze bident forged as the
   Poolrooms' native cursor for conversational forks.
+- **Love paint**: the deep-pink, rough coating confined to the flat floor of a
+  steep engraving; it changes no cutter geometry.
 - **Monoglyph finish**: the cutter and floor treatment of a monoglyph's mark:
-  bright cut, void, or danger.
+  bright cut, void, danger, or love.

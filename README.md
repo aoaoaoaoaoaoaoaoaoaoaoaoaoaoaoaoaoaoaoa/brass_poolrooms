@@ -78,10 +78,11 @@ independently projected and illuminated at build time.
 common action to one scalar, one semantic finish default, and the selected
 foundry gauge's typography. `Symbol::Delete` therefore selects the rough
 blood-ochre `MonoglyphFinish::Danger`; `.finish(...)` may override that lookup
-without re-authoring the glyph. A product-specific mark may still use
+without re-authoring the glyph. `Symbol::Heart` likewise selects the rough
+deep-pink `MonoglyphFinish::Love`. A product-specific mark may still use
 `Monoglyph::new(char)` and defaults to `BrightCut`. Common add, remove, delete,
-duplicate, rename, confirm, disclosure, restore, help, and increment/decrement
-marks must not be re-authored at application call sites.
+duplicate, rename, confirm, disclosure, restore, help, heart, and
+increment/decrement marks must not be re-authored at application call sites.
 [`Coupled::horizontal`] places any two coupling-capable foundry responses at the
 canonical six-point gap and runs the standard twin bronze ties behind both
 casings. [`Coupled::horizontal_with_gap`] accepts a [`CouplingGap`] when dense
@@ -167,7 +168,7 @@ is deliberately a hardware WebGPU workload.
 
 ```toml
 [dependencies]
-brass_poolrooms = "0.13.8"
+brass_poolrooms = "0.13.9"
 ```
 
 Import egui through the crate to keep its public geometry types aligned with
@@ -183,7 +184,7 @@ chrome::install(&ctx);
 For chrome without GPU water:
 
 ```toml
-brass_poolrooms = { version = "0.13.8", default-features = false }
+brass_poolrooms = { version = "0.13.9", default-features = false }
 ```
 
 ## Forge App Assets
@@ -197,10 +198,10 @@ Poolrooms chrome without moving application-specific dies into Poolrooms.
 
 ```toml
 [dependencies]
-brass_poolrooms = "0.13.8"
+brass_poolrooms = "0.13.9"
 
 [build-dependencies]
-brass_foundry = "0.13.8"
+brass_foundry = "0.13.9"
 ```
 
 The normal build boundary is `forge` followed by `emit_rust` in `build.rs`.

@@ -25,7 +25,9 @@ const PLAQUE_TEXT_PAD_X: f32 = 6.0;
 const PLAQUE_ETCH_DEPTH: f32 = 0.96;
 const PLAQUE_ETCH_BEVEL_RUN: f32 = 0.42;
 const FLAT_CUT_BEVEL_RUN: f32 = 0.42;
-const DANGER_GRAIN_PITCH: f32 = 1.6;
+const PAINT_GRAIN_PITCH: f32 = 1.6;
+const DANGER_PAINT: Color32 = Color32::from_rgb(139, 49, 13);
+const LOVE_PAINT: Color32 = Color32::from_rgb(191, 61, 105);
 const _: () =
     assert!(PLAQUE_ETCH_DEPTH < PLAQUE_RISE && PLAQUE_ETCH_DEPTH / PLAQUE_ETCH_BEVEL_RUN > 2.0);
 const COUPLING_TIE_DIAMETER: f32 = 1.55;
@@ -74,6 +76,7 @@ fn fresh_cut_bronze(ny: f32, nz: f32) -> Color32 {
 pub(crate) enum EngravingFloor {
     Void,
     Danger(u32),
+    Love(u32),
 }
 
 /// Perspective magnification at a faceplate-normal elevation in the common
@@ -180,14 +183,21 @@ pub(crate) fn flat_cut_etch(
         EngravingFloor::Danger(seed) => {
             let _floor = incision.add(Shape::galley(
                 pos,
-                danger_painted_galley(galley, seed),
-                danger_paint(seed, 0, 0),
+                painted_galley(galley, DANGER_PAINT, seed),
+                rough_paint(DANGER_PAINT, seed, 0, 0),
+            ));
+        }
+        EngravingFloor::Love(seed) => {
+            let _floor = incision.add(Shape::galley(
+                pos,
+                painted_galley(galley, LOVE_PAINT, seed),
+                rough_paint(LOVE_PAINT, seed, 0, 0),
             ));
         }
     }
 }
 
-fn danger_painted_galley(mut galley: Arc<Galley>, seed: u32) -> Arc<Galley> {
+fn painted_galley(mut galley: Arc<Galley>, albedo: Color32, seed: u32) -> Arc<Galley> {
     let galley_mut = Arc::make_mut(&mut galley);
     galley_mut.mesh_bounds = Rect::NOTHING;
     galley_mut.num_vertices = 0;
@@ -204,6 +214,7 @@ fn danger_painted_galley(mut galley: Arc<Galley>, seed: u32) -> Arc<Galley> {
                 subdivide_painted_quad(
                     &mut painted,
                     quad,
+                    albedo,
                     seed ^ (row_index as u32).wrapping_mul(0x9e37_79b9)
                         ^ (glyph_index as u32).wrapping_mul(0x85eb_ca6b),
                 );
@@ -211,7 +222,7 @@ fn danger_painted_galley(mut galley: Arc<Galley>, seed: u32) -> Arc<Galley> {
         } else {
             painted = source.clone();
             for (index, vertex) in painted.vertices.iter_mut().enumerate() {
-                vertex.color = danger_paint(seed, index, 0);
+                vertex.color = rough_paint(albedo, seed, index, 0);
             }
         }
 
@@ -226,14 +237,14 @@ fn danger_painted_galley(mut galley: Arc<Galley>, seed: u32) -> Arc<Galley> {
     galley
 }
 
-fn subdivide_painted_quad(mesh: &mut Mesh, quad: &[Vertex], seed: u32) {
+fn subdivide_painted_quad(mesh: &mut Mesh, quad: &[Vertex], albedo: Color32, seed: u32) {
     let [top_left, top_right, bottom_left, _bottom_right] = quad else {
         unreachable!("glyph meshes are partitioned into four-vertex quads");
     };
     let width = top_left.pos.distance(top_right.pos);
     let height = top_left.pos.distance(bottom_left.pos);
-    let columns = (width / DANGER_GRAIN_PITCH).ceil().clamp(1.0, 12.0) as usize;
-    let rows = (height / DANGER_GRAIN_PITCH).ceil().clamp(1.0, 12.0) as usize;
+    let columns = (width / PAINT_GRAIN_PITCH).ceil().clamp(1.0, 12.0) as usize;
+    let rows = (height / PAINT_GRAIN_PITCH).ceil().clamp(1.0, 12.0) as usize;
     let base = mesh.vertices.len() as u32;
 
     for y in 0..=rows {
@@ -249,7 +260,7 @@ fn subdivide_painted_quad(mesh: &mut Mesh, quad: &[Vertex], seed: u32) {
                     egui::lerp(top_left.uv.x..=top_right.uv.x, fx),
                     egui::lerp(top_left.uv.y..=bottom_left.uv.y, fy),
                 ),
-                color: danger_paint(seed, x, y),
+                color: rough_paint(albedo, seed, x, y),
             });
         }
     }
@@ -272,17 +283,18 @@ fn subdivide_painted_quad(mesh: &mut Mesh, quad: &[Vertex], seed: u32) {
     }
 }
 
-fn danger_paint(seed: u32, x: usize, y: usize) -> Color32 {
+fn rough_paint(albedo: Color32, seed: u32, x: usize, y: usize) -> Color32 {
     let mut grain =
         seed ^ (x as u32).wrapping_mul(0x9e37_79b9) ^ (y as u32).wrapping_mul(0x85eb_ca6b);
     grain ^= grain >> 16;
     grain = grain.wrapping_mul(0x7feb_352d);
     grain ^= grain >> 15;
     let light = (grain & 0x1f) as i16 - 15;
+    let [r, g, b, _] = albedo.to_array();
     Color32::from_rgb(
-        (139_i16 + light).clamp(0, 255) as u8,
-        (49_i16 + light / 2).clamp(0, 255) as u8,
-        (13_i16 + light / 4).clamp(0, 255) as u8,
+        (i16::from(r) + light).clamp(0, 255) as u8,
+        (i16::from(g) + light / 2).clamp(0, 255) as u8,
+        (i16::from(b) + light / 4).clamp(0, 255) as u8,
     )
 }
 

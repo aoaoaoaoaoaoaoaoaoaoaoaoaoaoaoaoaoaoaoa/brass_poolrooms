@@ -13,6 +13,9 @@ use super::MonoglyphFinish;
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Symbol {
     /// Add a new member to a collection.
+    ///
+    /// Its heavy plus cut is centered and D₄-symmetric, and is shared with
+    /// [`Self::Increment`].
     Add,
     /// Collapse an open disclosure.
     Collapse,
@@ -28,9 +31,14 @@ pub enum Symbol {
     Expand,
     /// Open contextual help and keyboard guidance.
     Help,
+    /// Mark an item with the canonical heart.
+    Heart,
     /// Increase a scalar by one application-defined quantum.
     Increment,
     /// Remove, clear, or dismiss the targeted member.
+    ///
+    /// Its heavy multiplication cut is centered and D₄-symmetric: every arm
+    /// retains equal weight under quarter-turns and reflections.
     Remove,
     /// Rename the targeted member.
     Rename,
@@ -40,7 +48,7 @@ pub enum Symbol {
 
 impl Symbol {
     /// Complete armory in stable presentation order.
-    pub const ALL: [Self; 12] = [
+    pub const ALL: [Self; 13] = [
         Self::Add,
         Self::Remove,
         Self::Delete,
@@ -50,6 +58,7 @@ impl Symbol {
         Self::Expand,
         Self::Collapse,
         Self::Help,
+        Self::Heart,
         Self::Restore,
         Self::Increment,
         Self::Decrement,
@@ -58,7 +67,7 @@ impl Symbol {
     /// Canonical Unicode scalar cut for this action.
     pub const fn glyph(self) -> char {
         match self {
-            Self::Add | Self::Increment => '+',
+            Self::Add | Self::Increment => '➕',
             Self::Collapse => '▾',
             Self::Confirm => '✓',
             Self::Decrement => '−',
@@ -66,7 +75,8 @@ impl Symbol {
             Self::Duplicate => '⧉',
             Self::Expand => '▸',
             Self::Help => '?',
-            Self::Remove => '×',
+            Self::Heart => '♥',
+            Self::Remove => '✖',
             Self::Rename => '✎',
             Self::Restore => '↺',
         }
@@ -80,6 +90,7 @@ impl Symbol {
     pub const fn default_finish(self) -> MonoglyphFinish {
         match self {
             Self::Delete => MonoglyphFinish::Danger,
+            Self::Heart => MonoglyphFinish::Love,
             Self::Add
             | Self::Collapse
             | Self::Confirm
@@ -105,6 +116,7 @@ impl Symbol {
             Self::Duplicate => "DUPLICATE",
             Self::Expand => "EXPAND",
             Self::Help => "HELP",
+            Self::Heart => "HEART",
             Self::Increment => "INCREMENT",
             Self::Remove => "REMOVE",
             Self::Rename => "RENAME",

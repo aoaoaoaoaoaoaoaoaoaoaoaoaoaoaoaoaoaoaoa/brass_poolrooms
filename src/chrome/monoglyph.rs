@@ -41,11 +41,13 @@ pub enum MonoglyphFinish {
     Void,
     /// A steep, flat-bottomed engraving filled with rough blood-ochre paint.
     Danger,
+    /// A steep, flat-bottomed engraving filled with rough deep-pink paint.
+    Love,
 }
 
 impl MonoglyphFinish {
     /// Complete finish register in stable gallery order.
-    pub const ALL: [Self; 3] = [Self::BrightCut, Self::Void, Self::Danger];
+    pub const ALL: [Self; 4] = [Self::BrightCut, Self::Void, Self::Danger, Self::Love];
 
     /// Stable material name for galleries and instrumentation.
     pub const fn name(self) -> &'static str {
@@ -53,13 +55,14 @@ impl MonoglyphFinish {
             Self::BrightCut => "BRIGHT CUT",
             Self::Void => "VOID",
             Self::Danger => "DANGER",
+            Self::Love => "LOVE",
         }
     }
 
     const fn depth(self) -> f32 {
         match self {
             Self::BrightCut => BRIGHT_CUT_DEPTH,
-            Self::Void | Self::Danger => FLAT_CUT_DEPTH,
+            Self::Void | Self::Danger | Self::Love => FLAT_CUT_DEPTH,
         }
     }
 }
@@ -313,6 +316,17 @@ fn etch(
                 elevation,
                 depth,
                 foundry::EngravingFloor::Danger(glyph as u32),
+            );
+        }
+        MonoglyphFinish::Love => {
+            foundry::flat_cut_etch(
+                painter,
+                clip,
+                pos,
+                galley,
+                elevation,
+                depth,
+                foundry::EngravingFloor::Love(glyph as u32),
             );
         }
     }
