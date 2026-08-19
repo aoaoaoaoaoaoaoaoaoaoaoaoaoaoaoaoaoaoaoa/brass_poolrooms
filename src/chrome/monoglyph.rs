@@ -7,7 +7,9 @@
 
 use std::ops::Deref;
 
-use egui::{CursorIcon, FontId, Pos2, Rect, Sense, Vec2, WidgetInfo, WidgetType};
+use egui::{
+    Atom, Button, CursorIcon, FontId, Pos2, Rect, Response, Sense, Vec2, WidgetInfo, WidgetType,
+};
 
 use super::{MechanismSize, Symbol, foundry};
 
@@ -159,13 +161,7 @@ impl Monoglyph {
     /// `water::Surface::monoglyph` during the same UI pass to couple the plunge
     /// and return stroke into the active water world.
     pub fn show(self, ui: &mut egui::Ui) -> MonoglyphResponse {
-        let atlas = self.size.atlas_index();
-        let gauge = baked::GAUGES[atlas];
-        let law = foundry::law::momentary_gauge(gauge.side);
-        debug_assert_eq!(gauge.side, self.size.side() as u8);
-        debug_assert_eq!(gauge.socket_half, law.socket_half);
-        debug_assert_eq!(gauge.top_half, law.top_half);
-        debug_assert_eq!(gauge.body_half, law.body_half);
+        let (atlas, gauge) = self.gauge();
         let sense = if self.focusable {
             Sense::click()
         } else {
@@ -210,7 +206,8 @@ impl Monoglyph {
             &painter,
             anatomy,
             motion.position,
-            &response,
+            response.id,
+            response.has_focus(),
             atlas,
             gauge.poses,
             baked::POSE_MIN,
@@ -237,12 +234,77 @@ impl Monoglyph {
             activated,
         }
     }
+
+    /// Embed the mechanism's resting pose as an inert legend inside `button`.
+    ///
+    /// The monoglyph remains part of the enclosing button's allocation and
+    /// interaction surface; it does not introduce a nested actuator or focus
+    /// stop. The monoglyph terminates the parent plate: its casing covers the
+    /// trailing frame and consumes that frame's redundant inset. The gap to
+    /// the command label equals the vertical frame inset.
+    pub fn show_in(self, ui: &mut egui::Ui, button: Button<'_>) -> Response {
+        let (atlas, gauge) = self.gauge();
+        let side = self.size.side();
+        let padding = ui.spacing().button_padding;
+        let atom_size = Vec2::new(side - padding.x, side);
+        debug_assert!(atom_size.x > 0.0);
+        let id = ui.next_auto_id().with("inline-monoglyph");
+        let layout = button
+            .small()
+            .right_text(Atom::custom(id, atom_size))
+            .gap(padding.y)
+            .atom_ui(ui);
+        if let Some(atom) = layout.rect(id) {
+            let rect = Rect::from_min_size(atom.left_top(), Vec2::splat(side));
+            let anatomy =
+                plunger::MomentaryAnatomy::new(rect, side, gauge.socket_half, gauge.body_half);
+            let mut painter = ui.painter().clone();
+            if !ui.is_enabled() {
+                painter.set_opacity(1.0);
+            }
+            plunger::paint_momentary(
+                ui,
+                &painter,
+                anatomy,
+                baked::REST,
+                id,
+                false,
+                atlas,
+                gauge.poses,
+                baked::POSE_MIN,
+                baked::POSE_MAX,
+                |painter, aperture, origin| {
+                    etch(
+                        painter,
+                        aperture,
+                        origin,
+                        self.glyph,
+                        self.finish,
+                        baked::REST,
+                        gauge.top_half,
+                    );
+                },
+            );
+        }
+        layout.response
+    }
+
+    fn gauge(self) -> (usize, BakedGauge) {
+        let atlas = self.size.atlas_index();
+        let gauge = baked::GAUGES[atlas];
+        let law = foundry::law::momentary_gauge(gauge.side);
+        debug_assert_eq!(gauge.side, self.size.side() as u8);
+        debug_assert_eq!(gauge.socket_half, law.socket_half);
+        debug_assert_eq!(gauge.top_half, law.top_half);
+        debug_assert_eq!(gauge.body_half, law.body_half);
+        (atlas, gauge)
+    }
 }
 
 #[must_use = "the response carries both egui state and displaced-water volume"]
 /// Interaction state and displaced-water geometry from one [`Monoglyph`] frame.
 pub struct MonoglyphResponse {
-    response: egui::Response,
+    response: Response,
     wake: Option<MonoglyphWake>,
     elevation: f32,
     ports: CouplingPorts,
@@ -272,13 +334,13 @@ impl MonoglyphResponse {
     }
 
     /// Discard physical displacement and return the ordinary egui response.
-    pub fn into_response(self) -> egui::Response {
+    pub fn into_response(self) -> Response {
         self.response
     }
 }
 
 impl Deref for MonoglyphResponse {
-    type Target = egui::Response;
+    type Target = Response;
 
     fn deref(&self) -> &Self::Target {
         &self.response

@@ -184,28 +184,33 @@ case "$gallery" in
     widget_gallery)
         # The numerical wheel owns its complete smoothed impulse. Its value and
         # water may move, but the enclosing menagerie must remain nailed down.
-        # First place the numerical exhibit at a deterministic viewport
-        # coordinate; preceding exhibits may grow without turning this wheel
-        # gesture into an accidental ScrollArea gesture.
-        xdotool mousemove --window "$window" 740 820
-        xdotool click --repeat 10 5
-        sleep 1.20
-        import -window "$window" "$out/number-wheel-before.png"
-        xdotool mousemove --window "$window" 121 597
-        xdotool click 5
-        sleep 1.20
-        import -window "$window" "$out/contained-number-wheel.png"
-        magick "$out/number-wheel-before.png" -crop 600x400+0+0 "$out/containment-before.png"
-        magick "$out/contained-number-wheel.png" -crop 600x400+0+0 "$out/containment-after.png"
-        contained=$(magick \
-            "$out/containment-before.png" \
-            "$out/containment-after.png" \
-            -compose difference \
-            -composite \
-            -format '%[fx:mean<0.015?1:0]' \
-            info:)
+        # Advance the outer scroll at the eventual wheel coordinate until the
+        # control itself contains the event. This admits preceding exhibit
+        # growth without encoding its accumulated height into the driver.
+        contained=0
+        attempt=0
+        while [ "$attempt" -lt 32 ]; do
+            import -window "$window" "$out/number-wheel-before.png"
+            xdotool mousemove --window "$window" 121 597
+            xdotool click 5
+            sleep 0.35
+            import -window "$window" "$out/contained-number-wheel.png"
+            magick "$out/number-wheel-before.png" \
+                -crop 600x400+0+0 "$out/containment-before.png"
+            magick "$out/contained-number-wheel.png" \
+                -crop 600x400+0+0 "$out/containment-after.png"
+            contained=$(magick \
+                "$out/containment-before.png" \
+                "$out/containment-after.png" \
+                -compose difference \
+                -composite \
+                -format '%[fx:mean<0.015?1:0]' \
+                info:)
+            [ "$contained" -eq 0 ] || break
+            attempt=$((attempt + 1))
+        done
         if [ "$contained" -ne 1 ]; then
-            printf 'numerical wheel leaked into the enclosing scroll area\n' >&2
+            printf 'numerical wheel never contained its wheel event\n' >&2
             exit 1
         fi
         xdotool mousemove --window "$window" 740 450

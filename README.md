@@ -56,7 +56,9 @@ multiplying equivalent Cartesian combinations.
 [`Section`] embodies the recessed disclosure used by higher-level panel
 managers. Its active and focused states are physical indications only;
 application logic owns panel selection and traversal. [`MnemonicText`] marks
-one permanent Alt glyph, while [`Keycap`] renders a noninteractive chord plate.
+one permanent Alt glyph. [`Monoglyph::show_in`] embeds an inert resting
+monoglyph inside a button; [`Keycap`] renders standalone chord plates and
+compact multi-key accelerator wells.
 `chrome::exact_activation` refines button-like egui responses to pointer,
 accessibility, or fresh unmodified Enter/Space activation and leaves modified
 chords for their exact owner. Disabled controls and controls behind a modal
@@ -168,7 +170,7 @@ is deliberately a hardware WebGPU workload.
 
 ```toml
 [dependencies]
-brass_poolrooms = "0.13.12"
+brass_poolrooms = "0.13.13"
 ```
 
 Import egui through the crate to keep its public geometry types aligned with
@@ -184,7 +186,7 @@ chrome::install(&ctx);
 For chrome without GPU water:
 
 ```toml
-brass_poolrooms = { version = "0.13.12", default-features = false }
+brass_poolrooms = { version = "0.13.13", default-features = false }
 ```
 
 ## Forge App Assets
@@ -198,10 +200,10 @@ Poolrooms chrome without moving application-specific dies into Poolrooms.
 
 ```toml
 [dependencies]
-brass_poolrooms = "0.13.12"
+brass_poolrooms = "0.13.13"
 
 [build-dependencies]
-brass_foundry = "0.13.12"
+brass_foundry = "0.13.13"
 ```
 
 The normal build boundary is `forge` followed by `emit_rust` in `build.rs`.
@@ -267,6 +269,7 @@ Physical terms are fixed in the [Poolrooms glossary](docs/glossary.md).
 [`DateSpool`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.DateSpool.html
 [`Checkbox`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.Checkbox.html
 [`Monoglyph`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.Monoglyph.html
+[`Monoglyph::show_in`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.Monoglyph.html#method.show_in
 [`MonoglyphFinish`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/enum.MonoglyphFinish.html
 [`CornerClose`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.CornerClose.html
 [`DragHandle`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.DragHandle.html

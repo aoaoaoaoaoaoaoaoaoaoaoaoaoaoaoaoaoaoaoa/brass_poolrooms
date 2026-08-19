@@ -12,10 +12,10 @@
 //! `water::Surface` during the same UI pass.
 //!
 //! [`Section`] supplies the physical disclosure used by application-level
-//! panel managers. [`MnemonicText`] and [`Keycap`] supply command legends;
-//! [`exact_activation`] gives button-like responses exact, non-bleeding
-//! Enter/Space ownership. Command routing and panel traversal remain outside
-//! Poolrooms.
+//! panel managers. [`MnemonicText`], [`Monoglyph::show_in`], and [`Keycap`]
+//! supply command legends; [`exact_activation`] gives button-like responses
+//! exact, non-bleeding Enter/Space ownership. Command routing and panel
+//! traversal remain outside Poolrooms.
 
 use std::f32::consts::TAU;
 use std::sync::Arc;

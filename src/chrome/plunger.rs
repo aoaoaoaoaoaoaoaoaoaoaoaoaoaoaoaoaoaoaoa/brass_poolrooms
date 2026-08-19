@@ -266,7 +266,8 @@ pub(super) fn paint_momentary(
     painter: &egui::Painter,
     anatomy: MomentaryAnatomy,
     elevation: f32,
-    response: &egui::Response,
+    id: egui::Id,
+    focused: bool,
     atlas: usize,
     poses: &'static [BakedPose],
     pose_min: f32,
@@ -276,7 +277,7 @@ pub(super) fn paint_momentary(
     let origin = anatomy.socket.center();
     let pose_index = pose_index(elevation, pose_min, pose_max, poses.len());
     let rendered = ui.ctx().data_mut(|data| {
-        data.get_temp_mut_or_default::<PoseCache>(response.id.with("compiled-foundry"))
+        data.get_temp_mut_or_default::<PoseCache>(id.with("compiled-foundry"))
             .prepare(origin, atlas, pose_index, poses)
     });
 
@@ -287,7 +288,7 @@ pub(super) fn paint_momentary(
     paint_crown(painter, aperture, origin);
     foundry::socket_rim(painter, anatomy.socket);
 
-    if response.has_focus() {
+    if focused {
         let _focus = painter.rect_stroke(
             anatomy.assembly.shrink(0.5),
             1.0,

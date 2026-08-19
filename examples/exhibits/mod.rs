@@ -300,15 +300,18 @@ impl Legends {
     pub fn show(&mut self, ui: &mut egui::Ui, water: &mut Surface) {
         let _title = ui.label(chrome::title("COMMAND LEGENDS"));
         let _law = ui.label(chrome::muted(
-            "one mnemonic underline · one chord plate · inherited enabled state",
+            "one mnemonic underline · typed accelerator legend · inherited enabled state",
         ));
         ui.add_space(16.0);
 
         let _buttons = ui.horizontal(|ui| {
             let open = MnemonicText::new("Open archive", 'O').widget_text(ui);
-            let _open = ui.add(egui::Button::new(open).shortcut_text("Alt+O"));
-            let save = MnemonicText::new("Save archive", 'S').widget_text(ui);
-            let _save = ui.add(egui::Button::new(save).shortcut_text("Ctrl+S"));
+            let _open = ui.add(egui::Button::new(open));
+            let _save = Keycap::new("Ctrl+S").show_in(ui, egui::Button::new("Save archive"));
+            let _tags = Monoglyph::new('T')
+                .size(MechanismSize::Small)
+                .finish(MonoglyphFinish::Void)
+                .show_in(ui, egui::Button::new("Tags"));
         });
         ui.add_space(10.0);
         let _caps = ui.horizontal(|ui| {

@@ -4,11 +4,15 @@
 
 use std::{borrow::Cow, sync::Arc};
 
-use egui::{Color32, FontId, Sense, Stroke, TextStyle, Vec2, WidgetInfo, WidgetType};
+use egui::{
+    Atom, Button, Color32, FontId, Response, Sense, Stroke, TextStyle, Vec2, WidgetInfo, WidgetType,
+};
 
 use super::{CONTROL, EDGE, EDGE_STRONG, HOT, MUTED, TEXT};
 
 const MNEMONIC_UNDERLINE_LIFT: f32 = 2.0;
+const INLINE_KEYCAP_FONT_SIZE: f32 = 9.0;
+const INLINE_KEYCAP_PADDING: Vec2 = Vec2::new(3.0, 1.0);
 
 /// Text carrying one permanently visible Alt mnemonic underline.
 ///
@@ -119,7 +123,7 @@ impl Keycap {
     }
 
     /// Lay out and paint the chord plate.
-    pub fn show(self, ui: &mut egui::Ui) -> egui::Response {
+    pub fn show(self, ui: &mut egui::Ui) -> Response {
         let enabled = ui.is_enabled();
         let ink = if enabled { TEXT } else { MUTED };
         let font = FontId::monospace(11.0);
@@ -139,5 +143,35 @@ impl Keycap {
         response
             .widget_info(|| WidgetInfo::labeled(WidgetType::Label, enabled, self.label.clone()));
         response
+    }
+
+    /// Embed this key legend at the trailing edge of a button.
+    ///
+    /// The compact key well remains part of the enclosing button's allocation
+    /// and interaction surface. It conveys an accelerator without turning the
+    /// command label itself into mutable shortcut notation.
+    pub fn show_in(self, ui: &mut egui::Ui, button: Button<'_>) -> Response {
+        let enabled = ui.is_enabled();
+        let ink = if enabled { HOT } else { MUTED };
+        let font = FontId::monospace(INLINE_KEYCAP_FONT_SIZE);
+        let galley = ui.painter().layout_no_wrap(self.label, font, ink);
+        let size = galley.size() + 2.0 * INLINE_KEYCAP_PADDING;
+        let id = ui.next_auto_id().with("inline-keycap");
+        let layout = button
+            .right_text(Atom::custom(id, size))
+            .gap(4.0)
+            .atom_ui(ui);
+        if let Some(rect) = layout.rect(id) {
+            let painter = ui.painter();
+            let _well = painter.rect_filled(rect, 1.0, CONTROL);
+            let _edge = painter.rect_stroke(
+                rect,
+                1.0,
+                Stroke::new(1.0_f32, EDGE),
+                egui::StrokeKind::Inside,
+            );
+            painter.galley(rect.center() - galley.size() * 0.5, galley, ink);
+        }
+        layout.response
     }
 }
