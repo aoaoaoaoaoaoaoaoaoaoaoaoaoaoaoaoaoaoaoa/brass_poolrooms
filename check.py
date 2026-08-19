@@ -140,11 +140,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "mode",
         nargs="?",
-        choices=("check", "verify", "deep", "fix", "canon"),
+        choices=("check", "verify", "source", "deep", "fix", "canon"),
         default="check",
         help=(
             "Run canonicalization plus the fast gate, run a non-mutating verification gate, "
-            "include docs for the deep gate, or run only canonicalization."
+            "run the test-free hosted source gate, include docs for the deep gate, "
+            "or run only canonicalization."
         ),
     )
     return parser.parse_args()
@@ -213,14 +214,15 @@ def main() -> None:
         return
 
     enforce_source_file_policy(source_file_policy)
-    if args.mode != "verify":
+    if args.mode not in {"verify", "source"}:
         run_command_sequence("canonicalize", commands["canonicalize_commands"])
 
     run("fmt", commands["format_command"])
     if "web_command" in commands:
         run("web", commands["web_command"])
     run("clippy", commands["clippy_command"])
-    run("test", commands["test_command"])
+    if args.mode != "source":
+        run("test", commands["test_command"])
 
     if args.mode == "deep" and "doc_command" in commands:
         run("doc", commands["doc_command"])
