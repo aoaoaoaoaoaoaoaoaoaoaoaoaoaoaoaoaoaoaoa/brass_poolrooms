@@ -122,6 +122,9 @@ builds and binds this exact release-mode Wasm example, so native-only drift
 fails the gate. The server also uses that optimized artifact; debug Wasm is not
 representative enough to serve.
 
+The same bundle is permanently hosted at
+`https://eternalist.moe/demos/brass-poolrooms/`.
+
 For sites that cannot justify the full WebGPU renderer, Poolrooms also owns a
 versioned lightweight Web Kit:
 
@@ -170,7 +173,7 @@ is deliberately a hardware WebGPU workload.
 
 ```toml
 [dependencies]
-brass_poolrooms = "0.13.14"
+brass_poolrooms = "0.13.15"
 ```
 
 Import egui through the crate to keep its public geometry types aligned with
@@ -186,7 +189,7 @@ chrome::install(&ctx);
 For chrome without GPU water:
 
 ```toml
-brass_poolrooms = { version = "0.13.14", default-features = false }
+brass_poolrooms = { version = "0.13.15", default-features = false }
 ```
 
 ## Forge App Assets
@@ -200,10 +203,10 @@ Poolrooms chrome without moving application-specific dies into Poolrooms.
 
 ```toml
 [dependencies]
-brass_poolrooms = "0.13.14"
+brass_poolrooms = "0.13.15"
 
 [build-dependencies]
-brass_foundry = "0.13.14"
+brass_foundry = "0.13.15"
 ```
 
 The normal build boundary is `forge` followed by `emit_rust` in `build.rs`.

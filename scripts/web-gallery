@@ -32,11 +32,13 @@ wasm="$target/wasm32-unknown-unknown/release/examples/widget_gallery.wasm"
 verify_bundle() {
     bundle=$1
     test -s "$bundle/index.html"
+    test -s "$bundle/boot.js"
     test -s "$bundle/poolrooms.js"
     test -s "$bundle/poolrooms_bg.wasm"
-    grep -Fq 'import init from "./poolrooms.js"' "$bundle/index.html"
-    grep -Fq 'await navigator.gpu.requestAdapter({' "$bundle/index.html"
-    grep -Fq '"swiftshader"' "$bundle/index.html"
+    grep -Fq 'src="./boot.js"' "$bundle/index.html"
+    grep -Fq 'import init from "./poolrooms.js"' "$bundle/boot.js"
+    grep -Fq 'await navigator.gpu.requestAdapter({' "$bundle/boot.js"
+    grep -Fq '"swiftshader"' "$bundle/boot.js"
     grep -Fq 'wasm.__wbindgen_start();' "$bundle/poolrooms.js"
 }
 
@@ -62,6 +64,7 @@ if [ "$action" != serve-built ]; then
         --out-name poolrooms \
         "$wasm"
     install -Dm644 web/widget-gallery.html "$stage/index.html"
+    install -Dm644 web/widget-gallery-boot.js "$stage/boot.js"
     verify_bundle "$stage"
 
     rm -rf "$previous"

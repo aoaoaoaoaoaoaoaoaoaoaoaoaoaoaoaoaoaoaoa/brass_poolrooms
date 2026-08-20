@@ -21,6 +21,10 @@ logical managers, menus, storage surfaces, and other application-scale state
 machines. Eternalist may depend on Poolrooms; Poolrooms must never depend on
 Eternalist.
 
+The widget gallery may publish one Foundry `demonstration` archive for permanent
+hosting beneath `eternalist.moe/demos/`. It remains evidence of this product,
+not another product or a host-support claim.
+
 [`docs/glossary.md`](docs/glossary.md) owns the rectified names of visible
 Poolrooms objects. Reuse those nouns exactly; do not mint near-synonyms for an
 existing physical kind.

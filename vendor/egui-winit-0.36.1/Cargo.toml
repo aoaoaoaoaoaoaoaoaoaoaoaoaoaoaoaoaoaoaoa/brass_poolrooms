@@ -44,6 +44,8 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/emilk/egui/tree/main/crates/egui-winit"
 resolver = "2"
 
+[workspace]
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--generate-link-to-definition"]
