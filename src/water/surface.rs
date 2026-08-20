@@ -893,6 +893,7 @@ impl Surface {
                 }
             })
             .collect();
+        let radiating = self.wetness != Wetness::Dry && !self.radiator_seeds.is_empty();
         let mut tension_seeds = crate::tide::take(ctx);
         tension_seeds.append(&mut self.radiator_seeds);
         let (tensions, quiver_changed) = take_tensions(
@@ -914,7 +915,7 @@ impl Surface {
         if !water_wake {
             self.water_until = None;
         }
-        let repaint = water_wake || quiver_wake;
+        let repaint = radiating || water_wake || quiver_wake;
         if repaint {
             ctx.request_repaint();
         }
@@ -1226,5 +1227,22 @@ mod tests {
         crate::tide::push(&ctx, 7, rect, pointer + egui::vec2(1.0, 0.0), 1.0, 0.0);
         let (_, changed) = take_tensions(1.0, &mut bank, &mut then, 0.48, crate::tide::take(&ctx));
         assert!(changed);
+    }
+
+    #[test]
+    fn held_radiator_remains_a_frame_clock_after_its_transition_wake() {
+        // Ordinary held tension is quiescent state, but a radiator's phase is
+        // time-varying forcing. Conflating them strands a live oscillator in a
+        // frozen frame once its finite transition wake expires.
+        let ctx = egui::Context::default();
+        let mut surface = Surface::new(Wetness::Wet);
+        let radiator = Radiator::point("clock", egui::pos2(23.0, 31.0), 0.5, 0.66);
+
+        surface.radiate(radiator);
+        let _first = surface.frame(&ctx, 1.0, &[], None);
+        surface.quiver_until = None;
+        surface.radiate(radiator);
+
+        assert!(surface.frame(&ctx, 1.0, &[], None).wants_repaint());
     }
 }
