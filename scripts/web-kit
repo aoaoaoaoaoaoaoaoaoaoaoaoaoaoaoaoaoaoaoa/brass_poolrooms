@@ -218,7 +218,8 @@ case "$action" in
         printf 'Poolrooms Web Kit: %s\n' "$tarball"
         if [ "$action" = publish ]; then
             [ "$dirty" = false ] || fail 'publication requires a clean worktree'
-            [ "$(git branch --show-current)" = main ] || fail 'publication requires main'
+            [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] ||
+                fail 'publication requires the pushed origin/main commit'
             [ "$(git tag --points-at HEAD)" = "v$version" ] ||
                 fail "publication requires v$version at HEAD"
             signing_program=$(git config --get gpg.program) ||
