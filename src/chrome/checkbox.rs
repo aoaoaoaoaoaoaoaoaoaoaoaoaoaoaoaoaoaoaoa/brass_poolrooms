@@ -492,9 +492,17 @@ impl RenderCache {
         Rendered {
             button: installed.button.clone(),
             button_shadow: installed.button_shadow.clone(),
-            guard_crown_shadow: installed.guard_crown_shadow.clone(),
-            guard: self.guard.clone(),
-            guard_floor_shadow: self.guard_floor_shadow.clone(),
+            guard_crown_shadow: if guarded {
+                installed.guard_crown_shadow.clone()
+            } else {
+                None
+            },
+            guard: if guarded { self.guard.clone() } else { None },
+            guard_floor_shadow: if guarded {
+                self.guard_floor_shadow.clone()
+            } else {
+                None
+            },
         }
     }
 }
@@ -505,4 +513,27 @@ struct Rendered {
     guard_crown_shadow: Option<Arc<egui::Mesh>>,
     guard: Option<Arc<egui::Mesh>>,
     guard_floor_shadow: Option<Arc<egui::Mesh>>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cached_guard_obeys_the_current_enabled_state() {
+        let mut cache = RenderCache::default();
+        let gauge = baked::GAUGES[MechanismSize::Small.atlas_index()];
+        let origin = Pos2::new(20.0, 20.0);
+
+        let guarded = cache.prepare(origin, 0, gauge, 0, true);
+        assert!(guarded.guard.is_some());
+
+        let enabled = cache.prepare(origin, 0, gauge, 0, false);
+        assert!(enabled.guard.is_none());
+        assert!(enabled.guard_floor_shadow.is_none());
+        assert!(enabled.guard_crown_shadow.is_none());
+
+        let guarded_again = cache.prepare(origin, 0, gauge, 0, true);
+        assert!(guarded_again.guard.is_some());
+    }
 }

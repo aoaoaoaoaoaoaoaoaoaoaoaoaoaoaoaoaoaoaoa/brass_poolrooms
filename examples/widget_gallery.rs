@@ -9,12 +9,13 @@ mod support;
 use anyhow::Result;
 use brass_poolrooms::{chrome, egui, water::Surface};
 use exhibits::{
-    Checkboxes, Closures, Dates, Handles, Legends, Numbers, Pins, Sliders, Sorts, Symbols,
+    Checkboxes, Closures, Dates, Handles, Legends, Numbers, Pins, Scrolls, Sliders, Sorts, Symbols,
 };
 use support::Exhibit;
 
 #[derive(Default)]
 struct Menagerie {
+    scrolls: Scrolls,
     closures: Closures,
     handles: Handles,
     sorts: Sorts,
@@ -35,7 +36,7 @@ impl Exhibit for Menagerie {
         let panel = egui::CentralPanel::default()
             .frame(egui::Frame::new().fill(chrome::PAGE).inner_margin(28))
             .show(ui, |ui| {
-                egui::ScrollArea::vertical()
+                chrome::ScrewScroll::vertical()
                     .id_salt("crafted-widget-menagerie")
                     .auto_shrink([false; 2])
                     .show(ui, |ui| {
@@ -45,6 +46,8 @@ impl Exhibit for Menagerie {
                             "one foundry · one physical universe · one living water table",
                         ));
                         ui.add_space(28.0);
+                        self.scrolls.show(ui);
+                        ui.add_space(42.0);
                         self.closures.show(ui, water);
                         ui.add_space(42.0);
                         self.handles.show(ui, water);

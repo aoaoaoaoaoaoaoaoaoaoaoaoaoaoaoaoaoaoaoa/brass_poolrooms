@@ -13,6 +13,9 @@
   Poolrooms' native cursor for conversational forks.
 - **Love paint**: the deep-pink, rough coating confined to the flat floor of a
   steep engraving; it changes no cutter geometry.
+- **Lead screw**: a threaded shaft whose fixed lead converts rotation into the
+  axial travel of a captive nut. A screw scroll uses that nut as its visible
+  scroll-position indicator.
 - **Monoglyph finish**: the cutter and floor treatment of a monoglyph's mark:
   bright cut, void, danger, or love.
 - **Radiator**: a held local source that emits periodic waves into the water

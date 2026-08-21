@@ -11,8 +11,10 @@ deeply recessed X. [`DragHandle`] supplies fixed friction pads and rigid or
 folding bails for reorder gestures. The map-anchored [`ForgePin`] unifies its
 shaft, spherical grip, hit region, and optional inscription. [`NumberInput`]
 couples an exact scalar register to a scalloped thumbwheel. [`SortToggle`]
-provides hollow, ascending, and descending detents. All are machined in one
-fixed projection, material, and lighting model.
+provides hollow, ascending, and descending detents. [`ScrewScroll`] is the
+fixed-gauge scroll transport: a captive bronze nut traverses a 30° lead screw
+between welded six-cove handwheels. All are machined in one fixed projection,
+material, and lighting model.
 The [`LonginusCursor`] is the same foundry's mirror-polished bronze bident,
 compiled from coherent 3D geometry into a native cursor projection.
 
@@ -43,10 +45,11 @@ composition.
 | [`ForgePin`] | Three-gauge coordinate pin with one coherent shaft, bulb, grip region, medium/large inscription API, and native large-pin cursor | application-defined |
 | [`NumberInput`] | Bounded integer or floating register with an explicit quantum, precision, exact-entry override, two wheel planes, and sprung limit refusal | `Surface::number_input` |
 | [`SortToggle`] | Three-gauge sorting index with hollow, ascending, and descending detents | `Surface::sort_toggle` |
+| [`ScrewScroll`] | Always-visible fixed-gauge vertical transport whose proportional bronze nut and shaft rotation share one lead law; includes virtualized fixed-height rows | none |
 | [`LonginusCursor`] | Native 84-pixel fork cursor baked from the fixed-view Lance of Longinus model | application-defined |
 
-These ten types are the complete inventory of authored foundry mechanisms:
-their projected geometry, dynamics, material response, and displaced-water
+These eleven types are the complete inventory of authored foundry mechanisms:
+their projected geometry, dynamics, material response, and any displaced-water
 contract live here. The other `chrome` exports are shared typography, frames,
 layout, and interaction assemblies rather than custom projected mechanisms.
 [`widget_gallery`](examples/widget_gallery.rs) is the living visual contract:
@@ -280,6 +283,7 @@ Physical terms are fixed in the [Poolrooms glossary](docs/glossary.md).
 [`LonginusCursor`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.LonginusCursor.html
 [`NumberInput`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.NumberInput.html
 [`SortToggle`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.SortToggle.html
+[`ScrewScroll`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.ScrewScroll.html
 [`Section`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.Section.html
 [`MnemonicText`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.MnemonicText.html
 [`Keycap`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.Keycap.html

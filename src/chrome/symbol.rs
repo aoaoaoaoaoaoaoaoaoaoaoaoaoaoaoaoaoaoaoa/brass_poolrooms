@@ -44,11 +44,13 @@ pub enum Symbol {
     Rename,
     /// Restore a withdrawn or resettable member.
     Restore,
+    /// Open application settings.
+    Settings,
 }
 
 impl Symbol {
     /// Complete armory in stable presentation order.
-    pub const ALL: [Self; 13] = [
+    pub const ALL: [Self; 14] = [
         Self::Add,
         Self::Remove,
         Self::Delete,
@@ -60,6 +62,7 @@ impl Symbol {
         Self::Help,
         Self::Heart,
         Self::Restore,
+        Self::Settings,
         Self::Increment,
         Self::Decrement,
     ];
@@ -79,6 +82,7 @@ impl Symbol {
             Self::Remove => '✖',
             Self::Rename => '✎',
             Self::Restore => '↺',
+            Self::Settings => '⚙',
         }
     }
 
@@ -101,7 +105,8 @@ impl Symbol {
             | Self::Increment
             | Self::Remove
             | Self::Rename
-            | Self::Restore => MonoglyphFinish::BrightCut,
+            | Self::Restore
+            | Self::Settings => MonoglyphFinish::BrightCut,
         }
     }
 
@@ -121,6 +126,7 @@ impl Symbol {
             Self::Remove => "REMOVE",
             Self::Rename => "RENAME",
             Self::Restore => "RESTORE",
+            Self::Settings => "SETTINGS",
         }
     }
 }

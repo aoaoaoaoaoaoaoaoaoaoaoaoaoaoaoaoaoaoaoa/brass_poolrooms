@@ -333,74 +333,12 @@ impl Plaque {
     }
 
     pub(crate) fn paint(&self, painter: &egui::Painter, center: Pos2) {
-        let base_size = self.face_size + Vec2::splat(2.0 * PLAQUE_BEVEL_RUN);
-        let base = Rect::from_center_size(center, base_size);
-        let crown = Rect::from_center_size(center, self.face_size * perspective_scale(PLAQUE_RISE));
-        let shadow = Rect::from_center_size(
-            center + Vec2::new(0.0, -LIGHT_Y / LIGHT_Z * PLAQUE_RISE),
+        let crown = raised_sheet(
+            painter,
+            center,
             self.face_size,
-        );
-        let _shadow = painter.rect_filled(shadow, 0.0, Color32::from_black_alpha(64));
-
-        let [btl, btr, bbr, bbl] = [
-            [-base_size.x * 0.5, -base_size.y * 0.5, 0.0],
-            [base_size.x * 0.5, -base_size.y * 0.5, 0.0],
-            [base_size.x * 0.5, base_size.y * 0.5, 0.0],
-            [-base_size.x * 0.5, base_size.y * 0.5, 0.0],
-        ];
-        let [ctl, ctr, cbr, cbl] = [
-            [
-                -self.face_size.x * 0.5,
-                -self.face_size.y * 0.5,
-                PLAQUE_RISE,
-            ],
-            [self.face_size.x * 0.5, -self.face_size.y * 0.5, PLAQUE_RISE],
-            [self.face_size.x * 0.5, self.face_size.y * 0.5, PLAQUE_RISE],
-            [-self.face_size.x * 0.5, self.face_size.y * 0.5, PLAQUE_RISE],
-        ];
-        let columns = (self.face_size.x / DARK_REFLECTION_CELL).ceil() as usize;
-        let rows = (self.face_size.y / DARK_REFLECTION_CELL).ceil() as usize;
-        let mut metal = Mesh::default();
-        metal.vertices.reserve(16 + 4 * columns * rows);
-        metal.indices.reserve(24 + 6 * columns * rows);
-        let mut facet = |corners: [[f32; 3]; 4], normal| {
-            let base = metal.vertices.len() as u32;
-            for corner in corners {
-                metal.colored_vertex(center + project(corner), darkened_bronze(corner, normal));
-            }
-            metal.add_triangle(base, base + 1, base + 2);
-            metal.add_triangle(base, base + 2, base + 3);
-        };
-        facet([btl, btr, ctr, ctl], [0.0, -PLAQUE_RISE, PLAQUE_BEVEL_RUN]);
-        facet([btr, bbr, cbr, ctr], [PLAQUE_RISE, 0.0, PLAQUE_BEVEL_RUN]);
-        facet([bbr, bbl, cbl, cbr], [0.0, PLAQUE_RISE, PLAQUE_BEVEL_RUN]);
-        facet([bbl, btl, ctl, cbl], [-PLAQUE_RISE, 0.0, PLAQUE_BEVEL_RUN]);
-        let point = |x: usize, y: usize| {
-            [
-                -self.face_size.x * 0.5 + self.face_size.x * x as f32 / columns as f32,
-                -self.face_size.y * 0.5 + self.face_size.y * y as f32 / rows as f32,
-                PLAQUE_RISE,
-            ]
-        };
-        for y in 0..rows {
-            for x in 0..columns {
-                facet(
-                    [
-                        point(x, y),
-                        point(x + 1, y),
-                        point(x + 1, y + 1),
-                        point(x, y + 1),
-                    ],
-                    [0.0, 0.0, 1.0],
-                );
-            }
-        }
-        let _metal = painter.add(Shape::mesh(metal));
-        let _silhouette = painter.rect_stroke(
-            base,
-            0.0,
-            Stroke::new(0.7_f32, bronze(0.10)),
-            egui::StrokeKind::Inside,
+            PLAQUE_RISE,
+            PLAQUE_BEVEL_RUN,
         );
         plaque_engraving(
             painter,
@@ -411,6 +349,139 @@ impl Plaque {
             PLAQUE_ETCH_DEPTH,
         );
     }
+}
+
+/// Raise a variable rectangular face from the common work-darkened sheet.
+///
+/// The returned rectangle is the projected crown. `face_size`, `rise`, and
+/// `bevel_run` remain physical foundry dimensions; every facet is illuminated
+/// from its actual three-dimensional normal.
+pub(crate) fn raised_sheet(
+    painter: &egui::Painter,
+    center: Pos2,
+    face_size: Vec2,
+    rise: f32,
+    bevel_run: f32,
+) -> Rect {
+    raised_sheet_with_reflection_contrast(painter, center, face_size, rise, bevel_run, 1.0)
+}
+
+/// Raise a variable-length scroll nut whose reflection remains legible at
+/// every content ratio.
+///
+/// The nut's geometry and finite-eye sampling remain literal. Only reflection
+/// contrast is pulled toward one stock gauge, preventing long nuts from
+/// becoming a glare study and short nuts from collapsing to a flat swatch.
+pub(crate) fn raised_scroll_nut(
+    painter: &egui::Painter,
+    center: Pos2,
+    face_size: Vec2,
+    rise: f32,
+    bevel_run: f32,
+) -> Rect {
+    const REFLECTION_EQUIPOISE: f32 = 144.0;
+    const REFLECTION_CONTRAST_MIN: f32 = 0.70;
+    const REFLECTION_CONTRAST_MAX: f32 = 1.20;
+    let reflection_contrast = (REFLECTION_EQUIPOISE / face_size.y)
+        .sqrt()
+        .clamp(REFLECTION_CONTRAST_MIN, REFLECTION_CONTRAST_MAX);
+    raised_sheet_with_reflection_contrast(
+        painter,
+        center,
+        face_size,
+        rise,
+        bevel_run,
+        reflection_contrast,
+    )
+}
+
+fn raised_sheet_with_reflection_contrast(
+    painter: &egui::Painter,
+    center: Pos2,
+    face_size: Vec2,
+    rise: f32,
+    bevel_run: f32,
+    reflection_contrast: f32,
+) -> Rect {
+    assert!(
+        face_size.min_elem() > 0.0 && rise > 0.0 && bevel_run > 0.0,
+        "raised sheet dimensions must be positive"
+    );
+    assert!(
+        reflection_contrast > 0.0,
+        "reflection contrast must be positive"
+    );
+    let base_size = face_size + Vec2::splat(2.0 * bevel_run);
+    let base = Rect::from_center_size(center, base_size);
+    let crown = Rect::from_center_size(center, face_size * perspective_scale(rise));
+    let shadow = Rect::from_center_size(
+        center + Vec2::new(0.0, -LIGHT_Y / LIGHT_Z * rise),
+        face_size,
+    );
+    let _shadow = painter.rect_filled(shadow, 0.0, Color32::from_black_alpha(64));
+
+    let [btl, btr, bbr, bbl] = [
+        [-base_size.x * 0.5, -base_size.y * 0.5, 0.0],
+        [base_size.x * 0.5, -base_size.y * 0.5, 0.0],
+        [base_size.x * 0.5, base_size.y * 0.5, 0.0],
+        [-base_size.x * 0.5, base_size.y * 0.5, 0.0],
+    ];
+    let [ctl, ctr, cbr, cbl] = [
+        [-face_size.x * 0.5, -face_size.y * 0.5, rise],
+        [face_size.x * 0.5, -face_size.y * 0.5, rise],
+        [face_size.x * 0.5, face_size.y * 0.5, rise],
+        [-face_size.x * 0.5, face_size.y * 0.5, rise],
+    ];
+    let columns = (face_size.x / DARK_REFLECTION_CELL).ceil() as usize;
+    let rows = (face_size.y / DARK_REFLECTION_CELL).ceil() as usize;
+    let mut metal = Mesh::default();
+    metal.vertices.reserve(16 + 4 * columns * rows);
+    metal.indices.reserve(24 + 6 * columns * rows);
+    let mut facet = |corners: [[f32; 3]; 4], normal| {
+        let base = metal.vertices.len() as u32;
+        for corner in corners {
+            let anchor = [corner[0], 0.0, corner[2]];
+            let anchor_tone = darkened_metal_tone(anchor, normal);
+            let reflected_tone = darkened_metal_tone(corner, normal);
+            let tone = anchor_tone + reflection_contrast * (reflected_tone - anchor_tone);
+            let [r, g, b] = darkened_bronze_rgb(tone);
+            metal.colored_vertex(center + project(corner), Color32::from_rgb(r, g, b));
+        }
+        metal.add_triangle(base, base + 1, base + 2);
+        metal.add_triangle(base, base + 2, base + 3);
+    };
+    facet([btl, btr, ctr, ctl], [0.0, -rise, bevel_run]);
+    facet([btr, bbr, cbr, ctr], [rise, 0.0, bevel_run]);
+    facet([bbr, bbl, cbl, cbr], [0.0, rise, bevel_run]);
+    facet([bbl, btl, ctl, cbl], [-rise, 0.0, bevel_run]);
+    let point = |x: usize, y: usize| {
+        [
+            -face_size.x * 0.5 + face_size.x * x as f32 / columns as f32,
+            -face_size.y * 0.5 + face_size.y * y as f32 / rows as f32,
+            rise,
+        ]
+    };
+    for y in 0..rows {
+        for x in 0..columns {
+            facet(
+                [
+                    point(x, y),
+                    point(x + 1, y),
+                    point(x + 1, y + 1),
+                    point(x, y + 1),
+                ],
+                [0.0, 0.0, 1.0],
+            );
+        }
+    }
+    let _metal = painter.add(Shape::mesh(metal));
+    let _silhouette = painter.rect_stroke(
+        base,
+        0.0,
+        Stroke::new(0.7_f32, bronze(0.10)),
+        egui::StrokeKind::Inside,
+    );
+    crown
 }
 
 /// A variable-span sheet cut from work-darkened bronze.

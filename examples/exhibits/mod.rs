@@ -2,11 +2,64 @@ use brass_poolrooms::{
     chrome::{
         self, Checkbox, CornerClose, Coupled, CouplingGap, DateReels, DateSpool, DragHandle,
         ForgePin, GregorianDay, Keycap, LabelSide, MechanismSize, MnemonicText, Monoglyph,
-        MonoglyphFinish, NumberInput, Rail, Section, SortDetent, SortToggle, Symbol, WheelPlane,
+        MonoglyphFinish, NumberInput, Rail, ScrewScroll, Section, SortDetent, SortToggle, Symbol,
+        WheelPlane,
     },
     egui,
     water::Surface,
 };
+
+#[derive(Default)]
+pub struct Scrolls;
+
+impl Scrolls {
+    pub fn show(&mut self, ui: &mut egui::Ui) {
+        let _title = ui.label(chrome::title("LEAD-SCREW SCROLL TRANSPORT"));
+        let _law = ui.label(chrome::muted(
+            "30° helix · captive bronze nut · six-cove welded handwheels · fixed gauge",
+        ));
+        ui.add_space(16.0);
+
+        let _pair = ui.horizontal_top(|ui| {
+            scroll_column(ui, "short-ledger", "SHORT LEDGER · FAST SHAFT", 14);
+            ui.add_space(20.0);
+            scroll_column(ui, "long-ledger", "LONG LEDGER · SLOW SHAFT", 140);
+        });
+    }
+}
+
+fn scroll_column(ui: &mut egui::Ui, id: &'static str, caption: &'static str, rows: usize) {
+    let _column = ui.vertical(|ui| {
+        ui.set_width(350.0);
+        let _caption = ui.label(chrome::eyebrow(caption));
+        ui.add_space(5.0);
+        let _scroll = ScrewScroll::vertical()
+            .id_salt(id)
+            .max_width(350.0)
+            .max_height(230.0)
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                ui.set_min_width(326.0);
+                for row in 1..=rows {
+                    let _entry = egui::Frame::new()
+                        .fill(if row % 2 == 0 {
+                            chrome::SURFACE
+                        } else {
+                            chrome::CONTROL
+                        })
+                        .stroke(egui::Stroke::new(1.0_f32, chrome::EDGE))
+                        .inner_margin(egui::Margin::symmetric(8, 5))
+                        .show(ui, |ui| {
+                            ui.set_min_width(308.0);
+                            let _label = ui.label(chrome::muted(format!(
+                                "LEDGER PLATE {row:03} · BRONZE STOCK"
+                            )));
+                        });
+                    ui.add_space(3.0);
+                }
+            });
+    });
+}
 
 pub struct Closures {
     open: [bool; 3],
