@@ -17,7 +17,7 @@ eded0433b67f2c85990e331dffdf13d167eef4ee1e2004bc447907d2945d150f  src/chrome/mon
 736c5f87533dfb631e9c69e788894fad3dad411c9dfbd6cef59e9a1daf2236f0  tools/web-floor-forge/Cargo.lock
 0198fa2d27a3c6af8bca84a9f4f54275564745e3e2004dde64e502de00cbbf1f  tools/web-floor-forge/src/main.rs
 28a5a69ef9e8daf6a20a9c8ff8fcf37aca34ab9d3361fabf427ebe91fd6c8c3e  tools/web-chrome-forge/Cargo.toml
-6798b6c940dd517d04e3de898702effaf205c5bbff0e9c6f3fba61eca3621f89  tools/web-chrome-forge/Cargo.lock
+4feca5bd56fd30dc0c326e58e9aabcc39305824244baf1c3b5c48544fdf41f85  tools/web-chrome-forge/Cargo.lock
 9cff820bfb4e823d0addca1f01d8f85d1f8e29540725d8bb28339c4ab369685f  tools/web-chrome-forge/src/main.rs
 32e79d1d57956b911291ac24db7829658f28a44ef73e53ea9bde05e31d4c605f  tools/web-platform-die-forge/main.rs
 cebfed8dfa4fc35ac4a2cf49102639acbea46564542874a97a0b4bffd456967f  tools/web-platform-die-forge/dies.rs
