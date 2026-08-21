@@ -60,6 +60,7 @@ git tag -v "v$version" >/dev/null 2>&1 || die "v$version is not a valid signed t
 
 ./check.py verify
 scripts/audit
+cargo check --locked --manifest-path tools/web-chrome-forge/Cargo.toml
 cargo package --locked --package brass_foundry
 if [ "$mode" = publish ]; then
     publish_once brass_foundry "$version"
