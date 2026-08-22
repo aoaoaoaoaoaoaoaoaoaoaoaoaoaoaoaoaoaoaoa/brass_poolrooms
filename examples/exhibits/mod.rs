@@ -252,8 +252,19 @@ impl Pins {
     }
 }
 
-#[derive(Default)]
-pub struct Symbols;
+pub struct Symbols {
+    latches: [bool; 3],
+    finish_latches: [bool; MonoglyphFinish::ALL.len()],
+}
+
+impl Default for Symbols {
+    fn default() -> Self {
+        Self {
+            latches: [false, true, false],
+            finish_latches: [true; MonoglyphFinish::ALL.len()],
+        }
+    }
+}
 
 impl Symbols {
     pub fn show(&mut self, ui: &mut egui::Ui, water: &mut Surface) {
@@ -264,25 +275,49 @@ impl Symbols {
         ui.add_space(16.0);
 
         for size in MechanismSize::ALL {
-            let _gauge = ui.horizontal(|ui| {
-                ui.set_min_height(size.side());
-                let name = match size {
-                    MechanismSize::Small => "SMALL",
-                    MechanismSize::Medium => "MEDIUM",
-                    MechanismSize::Large => "LARGE",
-                };
-                let _name =
-                    ui.add_sized([74.0, size.side()], egui::Label::new(chrome::eyebrow(name)));
-                for symbol in Symbol::ALL {
-                    let button = Monoglyph::symbol(symbol)
-                        .size(size)
-                        .show(ui)
-                        .on_hover_text(symbol.name());
-                    water.monoglyph(&button);
-                }
-            });
+            let name = match size {
+                MechanismSize::Small => "SMALL",
+                MechanismSize::Medium => "MEDIUM",
+                MechanismSize::Large => "LARGE",
+            };
+            for (band, symbols) in Symbol::ALL.chunks(9).enumerate() {
+                let _gauge = ui.horizontal(|ui| {
+                    ui.set_min_height(size.side());
+                    let _name = ui.add_sized(
+                        [74.0, size.side()],
+                        egui::Label::new(chrome::eyebrow(if band == 0 { name } else { "" })),
+                    );
+                    for &symbol in symbols {
+                        let button = Monoglyph::symbol(symbol)
+                            .size(size)
+                            .show(ui)
+                            .on_hover_text(symbol.name());
+                        water.monoglyph(&button);
+                    }
+                });
+            }
             ui.add_space(8.0);
         }
+
+        ui.add_space(8.0);
+        let _latches = ui.horizontal(|ui| {
+            let _name = ui.add_sized(
+                [74.0, MechanismSize::Large.side()],
+                egui::Label::new(chrome::eyebrow("LATCH")),
+            );
+            for (index, size) in MechanismSize::ALL.into_iter().enumerate() {
+                let button = Monoglyph::symbol(Symbol::Visibility)
+                    .size(size)
+                    .show_latched(ui, &mut self.latches[index])
+                    .on_hover_text(match size {
+                        MechanismSize::Small => "SMALL LATCH",
+                        MechanismSize::Medium => "MEDIUM LATCH",
+                        MechanismSize::Large => "LARGE LATCH",
+                    });
+                water.monoglyph(&button);
+                ui.add_space(8.0);
+            }
+        });
 
         ui.add_space(8.0);
         let _finishes = ui.horizontal(|ui| {
@@ -290,13 +325,19 @@ impl Symbols {
                 [74.0, MechanismSize::Medium.side()],
                 egui::Label::new(chrome::eyebrow("FINISH")),
             );
-            for finish in MonoglyphFinish::ALL {
-                let button = Monoglyph::symbol(Symbol::Delete)
+            for (index, finish) in MonoglyphFinish::ALL.into_iter().enumerate() {
+                let raised = Monoglyph::symbol(Symbol::Delete)
                     .finish(finish)
                     .size(MechanismSize::Medium)
                     .show(ui)
-                    .on_hover_text(finish.name());
-                water.monoglyph(&button);
+                    .on_hover_text(format!("{} RAISED", finish.name()));
+                water.monoglyph(&raised);
+                let latched = Monoglyph::symbol(Symbol::Delete)
+                    .finish(finish)
+                    .size(MechanismSize::Medium)
+                    .show_latched(ui, &mut self.finish_latches[index])
+                    .on_hover_text(format!("{} LATCHED", finish.name()));
+                water.monoglyph(&latched);
                 let _finish = ui.label(chrome::eyebrow(finish.name()));
                 ui.add_space(8.0);
             }

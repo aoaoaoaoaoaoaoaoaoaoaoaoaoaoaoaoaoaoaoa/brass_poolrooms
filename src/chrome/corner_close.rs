@@ -183,6 +183,7 @@ impl CornerClose {
             response.id,
             response.has_focus(),
             atlas,
+            gauge.socket,
             gauge.poses,
             baked::POSE_MIN,
             baked::POSE_MAX,

@@ -707,8 +707,8 @@ impl Surface {
     pub fn checkbox(&mut self, checkbox: &crate::chrome::CheckboxResponse) {
         self.plunger(checkbox.wake());
     }
-    /// Couple a monoglyph button's plunge and sprung return into this water
-    /// world using the moving crown's signed swept volume.
+    /// Couple a monoglyph button's plunge, latch transition, and sprung return
+    /// into this water world using the moving crown's signed swept volume.
     pub fn monoglyph(&mut self, button: &crate::chrome::MonoglyphResponse) {
         self.plunger(button.wake());
     }

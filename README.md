@@ -39,7 +39,7 @@ composition.
 | [`Rail`] | Bounded linear transport with explicit total and admissible spans, detents, focused Left/Right/Home/End input, and hovered wheel input by default | `Surface::rail` |
 | [`DateSpool`] | One-to-three Gregorian tape reels with explicit width and a reel-derived rigid minimum | `Surface::date_spool` |
 | [`Checkbox`] | Three-gauge latching plunger with an optional side-selectable etched plaque and a state-transparent fixed-stock guard | `Surface::checkbox` |
-| [`Monoglyph`] | Three-gauge momentary square plunger carrying one engraved scalar; [`Symbol`] supplies semantic marks and their default [`MonoglyphFinish`] | `Surface::monoglyph` |
+| [`Monoglyph`] | Three-gauge momentary or boolean-latching square plunger carrying one engraved scalar; [`Symbol`] supplies semantic marks and their default [`MonoglyphFinish`] | `Surface::monoglyph` |
 | [`CornerClose`] | Three-gauge momentary close plunger centered on a pane corner, with a build-time modelled and self-shadowed X trench | `Surface::corner_close` |
 | [`DragHandle`] | Rigid half-width friction pad, rigid square bail, or sprung folding bail on a riveted crosshatched plate | `Surface::drag_handle` |
 | [`ForgePin`] | Three-gauge coordinate pin with one coherent shaft, bulb, grip region, medium/large inscription API, and native large-pin cursor | application-defined |
@@ -62,6 +62,10 @@ application logic owns panel selection and traversal. [`MnemonicText`] marks
 one permanent Alt glyph. [`Monoglyph::show_in`] embeds an inert resting
 monoglyph inside a button; [`Keycap`] renders standalone chord plates and
 compact multi-key accelerator wells.
+`Monoglyph::show_latched` binds any raw or armory glyph to a boolean latch while
+retaining the same foundry body and water coupling as its momentary form. The
+true state seats at the deeper, darker latch register; pointer pressure retains
+a further overtravel stop.
 `chrome::exact_activation` refines button-like egui responses to pointer,
 accessibility, or fresh unmodified Enter/Space activation and leaves modified
 chords for their exact owner. Disabled controls and controls behind a modal
@@ -86,8 +90,9 @@ blood-ochre `MonoglyphFinish::Danger`; `.finish(...)` may override that lookup
 without re-authoring the glyph. `Symbol::Heart` likewise selects the rough
 deep-pink `MonoglyphFinish::Love`. A product-specific mark may still use
 `Monoglyph::new(char)` and defaults to `BrightCut`. Common add, remove, delete,
-duplicate, rename, confirm, disclosure, restore, help, heart, and
-increment/decrement marks must not be re-authored at application call sites.
+duplicate, rename, confirm, undo, redo, disclosure, export, visibility,
+restore, help, heart, and increment/decrement marks must not be re-authored at
+application call sites.
 [`Coupled::horizontal`] places any two coupling-capable foundry responses at the
 canonical six-point gap and runs the standard twin bronze ties behind both
 casings. [`Coupled::horizontal_with_gap`] accepts a [`CouplingGap`] when dense

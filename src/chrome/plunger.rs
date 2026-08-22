@@ -31,6 +31,7 @@ pub(super) struct BakedGauge {
     pub(super) socket_half: f32,
     pub(super) top_half: f32,
     pub(super) body_half: f32,
+    pub(super) socket: BakedMesh,
     pub(super) poses: &'static [BakedPose],
 }
 
@@ -126,6 +127,41 @@ pub(super) fn momentary_motion(
     )
 }
 
+/// Drive the shared stiff-spring law between two stable latches and one
+/// pointer-pressure overtravel stop.
+pub(super) fn latching_motion(
+    ui: &egui::Ui,
+    response: &egui::Response,
+    enabled: bool,
+    activated: bool,
+    latched: bool,
+    raised: f32,
+    seated: f32,
+    press: f32,
+    strike: f32,
+    law: SpringLaw,
+) -> Motion {
+    let target = if enabled && response.is_pointer_button_down_on() {
+        press
+    } else if latched {
+        seated
+    } else {
+        raised
+    };
+    let dt = ui
+        .input(|input| input.stable_dt)
+        .clamp(1.0 / 240.0, 1.0 / 30.0);
+    motion(
+        ui,
+        response.id,
+        if latched { seated } else { raised },
+        target,
+        activated.then_some(strike),
+        dt,
+        law,
+    )
+}
+
 fn synthetic_pressure(ui: &egui::Ui, id: egui::Id, fire: bool, dt: f32) -> bool {
     let held = ui.ctx().data_mut(|data| {
         let key = id.with("synthetic-pressure");
@@ -212,6 +248,7 @@ struct InstalledPose {
 struct PoseCache {
     origin: Option<Pos2>,
     atlas: usize,
+    socket: Option<Arc<egui::Mesh>>,
     poses: HashMap<usize, InstalledPose>,
 }
 
@@ -221,16 +258,23 @@ impl PoseCache {
         origin: Pos2,
         atlas: usize,
         pose_index: usize,
+        socket: BakedMesh,
         poses: &'static [BakedPose],
-    ) -> InstalledPose {
+    ) -> (Arc<egui::Mesh>, InstalledPose) {
         if self.origin != Some(origin) || self.atlas != atlas {
             *self = Self {
                 origin: Some(origin),
                 atlas,
+                socket: Some(instantiate(socket, origin)),
                 ..Self::default()
             };
         }
-        self.poses
+        let socket = self
+            .socket
+            .get_or_insert_with(|| instantiate(socket, origin))
+            .clone();
+        let pose = self
+            .poses
             .entry(pose_index)
             .or_insert_with(|| {
                 let pose = poses[pose_index];
@@ -239,7 +283,8 @@ impl PoseCache {
                     shadow: instantiate(pose.shadow, origin),
                 }
             })
-            .clone()
+            .clone();
+        (socket, pose)
     }
 }
 
@@ -269,6 +314,7 @@ pub(super) fn paint_momentary(
     id: egui::Id,
     focused: bool,
     atlas: usize,
+    socket: BakedMesh,
     poses: &'static [BakedPose],
     pose_min: f32,
     pose_max: f32,
@@ -276,17 +322,17 @@ pub(super) fn paint_momentary(
 ) {
     let origin = anatomy.socket.center();
     let pose_index = pose_index(elevation, pose_min, pose_max, poses.len());
-    let rendered = ui.ctx().data_mut(|data| {
+    let (socket, rendered) = ui.ctx().data_mut(|data| {
         data.get_temp_mut_or_default::<PoseCache>(id.with("compiled-foundry"))
-            .prepare(origin, atlas, pose_index, poses)
+            .prepare(origin, atlas, pose_index, socket, poses)
     });
 
-    foundry::socket_bed(painter, anatomy.socket);
+    foundry::socket_void(painter, anatomy.socket);
     foundry::paint_compiled(painter, anatomy.socket.shrink(1.0), &rendered.shadow);
     let aperture = anatomy.socket.shrink(foundry::RIM_WIDTH);
     foundry::paint_compiled(painter, aperture, &rendered.button);
     paint_crown(painter, aperture, origin);
-    foundry::socket_rim(painter, anatomy.socket);
+    foundry::paint_compiled(painter, anatomy.socket, &socket);
 
     if focused {
         let _focus = painter.rect_stroke(

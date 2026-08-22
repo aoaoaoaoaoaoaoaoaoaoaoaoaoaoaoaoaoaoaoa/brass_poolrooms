@@ -16,7 +16,10 @@
 - **Lead screw**: a threaded shaft whose fixed lead converts rotation into the
   axial travel of a captive nut. A screw scroll uses that nut as its visible
   scroll-position indicator.
-- **Monoglyph finish**: the cutter and floor treatment of a monoglyph's mark:
-  bright cut, void, danger, or love.
+- **Latch**: one of a plunger's stable resting elevations. A boolean latching
+  monoglyph uses the raised rest for false and the seated rest for true while
+  retaining a deeper pointer-pressure overtravel stop.
+- **Monoglyph finish**: the cutter, floor, and tabulated depth-dependent
+  exposure of a monoglyph's mark: bright cut, void, danger, or love.
 - **Radiator**: a held local source that emits periodic waves into the water
   without displacing visible hardware.

@@ -11,12 +11,12 @@ use egui::{Color32, Galley, Mesh, Pos2, Rect, Shape, Stroke, Vec2, epaint::Verte
 use super::mechanism::CouplingPort;
 pub(super) mod law;
 
+pub(crate) use law::RIM_WIDTH;
 use law::*;
 
 pub(crate) const ABYSS: Color32 = Color32::from_rgb(3, 3, 4);
 pub(crate) const CONTROL_STOCK_DIAMETER: f32 = 14.0;
 pub(crate) const RIM_RADIUS: f32 = 1.0;
-pub(crate) const RIM_WIDTH: f32 = 1.0;
 
 const STAMP_GAUGE: f32 = 1.0;
 const PLAQUE_RISE: f32 = 2.0;
@@ -133,18 +133,19 @@ pub(crate) fn bright_cut_etch(
     galley: Arc<Galley>,
     surface_z: f32,
     depth: f32,
+    exposure: f32,
 ) {
     let incision = painter.with_clip_rect(clip);
     let light_fall = depth * (-LIGHT_Y / LIGHT_Z) * perspective_scale(surface_z);
     incision.galley_with_override_text_color(
         pos - Vec2::new(0.0, light_fall * 0.20),
         galley.clone(),
-        bronze(0.07),
+        bronze(0.07).gamma_multiply(exposure),
     );
     incision.galley_with_override_text_color(
         pos + Vec2::new(0.0, light_fall),
         galley,
-        fresh_cut_bronze(-FRAC_1_SQRT_2, FRAC_1_SQRT_2),
+        fresh_cut_bronze(-FRAC_1_SQRT_2, FRAC_1_SQRT_2).gamma_multiply(exposure),
     );
 }
 
@@ -162,6 +163,7 @@ pub(crate) fn flat_cut_etch(
     surface_z: f32,
     depth: f32,
     floor: EngravingFloor,
+    exposure: f32,
 ) {
     let incision = painter.with_clip_rect(clip);
     let wall_run = FLAT_CUT_BEVEL_RUN * perspective_scale(surface_z);
@@ -169,29 +171,32 @@ pub(crate) fn flat_cut_etch(
     incision.galley_with_override_text_color(
         pos - Vec2::new(0.0, wall_run * 0.18),
         galley.clone(),
-        bronze(0.04),
+        bronze(0.04).gamma_multiply(exposure),
     );
     incision.galley_with_override_text_color(
         pos + Vec2::new(0.0, wall_run),
         galley.clone(),
-        fresh_cut_bronze(-depth / normalizer, FLAT_CUT_BEVEL_RUN / normalizer),
+        fresh_cut_bronze(-depth / normalizer, FLAT_CUT_BEVEL_RUN / normalizer)
+            .gamma_multiply(exposure),
     );
     match floor {
         EngravingFloor::Void => {
             incision.galley_with_override_text_color(pos, galley, Color32::BLACK);
         }
         EngravingFloor::Danger(seed) => {
+            let paint = DANGER_PAINT.gamma_multiply(exposure);
             let _floor = incision.add(Shape::galley(
                 pos,
-                painted_galley(galley, DANGER_PAINT, seed),
-                rough_paint(DANGER_PAINT, seed, 0, 0),
+                painted_galley(galley, paint, seed),
+                rough_paint(paint, seed, 0, 0),
             ));
         }
         EngravingFloor::Love(seed) => {
+            let paint = LOVE_PAINT.gamma_multiply(exposure);
             let _floor = incision.add(Shape::galley(
                 pos,
-                painted_galley(galley, LOVE_PAINT, seed),
-                rough_paint(LOVE_PAINT, seed, 0, 0),
+                painted_galley(galley, paint, seed),
+                rough_paint(paint, seed, 0, 0),
             ));
         }
     }
@@ -648,6 +653,11 @@ pub(crate) fn socket_bed(painter: &egui::Painter, rect: Rect) {
         [rect.left_bottom(), rect.right_bottom()],
         Stroke::new(RIM_WIDTH, bronze(0.26)),
     );
+}
+
+/// Paint only the lightless receiver beneath a foundry-forged socket casing.
+pub(crate) fn socket_void(painter: &egui::Painter, rect: Rect) {
+    let _void = painter.rect_filled(rect, RIM_RADIUS, ABYSS);
 }
 
 pub(crate) fn socket_rim(painter: &egui::Painter, rect: Rect) {

@@ -29,12 +29,19 @@ pub enum Symbol {
     Duplicate,
     /// Expand a closed disclosure.
     Expand,
+    /// Export the targeted durable object.
+    ///
+    /// Its heavy northeast stroke remains legible at every mechanism gauge and
+    /// conveys outward motion without borrowing upload's source bar.
+    Export,
     /// Open contextual help and keyboard guidance.
     Help,
     /// Mark an item with the canonical heart.
     Heart,
     /// Increase a scalar by one application-defined quantum.
     Increment,
+    /// Reapply the next command-history entry withdrawn by an undo.
+    Redo,
     /// Remove, clear, or dismiss the targeted member.
     ///
     /// Its heavy multiplication cut is centered and D₄-symmetric: every arm
@@ -46,19 +53,27 @@ pub enum Symbol {
     Restore,
     /// Open application settings.
     Settings,
+    /// Withdraw the most recent command-history entry.
+    Undo,
+    /// Expose or conceal the targeted object in the current presentation.
+    Visibility,
 }
 
 impl Symbol {
     /// Complete armory in stable presentation order.
-    pub const ALL: [Self; 14] = [
+    pub const ALL: [Self; 18] = [
         Self::Add,
         Self::Remove,
         Self::Delete,
         Self::Duplicate,
         Self::Rename,
         Self::Confirm,
+        Self::Undo,
+        Self::Redo,
         Self::Expand,
         Self::Collapse,
+        Self::Export,
+        Self::Visibility,
         Self::Help,
         Self::Heart,
         Self::Restore,
@@ -77,12 +92,16 @@ impl Symbol {
             Self::Delete => '🗑',
             Self::Duplicate => '⧉',
             Self::Expand => '▸',
+            Self::Export => '➚',
             Self::Help => '?',
             Self::Heart => '♥',
             Self::Remove => '✖',
+            Self::Redo => '↷',
             Self::Rename => '✎',
             Self::Restore => '↺',
             Self::Settings => '⚙',
+            Self::Undo => '↶',
+            Self::Visibility => '👁',
         }
     }
 
@@ -101,12 +120,16 @@ impl Symbol {
             | Self::Decrement
             | Self::Duplicate
             | Self::Expand
+            | Self::Export
             | Self::Help
             | Self::Increment
+            | Self::Redo
             | Self::Remove
             | Self::Rename
             | Self::Restore
-            | Self::Settings => MonoglyphFinish::BrightCut,
+            | Self::Settings
+            | Self::Undo
+            | Self::Visibility => MonoglyphFinish::BrightCut,
         }
     }
 
@@ -120,13 +143,17 @@ impl Symbol {
             Self::Delete => "DELETE",
             Self::Duplicate => "DUPLICATE",
             Self::Expand => "EXPAND",
+            Self::Export => "EXPORT",
             Self::Help => "HELP",
             Self::Heart => "HEART",
             Self::Increment => "INCREMENT",
+            Self::Redo => "REDO",
             Self::Remove => "REMOVE",
             Self::Rename => "RENAME",
             Self::Restore => "RESTORE",
             Self::Settings => "SETTINGS",
+            Self::Undo => "UNDO",
+            Self::Visibility => "VISIBILITY",
         }
     }
 }

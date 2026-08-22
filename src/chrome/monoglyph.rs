@@ -1,4 +1,5 @@
-//! A momentary square plunger whose one engraved glyph is its entire label.
+//! A square plunger whose one engraved glyph is its entire label. It may return
+//! after activation or remain at a lower boolean latch.
 //! Crown, bevel, skirt, projection, illumination, and directional shadow are
 //! compiled from a three-dimensional foundry model; runtime selects a pose and
 //! integrates the stiff return spring.
@@ -67,9 +68,19 @@ impl MonoglyphFinish {
             Self::Void | Self::Danger | Self::Love => FLAT_CUT_DEPTH,
         }
     }
+
+    fn exposure(self, elevation: f32) -> f32 {
+        let shade = foundry::law::monoglyph_shade(elevation);
+        match self {
+            Self::BrightCut => shade.bright_cut,
+            Self::Void => shade.void,
+            Self::Danger => shade.danger,
+            Self::Love => shade.love,
+        }
+    }
 }
 
-/// A square, momentary Poolrooms button carrying exactly one engraved glyph.
+/// A square Poolrooms button carrying exactly one engraved glyph.
 ///
 /// The `char` constructor makes the one-glyph boundary structural: text labels
 /// and rectangular actions cannot accidentally enter this mechanism.
@@ -78,6 +89,9 @@ impl MonoglyphFinish {
 /// applications. Pointer pressure plunges the flat crown into its black
 /// socket; release excites a stiff underdamped spring that makes one small
 /// return bounce.
+/// [`Monoglyph::show_latched`] binds the same mechanism to a boolean state: the
+/// selected state rests at a lower latch while pointer pressure retains a
+/// deeper overtravel stroke.
 /// [`Monoglyph::size`] selects one of the exact gauges admitted by
 /// [`MechanismSize`].
 ///
@@ -161,6 +175,20 @@ impl Monoglyph {
     /// `water::Surface::monoglyph` during the same UI pass to couple the plunge
     /// and return stroke into the active water world.
     pub fn show(self, ui: &mut egui::Ui) -> MonoglyphResponse {
+        self.show_with_latch(ui, None)
+    }
+
+    /// Lay out and actuate the mechanism as a two-state latching button.
+    ///
+    /// Activation mutates `latched` immediately, marks the ordinary egui
+    /// response as changed, and reports checkbox accessibility semantics. The
+    /// selected crown remains visibly seated until a later activation releases
+    /// it. Water coupling is identical to [`Monoglyph::show`].
+    pub fn show_latched(self, ui: &mut egui::Ui, latched: &mut bool) -> MonoglyphResponse {
+        self.show_with_latch(ui, Some(latched))
+    }
+
+    fn show_with_latch(self, ui: &mut egui::Ui, latch: Option<&mut bool>) -> MonoglyphResponse {
         let (atlas, gauge) = self.gauge();
         let sense = if self.focusable {
             Sense::click()
@@ -172,25 +200,43 @@ impl Monoglyph {
         if enabled {
             response = response.on_hover_cursor(CursorIcon::PointingHand);
         }
-        response.widget_info(|| {
-            WidgetInfo::labeled(
-                WidgetType::Button,
-                enabled,
-                self.symbol
-                    .map_or_else(|| self.glyph.to_string(), |symbol| symbol.name().to_owned()),
-            )
-        });
         let activated = super::exact_activation(ui, &response);
-
-        let motion = plunger::momentary_motion(
-            ui,
-            &response,
-            enabled,
-            activated,
-            baked::REST,
-            baked::PRESS,
-            SPRING_LAW,
-        );
+        let label = self
+            .symbol
+            .map_or_else(|| self.glyph.to_string(), |symbol| symbol.name().to_owned());
+        let motion = if let Some(latched) = latch {
+            if activated {
+                *latched = !*latched;
+                response.mark_changed();
+            }
+            response.widget_info(|| {
+                WidgetInfo::selected(WidgetType::Checkbox, enabled, *latched, label.clone())
+            });
+            plunger::latching_motion(
+                ui,
+                &response,
+                enabled,
+                activated,
+                *latched,
+                baked::REST,
+                baked::LATCH,
+                baked::PRESS,
+                -42.0 * self.size.side() / MechanismSize::Large.side(),
+                SPRING_LAW,
+            )
+        } else {
+            response
+                .widget_info(|| WidgetInfo::labeled(WidgetType::Button, enabled, label.clone()));
+            plunger::momentary_motion(
+                ui,
+                &response,
+                enabled,
+                activated,
+                baked::REST,
+                baked::PRESS,
+                SPRING_LAW,
+            )
+        };
         let anatomy = plunger::MomentaryAnatomy::new(
             rect,
             self.size.side(),
@@ -209,6 +255,7 @@ impl Monoglyph {
             response.id,
             response.has_focus(),
             atlas,
+            gauge.socket,
             gauge.poses,
             baked::POSE_MIN,
             baked::POSE_MAX,
@@ -270,6 +317,7 @@ impl Monoglyph {
                 id,
                 false,
                 atlas,
+                gauge.socket,
                 gauge.poses,
                 baked::POSE_MIN,
                 baked::POSE_MAX,
@@ -368,13 +416,14 @@ fn etch(
     top_half: f32,
 ) {
     let depth = finish.depth();
+    let exposure = finish.exposure(elevation);
     let floor_scale = foundry::perspective_scale(elevation - depth);
     let font = FontId::monospace(top_half * 2.0 * ETCH_EM_PER_CROWN * floor_scale);
     let galley = painter.layout_no_wrap(glyph.to_string(), font, egui::Color32::PLACEHOLDER);
-    let pos = origin - galley.size() * 0.5;
+    let pos = origin - galley.mesh_bounds.center().to_vec2();
     match finish {
         MonoglyphFinish::BrightCut => {
-            foundry::bright_cut_etch(painter, clip, pos, galley, elevation, depth);
+            foundry::bright_cut_etch(painter, clip, pos, galley, elevation, depth, exposure);
         }
         MonoglyphFinish::Void => {
             foundry::flat_cut_etch(
@@ -385,6 +434,7 @@ fn etch(
                 elevation,
                 depth,
                 foundry::EngravingFloor::Void,
+                exposure,
             );
         }
         MonoglyphFinish::Danger => {
@@ -396,6 +446,7 @@ fn etch(
                 elevation,
                 depth,
                 foundry::EngravingFloor::Danger(glyph as u32),
+                exposure,
             );
         }
         MonoglyphFinish::Love => {
@@ -407,6 +458,7 @@ fn etch(
                 elevation,
                 depth,
                 foundry::EngravingFloor::Love(glyph as u32),
+                exposure,
             );
         }
     }

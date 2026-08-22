@@ -200,30 +200,17 @@ impl<'a> Checkbox<'a> {
             plaque.as_ref().map(foundry::Plaque::size),
             gauge,
         );
-        let held = enabled && response.is_pointer_button_down_on();
-        let target = if held {
-            gauge.pose_min
-        } else if *checked {
-            gauge.latch_down
-        } else {
-            gauge.latch_up
-        };
-        let dt = ui
-            .input(|input| input.stable_dt)
-            .clamp(1.0 / 240.0, 1.0 / 30.0);
-        let seed = if *checked {
-            gauge.latch_down
-        } else {
-            gauge.latch_up
-        };
         let scale = f32::from(gauge.side) / MechanismSize::Large.side();
-        let motion = plunger::motion(
+        let motion = plunger::latching_motion(
             ui,
-            response.id,
-            seed,
-            target,
-            activated.then_some(-32.0 * scale),
-            dt,
+            &response,
+            enabled,
+            activated,
+            *checked,
+            gauge.latch_up,
+            gauge.latch_down,
+            gauge.pose_min,
+            -32.0 * scale,
             spring_law(gauge),
         );
         let mut painter = ui.painter().clone();

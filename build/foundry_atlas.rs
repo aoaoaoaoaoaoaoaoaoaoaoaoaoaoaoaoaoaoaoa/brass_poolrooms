@@ -19,8 +19,8 @@ use crate::foundry_law::{
     DARK_AMBIENT, DARK_BROAD_SHINE, DARK_BROAD_WEIGHT, DARK_DIFFUSE_WEIGHT, DARK_EXPOSURE,
     DARK_GLINT_SHINE, DARK_GLINT_WEIGHT, DARK_REFLECTION_CELL, DARK_TONE_CEILING, EYE_Z, HALF_Y,
     HALF_Z, LIGHT_Y, LIGHT_Z, MECHANISM_SIDE_LARGE, MECHANISM_SIDE_MEDIUM, MECHANISM_SIDE_SMALL,
-    MECHANISM_SIDES, MomentaryGauge, bronze_rgb, material_terms, momentary_gauge,
-    polished_metal_tone,
+    MECHANISM_SIDES, MONOGLYPH_LATCH, MONOGLYPH_PRESS, MONOGLYPH_REST, MomentaryGauge, RIM_WIDTH,
+    bronze_rgb, material_terms, momentary_gauge, monoglyph_shade, polished_metal_tone,
 };
 
 const POSE_COUNT: usize = 32;
@@ -41,8 +41,6 @@ const BODY_ROOT: f32 = POSE_MIN - BEVEL_DEPTH - 2.4;
 
 const MONOGLYPH_POSE_COUNT: usize = 32;
 const MONOGLYPH_BEVEL_DEPTH: f32 = 0.95;
-const MONOGLYPH_REST: f32 = 3.25;
-const MONOGLYPH_PRESS: f32 = -7.15;
 const MONOGLYPH_POSE_MIN: f32 = -7.55;
 const MONOGLYPH_POSE_MAX: f32 = 4.30;
 const MONOGLYPH_BODY_ROOT: f32 = -11.0;
@@ -60,7 +58,8 @@ const CLOSE_FLOOR_REACH: f32 = 6.55;
 const CLOSE_MOUTH_REACH: f32 = 7.30;
 const _: () = {
     assert!(MONOGLYPH_POSE_MIN < MONOGLYPH_PRESS);
-    assert!(MONOGLYPH_PRESS < MONOGLYPH_REST);
+    assert!(MONOGLYPH_PRESS < MONOGLYPH_LATCH);
+    assert!(MONOGLYPH_LATCH < MONOGLYPH_REST);
     assert!(MONOGLYPH_REST < MONOGLYPH_POSE_MAX);
     assert!(MONOGLYPH_BODY_ROOT < MONOGLYPH_POSE_MIN - MONOGLYPH_BEVEL_DEPTH);
 };
@@ -547,6 +546,7 @@ fn bake_corner_close(path: &Path) -> io::Result<()> {
 
     for side in MECHANISM_SIDES {
         let gauge = close_gauge(side);
+        let socket = compile_darkened_bronze(&momentary_socket(gauge.plunger), 1.0);
         let poses = (0..MONOGLYPH_POSE_COUNT)
             .map(|index| {
                 let elevation = monoglyph_pose_elevation(index);
@@ -558,6 +558,7 @@ fn bake_corner_close(path: &Path) -> io::Result<()> {
                 )
             })
             .collect::<Vec<_>>();
+        emit_mesh(&mut out, &format!("GAUGE_{side}_SOCKET"), &socket)?;
         for (index, (_, button, shadow)) in poses.iter().enumerate() {
             emit_mesh(&mut out, &format!("GAUGE_{side}_BUTTON_{index:02}"), button)?;
             emit_mesh(&mut out, &format!("GAUGE_{side}_SHADOW_{index:02}"), shadow)?;
@@ -584,7 +585,7 @@ fn bake_corner_close(path: &Path) -> io::Result<()> {
         let gauge = close_gauge(side).plunger;
         writeln!(
             out,
-            "BakedGauge {{ side: {side}, socket_half: {}, top_half: {}, body_half: {}, poses: &GAUGE_{side}_POSES }},",
+            "BakedGauge {{ side: {side}, socket_half: {}, top_half: {}, body_half: {}, socket: GAUGE_{side}_SOCKET, poses: &GAUGE_{side}_POSES }},",
             scalar(gauge.socket_half),
             scalar(gauge.top_half),
             scalar(gauge.body_half),
@@ -600,6 +601,7 @@ fn bake_monoglyph(path: &Path) -> io::Result<()> {
         ("POSE_MIN", MONOGLYPH_POSE_MIN),
         ("POSE_MAX", MONOGLYPH_POSE_MAX),
         ("REST", MONOGLYPH_REST),
+        ("LATCH", MONOGLYPH_LATCH),
         ("PRESS", MONOGLYPH_PRESS),
     ] {
         writeln!(out, "pub(super) const {name}: f32 = {};", scalar(value))?;
@@ -613,6 +615,7 @@ fn bake_monoglyph(path: &Path) -> io::Result<()> {
 
     for side in MECHANISM_SIDES {
         let gauge = momentary_gauge(side);
+        let socket = compile_darkened_bronze(&momentary_socket(gauge), 1.0);
         let poses = (0..MONOGLYPH_POSE_COUNT)
             .map(|index| {
                 let elevation = monoglyph_pose_elevation(index);
@@ -624,6 +627,7 @@ fn bake_monoglyph(path: &Path) -> io::Result<()> {
                 )
             })
             .collect::<Vec<_>>();
+        emit_mesh(&mut out, &format!("GAUGE_{side}_SOCKET"), &socket)?;
         for (index, (_, button, shadow)) in poses.iter().enumerate() {
             emit_mesh(&mut out, &format!("GAUGE_{side}_BUTTON_{index:02}"), button)?;
             emit_mesh(&mut out, &format!("GAUGE_{side}_SHADOW_{index:02}"), shadow)?;
@@ -649,7 +653,7 @@ fn bake_monoglyph(path: &Path) -> io::Result<()> {
         let gauge = momentary_gauge(side);
         writeln!(
             out,
-            "BakedGauge {{ side: {side}, socket_half: {}, top_half: {}, body_half: {}, poses: &GAUGE_{side}_POSES }},",
+            "BakedGauge {{ side: {side}, socket_half: {}, top_half: {}, body_half: {}, socket: GAUGE_{side}_SOCKET, poses: &GAUGE_{side}_POSES }},",
             scalar(gauge.socket_half),
             scalar(gauge.top_half),
             scalar(gauge.body_half),
@@ -1432,8 +1436,8 @@ fn compile_scroll_cap(model: &Model, phase: f32, outward: f32) -> Compiled {
     })
 }
 
-fn compile_darkened_crown(model: &Model, _elevation: f32) -> Compiled {
-    compile_darkened_bronze(model, 1.0)
+fn compile_darkened_crown(model: &Model, elevation: f32) -> Compiled {
+    compile_darkened_bronze(model, monoglyph_shade(elevation).crown)
 }
 
 fn compile_close_crown(model: &Model, elevation: f32, gauge: CloseGauge) -> Compiled {
@@ -1518,6 +1522,128 @@ fn monoglyph_plunger(elevation: f32, gauge: MomentaryGauge) -> Model {
         MONOGLYPH_BODY_ROOT,
     );
     model
+}
+
+fn momentary_socket(gauge: MomentaryGauge) -> Model {
+    const RISE: f32 = 0.42;
+    const BEVEL_RUN: f32 = 0.18;
+    const FACE_WIDTH: f32 = RIM_WIDTH - 2.0 * BEVEL_RUN;
+    const _: () = assert!(FACE_WIDTH > 0.0);
+
+    let outer_floor = gauge.socket_half - 0.50;
+    let outer_crown = outer_floor - BEVEL_RUN;
+    let inner_crown = outer_crown - FACE_WIDTH;
+    let inner_floor = inner_crown - BEVEL_RUN;
+    let mut model = Model::default();
+    square_bevel(&mut model, RISE, outer_crown, outer_floor, RISE);
+    square_ring_face(&mut model, outer_crown, inner_crown, RISE);
+    square_inner_bevel(&mut model, RISE, inner_crown, inner_floor);
+    model
+}
+
+fn square_ring_face(model: &mut Model, outer: f32, inner: f32, elevation: f32) {
+    let vertex = |x, y| Vertex::new(V3::new(x, y, elevation), V3::new(0.0, 0.0, 1.0));
+    model.quad([
+        vertex(-outer, -outer),
+        vertex(outer, -outer),
+        vertex(inner, -inner),
+        vertex(-inner, -inner),
+    ]);
+    model.quad([
+        vertex(outer, -outer),
+        vertex(outer, outer),
+        vertex(inner, inner),
+        vertex(inner, -inner),
+    ]);
+    model.quad([
+        vertex(outer, outer),
+        vertex(-outer, outer),
+        vertex(-inner, inner),
+        vertex(inner, inner),
+    ]);
+    model.quad([
+        vertex(-outer, outer),
+        vertex(-outer, -outer),
+        vertex(-inner, -inner),
+        vertex(-inner, inner),
+    ]);
+}
+
+fn square_inner_bevel(model: &mut Model, elevation: f32, crown: f32, floor: f32) {
+    let vertex = |point: V3, normal: V3| Vertex::new(point, normal.normalized());
+    let depth = elevation;
+    model.quad([
+        vertex(
+            V3::new(-crown, -crown, elevation),
+            V3::new(0.0, depth, crown - floor),
+        ),
+        vertex(
+            V3::new(crown, -crown, elevation),
+            V3::new(0.0, depth, crown - floor),
+        ),
+        vertex(
+            V3::new(floor, -floor, 0.0),
+            V3::new(0.0, depth, crown - floor),
+        ),
+        vertex(
+            V3::new(-floor, -floor, 0.0),
+            V3::new(0.0, depth, crown - floor),
+        ),
+    ]);
+    model.quad([
+        vertex(
+            V3::new(crown, -crown, elevation),
+            V3::new(-depth, 0.0, crown - floor),
+        ),
+        vertex(
+            V3::new(crown, crown, elevation),
+            V3::new(-depth, 0.0, crown - floor),
+        ),
+        vertex(
+            V3::new(floor, floor, 0.0),
+            V3::new(-depth, 0.0, crown - floor),
+        ),
+        vertex(
+            V3::new(floor, -floor, 0.0),
+            V3::new(-depth, 0.0, crown - floor),
+        ),
+    ]);
+    model.quad([
+        vertex(
+            V3::new(crown, crown, elevation),
+            V3::new(0.0, -depth, crown - floor),
+        ),
+        vertex(
+            V3::new(-crown, crown, elevation),
+            V3::new(0.0, -depth, crown - floor),
+        ),
+        vertex(
+            V3::new(-floor, floor, 0.0),
+            V3::new(0.0, -depth, crown - floor),
+        ),
+        vertex(
+            V3::new(floor, floor, 0.0),
+            V3::new(0.0, -depth, crown - floor),
+        ),
+    ]);
+    model.quad([
+        vertex(
+            V3::new(-crown, crown, elevation),
+            V3::new(depth, 0.0, crown - floor),
+        ),
+        vertex(
+            V3::new(-crown, -crown, elevation),
+            V3::new(depth, 0.0, crown - floor),
+        ),
+        vertex(
+            V3::new(-floor, -floor, 0.0),
+            V3::new(depth, 0.0, crown - floor),
+        ),
+        vertex(
+            V3::new(-floor, floor, 0.0),
+            V3::new(depth, 0.0, crown - floor),
+        ),
+    ]);
 }
 
 fn corner_close_plunger(elevation: f32, gauge: CloseGauge) -> Model {
