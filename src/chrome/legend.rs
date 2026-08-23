@@ -148,7 +148,7 @@ impl Keycap {
     /// Embed this key legend at the trailing edge of a button.
     ///
     /// The compact key well remains part of the enclosing button's allocation
-    /// and interaction surface. It conveys an accelerator without turning the
+    /// and interaction surface. It conveys a shortcut without turning the
     /// command label itself into mutable shortcut notation.
     pub fn show_in(self, ui: &mut egui::Ui, button: Button<'_>) -> Response {
         let enabled = ui.is_enabled();

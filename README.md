@@ -63,7 +63,7 @@ forcibly folds the disclosure and locks out its complete header beneath a
 Lockout Grille; the mandatory reason inhabits its disabled hover explanation.
 [`MnemonicText`] marks one permanent Alt glyph. [`Monoglyph::show_in`] embeds an
 inert resting monoglyph inside a button; [`Keycap`] renders standalone chord
-plates and compact multi-key accelerator wells.
+plates and compact multi-key shortcut wells.
 `Monoglyph::show_latched` binds any raw or armory glyph to a boolean latch while
 retaining the same foundry body and water coupling as its momentary form. The
 true state seats at the deeper, darker latch register; pointer pressure retains

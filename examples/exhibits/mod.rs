@@ -414,7 +414,7 @@ impl Legends {
     pub fn show(&mut self, ui: &mut egui::Ui, water: &mut Surface) {
         let _title = ui.label(chrome::title("COMMAND LEGENDS"));
         let _law = ui.label(chrome::muted(
-            "one mnemonic underline · typed accelerator legend · inherited enabled state",
+            "one mnemonic underline · typed shortcut legend · inherited enabled state",
         ));
         ui.add_space(16.0);
 
