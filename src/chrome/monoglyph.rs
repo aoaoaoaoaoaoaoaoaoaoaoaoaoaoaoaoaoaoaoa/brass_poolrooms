@@ -16,8 +16,8 @@ use super::{MechanismSize, Symbol, foundry};
 
 use super::mechanism::{CouplingPorts, CouplingTarget, sealed};
 use super::plunger::{
-    self, BakedGuard, BakedMesh, BakedPose, BakedShadow, BakedVertex, GuardCache, PlungerWake,
-    SpringLaw,
+    self, BakedLockoutGrille, BakedMesh, BakedPose, BakedShadow, BakedVertex, LockoutGrilleCache,
+    PlungerWake, SpringLaw,
 };
 
 const ETCH_EM_PER_CROWN: f32 = 13.5 / (8.9 * 2.0);
@@ -37,13 +37,15 @@ struct BakedMonoglyphGauge {
     socket_half: f32,
     top_half: f32,
     body_half: f32,
-    guard: BakedGuard,
+    lockout_grille: BakedLockoutGrille,
     socket: BakedMesh,
     poses: &'static [BakedPose],
 }
 
 mod baked {
-    use super::{BakedGuard, BakedMesh, BakedMonoglyphGauge, BakedPose, BakedShadow, BakedVertex};
+    use super::{
+        BakedLockoutGrille, BakedMesh, BakedMonoglyphGauge, BakedPose, BakedShadow, BakedVertex,
+    };
 
     include!(concat!(env!("OUT_DIR"), "/monoglyph_atlas.rs"));
 }
@@ -51,14 +53,14 @@ mod baked {
 /// Material and cutter treatment applied to a monoglyph's mark.
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum MonoglyphFinish {
-    /// A shallow action cut dominated by its illuminated fresh-bronze wall.
+    /// A shallow action cut with an illuminated fresh-bronze wall and soot keyline.
     #[default]
     BrightCut,
     /// A steep, flat-bottomed engraving whose floor is soot black.
     Void,
-    /// A steep, flat-bottomed engraving filled with rough blood-ochre paint.
+    /// A steep, flat-bottomed engraving filled with soot-keyed vermilion paint.
     Danger,
-    /// A steep, flat-bottomed engraving filled with rough deep-pink paint.
+    /// A steep, flat-bottomed engraving filled with soot-keyed deep-pink paint.
     Love,
 }
 
@@ -106,8 +108,8 @@ impl MonoglyphFinish {
 /// [`Monoglyph::show_latched`] binds the same mechanism to a boolean state: the
 /// selected state rests at a lower latch while pointer pressure retains a
 /// deeper overtravel stroke.
-/// A disabled mechanism retains its live mark and crown position beneath a
-/// fixed-stock protective grille.
+/// A locked-out mechanism retains its live mark and crown position beneath a
+/// fixed-stock Lockout Grille.
 /// [`Monoglyph::size`] selects one of the exact gauges admitted by
 /// [`MechanismSize`].
 ///
@@ -266,24 +268,26 @@ impl Monoglyph {
             baked::POSE_MAX,
             gauge.poses.len(),
         );
-        let guard = ui.ctx().data_mut(|data| {
-            data.get_temp_mut_or_default::<GuardCache>(response.id.with("compiled-guard"))
-                .prepare(
-                    anatomy.socket.center(),
-                    atlas,
-                    gauge.guard,
-                    pose,
-                    gauge.poses[pose].elevation,
-                    baked::SHADOW_EYE_Z,
-                    baked::SHADOW_SLOPE,
-                    !enabled,
-                )
+        let lockout_grille = ui.ctx().data_mut(|data| {
+            data.get_temp_mut_or_default::<LockoutGrilleCache>(
+                response.id.with("compiled-lockout-grille"),
+            )
+            .prepare(
+                anatomy.socket.center(),
+                atlas,
+                gauge.lockout_grille,
+                pose,
+                gauge.poses[pose].elevation,
+                baked::SHADOW_EYE_Z,
+                baked::SHADOW_SLOPE,
+                !enabled,
+            )
         });
         let mut painter = ui.painter().clone();
         if !enabled {
             painter.set_opacity(1.0);
         }
-        guard.paint_floor(&painter, anatomy.assembly.expand(2.0));
+        lockout_grille.paint_floor(&painter, anatomy.assembly.expand(2.0));
         plunger::paint_momentary(
             ui,
             &painter,
@@ -308,7 +312,7 @@ impl Monoglyph {
                 );
             },
         );
-        guard.paint_crown(&painter, anatomy.assembly.expand(2.0));
+        lockout_grille.paint_crown(&painter, anatomy.assembly.expand(2.0));
         super::tension(ui, &response);
 
         MonoglyphResponse {
@@ -324,23 +328,35 @@ impl Monoglyph {
     ///
     /// The monoglyph remains part of the enclosing button's allocation and
     /// interaction surface; it does not introduce a nested actuator or focus
-    /// stop. The monoglyph terminates the parent plate: its casing covers the
-    /// trailing frame and consumes that frame's redundant inset. The gap to
-    /// the command label equals the vertical frame inset.
+    /// stop. The full selected mechanism gauge terminates the parent plate: its
+    /// casing replaces the plate's trailing frame rather than sitting inside
+    /// it. The gap to the command label equals the vertical frame inset.
     pub fn show_in(self, ui: &mut egui::Ui, button: Button<'_>) -> Response {
         let (atlas, gauge) = self.gauge();
         let side = self.size.side();
         let padding = ui.spacing().button_padding;
-        let atom_size = Vec2::new(side - padding.x, side);
-        debug_assert!(atom_size.x > 0.0);
+        let terminal_reservation = Vec2::new(side - padding.x, side);
+        assert!(
+            terminal_reservation.x > 0.0,
+            "button padding cannot consume a monoglyph gauge"
+        );
         let id = ui.next_auto_id().with("inline-monoglyph");
         let layout = button
             .small()
-            .right_text(Atom::custom(id, atom_size))
+            .right_text(Atom::custom(id, terminal_reservation))
             .gap(padding.y)
             .atom_ui(ui);
         if let Some(atom) = layout.rect(id) {
             let rect = Rect::from_min_size(atom.left_top(), Vec2::splat(side));
+            assert_eq!(
+                rect.size(),
+                Vec2::splat(self.size.side()),
+                "an inline monoglyph must retain its complete gauge envelope"
+            );
+            assert!(
+                layout.response.rect.contains_rect(rect),
+                "a button must allocate the inline monoglyph's complete gauge envelope"
+            );
             let anatomy = plunger::MomentaryAnatomy::new(
                 rect,
                 side,
@@ -348,30 +364,40 @@ impl Monoglyph {
                 gauge.body_half,
                 ui.pixels_per_point(),
             );
-            let guard = ui.ctx().data_mut(|data| {
+            let lockout_grille = ui.ctx().data_mut(|data| {
                 let pose = plunger::pose_index(
                     baked::REST,
                     baked::POSE_MIN,
                     baked::POSE_MAX,
                     gauge.poses.len(),
                 );
-                data.get_temp_mut_or_default::<GuardCache>(id.with("compiled-guard"))
-                    .prepare(
-                        anatomy.socket.center(),
-                        atlas,
-                        gauge.guard,
-                        pose,
-                        gauge.poses[pose].elevation,
-                        baked::SHADOW_EYE_Z,
-                        baked::SHADOW_SLOPE,
-                        !ui.is_enabled(),
-                    )
+                data.get_temp_mut_or_default::<LockoutGrilleCache>(
+                    id.with("compiled-lockout-grille"),
+                )
+                .prepare(
+                    anatomy.socket.center(),
+                    atlas,
+                    gauge.lockout_grille,
+                    pose,
+                    gauge.poses[pose].elevation,
+                    baked::SHADOW_EYE_Z,
+                    baked::SHADOW_SLOPE,
+                    !ui.is_enabled(),
+                )
             });
             let mut painter = ui.painter().clone();
             if !ui.is_enabled() {
                 painter.set_opacity(1.0);
             }
-            guard.paint_floor(&painter, anatomy.assembly.expand(2.0));
+            let plate_erasure = Rect::from_min_max(
+                Pos2::new(
+                    anatomy.assembly.left() + foundry::law::MOMENTARY_CASING_INSET,
+                    layout.response.rect.top(),
+                ),
+                layout.response.rect.right_bottom(),
+            );
+            let _erased_wrap = painter.rect_filled(plate_erasure, 0.0, ui.visuals().panel_fill);
+            lockout_grille.paint_floor(&painter, anatomy.assembly.expand(2.0));
             plunger::paint_momentary(
                 ui,
                 &painter,
@@ -396,7 +422,7 @@ impl Monoglyph {
                     );
                 },
             );
-            guard.paint_crown(&painter, anatomy.assembly.expand(2.0));
+            lockout_grille.paint_crown(&painter, anatomy.assembly.expand(2.0));
         }
         layout.response
     }

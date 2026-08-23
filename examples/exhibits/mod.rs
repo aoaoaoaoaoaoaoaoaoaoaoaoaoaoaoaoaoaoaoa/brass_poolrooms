@@ -426,6 +426,11 @@ impl Legends {
                 .size(MechanismSize::Small)
                 .finish(MonoglyphFinish::Void)
                 .show_in(ui, egui::Button::new("Tags"));
+            let bare = Monoglyph::new('T')
+                .size(MechanismSize::Small)
+                .finish(MonoglyphFinish::Void)
+                .show(ui);
+            water.monoglyph(&bare);
         });
         ui.add_space(10.0);
         let _caps = ui.horizontal(|ui| {
@@ -447,6 +452,14 @@ impl Legends {
                 let _body = ui.label(chrome::muted(
                     "Poolrooms embodies the disclosure; application logic owns panel traversal.",
                 ));
+            });
+        water.fold(section.wake);
+        ui.add_space(8.0);
+        let section = Section::new("LOCKED-OUT PANEL")
+            .default_open(true)
+            .locked_out("Finish or discard the active edit first.")
+            .show(ui, "gallery-locked-out-panel", |ui| {
+                let _body = ui.label(chrome::muted("A locked-out body must never be evaluated."));
             });
         water.fold(section.wake);
     }
@@ -630,14 +643,14 @@ impl Sliders {
 
 pub struct Checkboxes {
     live: [bool; 3],
-    guarded: [bool; 3],
+    locked_out: [bool; 3],
 }
 
 impl Default for Checkboxes {
     fn default() -> Self {
         Self {
             live: [false, false, true],
-            guarded: [false, true, false],
+            locked_out: [false, true, false],
         }
     }
 }
@@ -646,7 +659,7 @@ impl Checkboxes {
     pub fn show(&mut self, ui: &mut egui::Ui, water: &mut Surface) {
         let _title = ui.label(chrome::title("LATCHING PLUNGERS"));
         let _law = ui.label(chrome::muted(
-            "three forged gauges · fixed guard stock · stiff spring · swept-volume coupling",
+            "three forged gauges · fixed Lockout Grille stock · stiff spring · swept-volume coupling",
         ));
         ui.add_space(23.0);
 
@@ -680,13 +693,13 @@ impl Checkboxes {
         )));
 
         ui.add_space(18.0);
-        let _guarded = ui.label(chrome::eyebrow("HAND-GUARDED · STATE REMAINS VISIBLE"));
+        let _locked_out = ui.label(chrome::eyebrow("LOCKED OUT · STATE REMAINS VISIBLE"));
         ui.add_space(5.0);
         let _row = ui.horizontal(|ui| {
             let _small = ui.vertical(|ui| {
                 let _label = ui.label(chrome::muted("SMALL · 2×2 · OFF"));
-                let _guard = ui.add_enabled_ui(false, |ui| {
-                    Checkbox::without_text(&mut self.guarded[0])
+                let _lockout = ui.add_enabled_ui(false, |ui| {
+                    Checkbox::without_text(&mut self.locked_out[0])
                         .size(MechanismSize::Small)
                         .show(ui)
                 });
@@ -694,8 +707,8 @@ impl Checkboxes {
             ui.add_space(28.0);
             let _medium = ui.vertical(|ui| {
                 let _label = ui.label(chrome::muted("MEDIUM · 3×3 · ON"));
-                let _guard = ui.add_enabled_ui(false, |ui| {
-                    Checkbox::without_text(&mut self.guarded[1])
+                let _lockout = ui.add_enabled_ui(false, |ui| {
+                    Checkbox::without_text(&mut self.locked_out[1])
                         .size(MechanismSize::Medium)
                         .show(ui)
                 });
@@ -703,8 +716,8 @@ impl Checkboxes {
             ui.add_space(28.0);
             let _large = ui.vertical(|ui| {
                 let _label = ui.label(chrome::muted("LARGE · 4×4 · OFF"));
-                let _guard = ui.add_enabled_ui(false, |ui| {
-                    Checkbox::without_text(&mut self.guarded[2])
+                let _lockout = ui.add_enabled_ui(false, |ui| {
+                    Checkbox::without_text(&mut self.locked_out[2])
                         .size(MechanismSize::Large)
                         .show(ui)
                 });

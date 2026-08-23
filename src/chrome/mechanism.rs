@@ -14,7 +14,7 @@ use super::{COUPLING_SPACING, foundry};
 /// dimensions; half-width hardware, such as
 /// [`super::DragHandle::friction_pad`], derives its width from the same gauge.
 /// Protective or kinematic overhang remains part of a mechanism's allocation:
-/// [`super::Checkbox`] therefore derives a larger stable guard envelope.
+/// [`super::Checkbox`] therefore derives a larger stable Lockout Grille envelope.
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum MechanismSize {
     /// Dense 20-point hardware for compact tool strips.

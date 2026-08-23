@@ -2,19 +2,24 @@
 
 #![deny(missing_docs)]
 
+use std::borrow::Cow;
+
 use egui::{RichText, Sense, Stroke, WidgetInfo, WidgetType};
 
 use super::{EDGE, HOT, RAISED, SURFACE, section_title};
 
 /// A recessed, collapsible Poolrooms section.
 ///
-/// `active` is a physical indication only. Logical panel selection and
-/// keyboard traversal belong to the application layer.
-#[derive(Clone, Copy, Debug)]
+/// `active` is a physical indication only. [`Section::locked_out`] folds the
+/// disclosure and installs the common Lockout Grille over its complete header.
+/// Logical panel selection and keyboard traversal belong to the application
+/// layer.
+#[derive(Clone, Debug)]
 pub struct Section {
     title: &'static str,
     default_open: bool,
     active: bool,
+    lockout_reason: Option<Cow<'static, str>>,
 }
 
 impl Section {
@@ -24,6 +29,7 @@ impl Section {
             title,
             default_open: false,
             active: false,
+            lockout_reason: None,
         }
     }
 
@@ -41,6 +47,22 @@ impl Section {
         self
     }
 
+    /// Lock the folded header beneath a physical Lockout Grille.
+    ///
+    /// Lockout closes an open section, prevents every form of activation, and
+    /// exposes `reason` when the pointer rests over the grille. Removing the
+    /// lockout leaves the section folded; reopening remains an explicit act.
+    #[must_use]
+    pub fn locked_out(mut self, reason: impl Into<Cow<'static, str>>) -> Self {
+        let reason = reason.into();
+        assert!(
+            !reason.trim().is_empty(),
+            "a locked-out section requires a causal explanation"
+        );
+        self.lockout_reason = Some(reason);
+        self
+    }
+
     /// Lay out the disclosure and return its physical interaction witnesses.
     pub fn show(
         self,
@@ -52,8 +74,14 @@ impl Section {
             title,
             default_open,
             active,
+            lockout_reason,
         } = self;
+        assert!(
+            ui.is_enabled(),
+            "a Section cannot inherit disabled UI state; use Section::locked_out(reason)"
+        );
         let id = ui.make_persistent_id(id);
+        let header_id = id.with("header");
         let rect_id = id.with("rect");
         let wake_id = id.with("fold-wake");
         let frame_nr = ui.ctx().cumulative_frame_nr();
@@ -63,13 +91,25 @@ impl Section {
             default_open,
         );
         let mut flux = None;
+        let locked_out = lockout_reason.is_some();
+        if locked_out && state.is_open() {
+            state.set_open(false);
+            flux = Some(FoldFlux::Close);
+        }
+        if locked_out {
+            ui.memory_mut(|memory| memory.surrender_focus(header_id));
+        }
         let mut header_response = None;
         let mut header_activated = false;
         let frame = egui::Frame::new()
             .fill(SURFACE)
             .stroke(Stroke::new(
-                if active { 1.5_f32 } else { 1.0_f32 },
-                if active { HOT } else { EDGE },
+                if active && !locked_out {
+                    1.5_f32
+                } else {
+                    1.0_f32
+                },
+                if active && !locked_out { HOT } else { EDGE },
             ))
             .corner_radius(2)
             .inner_margin(egui::Margin::same(0))
@@ -87,13 +127,25 @@ impl Section {
                             let _title = ui.label(section_title(title.to_ascii_uppercase()));
                         });
                     });
-                let response = ui
-                    .interact(header.response.rect, id.with("header"), Sense::click())
-                    .on_hover_cursor(egui::CursorIcon::PointingHand);
+                let response = if let Some(reason) = lockout_reason.as_ref() {
+                    let response = ui
+                        .add_enabled_ui(false, |ui| {
+                            ui.interact(header.response.rect, header_id, Sense::click())
+                        })
+                        .inner
+                        .on_disabled_hover_text(reason.clone());
+                    if response.contains_pointer() {
+                        ui.ctx().set_cursor_icon(egui::CursorIcon::NotAllowed);
+                    }
+                    response
+                } else {
+                    ui.interact(header.response.rect, header_id, Sense::click())
+                        .on_hover_cursor(egui::CursorIcon::PointingHand)
+                };
                 response.widget_info(|| {
                     WidgetInfo::selected(
                         WidgetType::CollapsingHeader,
-                        ui.is_enabled(),
+                        response.enabled(),
                         state.is_open(),
                         title,
                     )
@@ -114,6 +166,9 @@ impl Section {
                         Stroke::new(1.0_f32, HOT.gamma_multiply(0.64)),
                         egui::StrokeKind::Inside,
                     );
+                }
+                if locked_out {
+                    super::lockout_grille::paint(ui.painter(), header.response.rect);
                 }
                 header_response = Some(response);
                 header_activated = activated;
@@ -170,6 +225,7 @@ impl Section {
             header: header_response.unwrap_or(frame.inner),
             activated: header_activated,
             open: state.is_open(),
+            locked_out,
         }
     }
 }
@@ -198,12 +254,14 @@ pub struct SectionResponse {
     pub wake: Option<FoldWake>,
     /// Response covering the complete section.
     pub response: egui::Response,
-    /// Focusable disclosure header response.
+    /// Disclosure header response; focusable unless locked out.
     pub header: egui::Response,
     /// Whether the disclosure accepted a pointer, accessibility, or exact key activation.
     pub activated: bool,
     /// Whether the disclosure body is open after this pass.
     pub open: bool,
+    /// Whether a Lockout Grille physically disables the folded header.
+    pub locked_out: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -236,4 +294,48 @@ pub enum FoldFlux {
     Open,
     /// The recess closed.
     Close,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn lockout_folds_the_section_and_keeps_it_folded_after_release() {
+        let ctx = egui::Context::default();
+        let mut body_runs = 0;
+
+        ctx.run_ui(egui::RawInput::default(), |ui| {
+            let section = Section::new("FINDER")
+                .default_open(true)
+                .show(ui, "finder", |_| body_runs += 1);
+            assert!(section.open);
+            assert!(!section.locked_out);
+            assert!(section.header.enabled());
+        })
+        .drop_without_applying_deltas();
+
+        ctx.run_ui(egui::RawInput::default(), |ui| {
+            let section = Section::new("FINDER")
+                .default_open(true)
+                .locked_out("Finish the trail edit first.")
+                .show(ui, "finder", |_| body_runs += 1);
+            assert!(!section.open);
+            assert!(section.locked_out);
+            assert!(!section.header.enabled());
+            assert!(!section.activated);
+        })
+        .drop_without_applying_deltas();
+
+        ctx.run_ui(egui::RawInput::default(), |ui| {
+            let section = Section::new("FINDER")
+                .default_open(true)
+                .show(ui, "finder", |_| body_runs += 1);
+            assert!(!section.open);
+            assert!(!section.locked_out);
+        })
+        .drop_without_applying_deltas();
+
+        assert_eq!(body_runs, 1);
+    }
 }

@@ -36,14 +36,14 @@ pub(super) struct BakedGauge {
 }
 
 #[derive(Clone, Copy)]
-pub(super) struct BakedGuard {
+pub(super) struct BakedLockoutGrille {
     pub(super) mesh: BakedMesh,
     pub(super) floor_shadow: BakedMesh,
     pub(super) crown_shadow: BakedShadow,
 }
 
 #[derive(Clone, Default)]
-pub(super) struct GuardCache {
+pub(super) struct LockoutGrilleCache {
     origin: Option<Pos2>,
     atlas: Option<usize>,
     mesh: Option<Arc<egui::Mesh>>,
@@ -51,18 +51,18 @@ pub(super) struct GuardCache {
     crown_shadows: HashMap<usize, Arc<egui::Mesh>>,
 }
 
-impl GuardCache {
+impl LockoutGrilleCache {
     pub(super) fn prepare(
         &mut self,
         origin: Pos2,
         atlas: usize,
-        guard: BakedGuard,
+        grille: BakedLockoutGrille,
         pose: usize,
         receiver_z: f32,
         eye_z: f32,
         slope: f32,
-        guarded: bool,
-    ) -> RenderedGuard {
+        locked_out: bool,
+    ) -> RenderedLockoutGrille {
         if self.origin != Some(origin) || self.atlas != Some(atlas) {
             *self = Self {
                 origin: Some(origin),
@@ -70,25 +70,25 @@ impl GuardCache {
                 ..Self::default()
             };
         }
-        if !guarded {
-            return RenderedGuard::default();
+        if !locked_out {
+            return RenderedLockoutGrille::default();
         }
         let mesh = self
             .mesh
-            .get_or_insert_with(|| instantiate(guard.mesh, origin))
+            .get_or_insert_with(|| instantiate(grille.mesh, origin))
             .clone();
         let floor_shadow = self
             .floor_shadow
-            .get_or_insert_with(|| instantiate(guard.floor_shadow, origin))
+            .get_or_insert_with(|| instantiate(grille.floor_shadow, origin))
             .clone();
         let crown_shadow = self
             .crown_shadows
             .entry(pose)
             .or_insert_with(|| {
-                instantiate_shadow(guard.crown_shadow, origin, receiver_z, eye_z, slope)
+                instantiate_shadow(grille.crown_shadow, origin, receiver_z, eye_z, slope)
             })
             .clone();
-        RenderedGuard {
+        RenderedLockoutGrille {
             mesh: Some(mesh),
             floor_shadow: Some(floor_shadow),
             crown_shadow: Some(crown_shadow),
@@ -97,13 +97,13 @@ impl GuardCache {
 }
 
 #[derive(Clone, Default)]
-pub(super) struct RenderedGuard {
+pub(super) struct RenderedLockoutGrille {
     mesh: Option<Arc<egui::Mesh>>,
     floor_shadow: Option<Arc<egui::Mesh>>,
     crown_shadow: Option<Arc<egui::Mesh>>,
 }
 
-impl RenderedGuard {
+impl RenderedLockoutGrille {
     pub(super) fn paint_floor(&self, painter: &egui::Painter, clip: Rect) {
         if let Some(shadow) = &self.floor_shadow {
             foundry::paint_compiled(painter, clip, shadow);

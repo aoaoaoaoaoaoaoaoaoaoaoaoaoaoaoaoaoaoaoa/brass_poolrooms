@@ -48,6 +48,9 @@ pub enum Symbol {
     /// retains equal weight under quarter-turns and reflections.
     Remove,
     /// Rename the targeted member.
+    ///
+    /// Its sparse diagonal pencil remains legible beneath the armory's physical
+    /// soot keyline without the false weight of a faceted barrel.
     Rename,
     /// Restore a withdrawn or resettable member.
     Restore,
@@ -103,7 +106,7 @@ impl Symbol {
             Self::Heart => '♥',
             Self::Remove => '✖',
             Self::Redo => '↷',
-            Self::Rename => '✎',
+            Self::Rename => '🖉',
             Self::Restore => '↺',
             Self::Save => '🖫',
             Self::Settings => '⚙',

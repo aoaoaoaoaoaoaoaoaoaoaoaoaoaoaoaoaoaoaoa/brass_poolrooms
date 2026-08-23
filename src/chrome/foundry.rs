@@ -124,7 +124,8 @@ fn plaque_engraving(
 /// [`plaque_engraving`].
 /// Action glyphs reverse the visible-wall ordering: the same recessed floor
 /// remains along the up-screen lip, while the illuminated bronze wall occupies
-/// most of the cut. Both passes still derive from the groove depth and fixed
+/// most of the cut. One physical pixel of that floor remains exposed around the
+/// wall as its keyline. Every pass still derives from the groove depth and fixed
 /// light rather than an ornamental text outline.
 pub(crate) fn bright_cut_etch(
     painter: &egui::Painter,
@@ -137,13 +138,15 @@ pub(crate) fn bright_cut_etch(
 ) {
     let incision = painter.with_clip_rect(clip);
     let light_fall = depth * (-LIGHT_Y / LIGHT_Z) * perspective_scale(surface_z);
+    let wall = pos + Vec2::new(0.0, light_fall);
+    paint_soot_keyline(&incision, wall, &galley);
     incision.galley_with_override_text_color(
         pos - Vec2::new(0.0, light_fall * 0.20),
         galley.clone(),
         bronze(0.07).gamma_multiply(exposure),
     );
     incision.galley_with_override_text_color(
-        pos + Vec2::new(0.0, light_fall),
+        wall,
         galley,
         fresh_cut_bronze(-FRAC_1_SQRT_2, FRAC_1_SQRT_2).gamma_multiply(exposure),
     );
@@ -152,9 +155,8 @@ pub(crate) fn bright_cut_etch(
 /// A steep engraving with a narrow bronze wall and a flat material floor.
 ///
 /// The relief is derived from the same dynamic glyph mask as the floor, so it
-/// remains available to every scalar admitted by the font chain. Danger paint
-/// exposes one physical pixel of soot-black primer around its edge; other
-/// finishes retain the cutter's nominal typographic outline.
+/// remains available to every scalar admitted by the font chain. Every painted
+/// floor exposes one physical pixel of soot-black primer around its edge.
 pub(crate) fn flat_cut_etch(
     painter: &egui::Painter,
     clip: Rect,
@@ -179,31 +181,24 @@ pub(crate) fn flat_cut_etch(
         fresh_cut_bronze(-depth / normalizer, FLAT_CUT_BEVEL_RUN / normalizer)
             .gamma_multiply(exposure),
     );
-    match floor {
+    let (albedo, seed) = match floor {
         EngravingFloor::Void => {
             incision.galley_with_override_text_color(pos, galley, Color32::BLACK);
+            return;
         }
-        EngravingFloor::Danger(seed) => {
-            let paint = DANGER_PAINT.gamma_multiply(exposure);
-            paint_keyline(&incision, pos, &galley, Color32::BLACK);
-            let _floor = incision.add(Shape::galley(
-                pos,
-                painted_galley(galley, paint, seed),
-                rough_paint(paint, seed, 0, 0),
-            ));
-        }
-        EngravingFloor::Love(seed) => {
-            let paint = LOVE_PAINT.gamma_multiply(exposure);
-            let _floor = incision.add(Shape::galley(
-                pos,
-                painted_galley(galley, paint, seed),
-                rough_paint(paint, seed, 0, 0),
-            ));
-        }
-    }
+        EngravingFloor::Danger(seed) => (DANGER_PAINT, seed),
+        EngravingFloor::Love(seed) => (LOVE_PAINT, seed),
+    };
+    let paint = albedo.gamma_multiply(exposure);
+    paint_soot_keyline(&incision, pos, &galley);
+    let _floor = incision.add(Shape::galley(
+        pos,
+        painted_galley(galley, paint, seed),
+        rough_paint(paint, seed, 0, 0),
+    ));
 }
 
-fn paint_keyline(painter: &egui::Painter, pos: Pos2, galley: &Arc<Galley>, color: Color32) {
+fn paint_soot_keyline(painter: &egui::Painter, pos: Pos2, galley: &Arc<Galley>) {
     let pixel = painter.pixels_per_point().recip();
     for [x, y] in [
         [-1.0, -1.0],
@@ -218,7 +213,7 @@ fn paint_keyline(painter: &egui::Painter, pos: Pos2, galley: &Arc<Galley>, color
         painter.galley_with_override_text_color(
             pos + Vec2::new(x * pixel, y * pixel),
             galley.clone(),
-            color,
+            Color32::BLACK,
         );
     }
 }

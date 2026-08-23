@@ -11,8 +11,9 @@
 //! `water` feature pass those responses to the corresponding methods on
 //! `water::Surface` during the same UI pass.
 //!
-//! [`Section`] supplies the physical disclosure used by application-level
-//! panel managers. [`MnemonicText`], [`Monoglyph::show_in`], and [`Keycap`]
+//! [`Section`] supplies the physical disclosure and complete-header Lockout
+//! Grille used by application-level panel managers. [`MnemonicText`],
+//! [`Monoglyph::show_in`], and [`Keycap`]
 //! supply command legends; [`exact_activation`] gives button-like responses
 //! exact, non-bleeding Enter/Space ownership. Command routing and panel
 //! traversal remain outside Poolrooms.
@@ -30,6 +31,7 @@ mod forge_pin;
 mod forged;
 mod foundry;
 mod legend;
+mod lockout_grille;
 mod longinus_cursor;
 mod mechanism;
 mod monoglyph;

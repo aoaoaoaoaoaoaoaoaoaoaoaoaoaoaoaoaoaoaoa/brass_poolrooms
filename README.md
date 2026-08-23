@@ -38,7 +38,7 @@ composition.
 | --- | --- | --- |
 | [`Rail`] | Bounded linear transport with explicit total and admissible spans, detents, focused Left/Right/Home/End input, and hovered wheel input by default | `Surface::rail` |
 | [`DateSpool`] | One-to-three Gregorian tape reels with explicit width and a reel-derived rigid minimum | `Surface::date_spool` |
-| [`Checkbox`] | Three-gauge latching plunger with an optional side-selectable etched plaque and a state-transparent fixed-stock guard | `Surface::checkbox` |
+| [`Checkbox`] | Three-gauge latching plunger with an optional side-selectable etched plaque and a state-transparent fixed-stock Lockout Grille | `Surface::checkbox` |
 | [`Monoglyph`] | Three-gauge momentary or boolean-latching square plunger carrying one engraved scalar; [`Symbol`] supplies semantic marks and their default [`MonoglyphFinish`] | `Surface::monoglyph` |
 | [`CornerClose`] | Three-gauge momentary close plunger centered on a pane corner, with a build-time modelled and self-shadowed X trench | `Surface::corner_close` |
 | [`DragHandle`] | Rigid half-width friction pad, rigid square bail, or sprung folding bail on a riveted crosshatched plate | `Surface::drag_handle` |
@@ -58,10 +58,12 @@ multiplying equivalent Cartesian combinations.
 
 [`Section`] embodies the recessed disclosure used by higher-level panel
 managers. Its active and focused states are physical indications only;
-application logic owns panel selection and traversal. [`MnemonicText`] marks
-one permanent Alt glyph. [`Monoglyph::show_in`] embeds an inert resting
-monoglyph inside a button; [`Keycap`] renders standalone chord plates and
-compact multi-key accelerator wells.
+application logic owns panel selection and traversal. `Section::locked_out`
+forcibly folds the disclosure and locks out its complete header beneath a
+Lockout Grille; the mandatory reason inhabits its disabled hover explanation.
+[`MnemonicText`] marks one permanent Alt glyph. [`Monoglyph::show_in`] embeds an
+inert resting monoglyph inside a button; [`Keycap`] renders standalone chord
+plates and compact multi-key accelerator wells.
 `Monoglyph::show_latched` binds any raw or armory glyph to a boolean latch while
 retaining the same foundry body and water coupling as its momentary form. The
 true state seats at the deeper, darker latch register; pointer pressure retains
@@ -77,18 +79,19 @@ without introducing commands, menus, or navigation policy.
 mechanisms use the 20-point `Small`, 24-point `Medium`, and 32-point `Large`
 values as their nominal casing and interaction height, not as a transparent
 layout envelope.
-Monoglyphs and bails are square; friction pads are half-width. Checkbox guards
-retain one wire gauge while their lattices step from 2×2 through 3×3 to 4×4,
-and their full protective envelopes are allocated explicitly. Forge pins have
+Monoglyphs and bails are square; friction pads are half-width. Checkbox Lockout
+Grilles retain one wire gauge while their lattices step from 2×2 through 3×3 to
+4×4, and their full lockout envelopes are allocated explicitly. Forge pins have
 their own map-anchored gauge geometry; medium and large bulbs admit native
 centered text while small remains unlettered. Each admitted cased gauge is
 independently projected and illuminated at build time.
 `Monoglyph::symbol(Symbol::Add)` and the other armory constructors bind a
 common action to one scalar, one semantic finish default, and the selected
-foundry gauge's typography. `Symbol::Delete` therefore selects the soot-keyed
-vermilion `MonoglyphFinish::Danger`; `.finish(...)` may override that lookup
-without re-authoring the glyph. `Symbol::Heart` likewise selects the rough
-deep-pink `MonoglyphFinish::Love`. A product-specific mark may still use
+foundry gauge's typography. Every nonblack mark exposes one physical pixel of
+soot around its face. `Symbol::Delete` therefore selects the vermilion
+`MonoglyphFinish::Danger`; `.finish(...)` may override that lookup without
+re-authoring the glyph. `Symbol::Heart` likewise selects the rough deep-pink
+`MonoglyphFinish::Love`. A product-specific mark may still use
 `Monoglyph::new(char)` and defaults to `BrightCut`. Common add, remove, delete,
 duplicate, rename, confirm, save, undo, redo, disclosure, export, visibility,
 restore, help, heart, and increment/decrement marks must not be re-authored at

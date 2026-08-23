@@ -1,14 +1,14 @@
-//! A latching square plunger under a sprung protective grille. The plunger's
+//! A latching square plunger under a sprung Lockout Grille. The plunger's
 //! two boolean states are literal z-stops: unchecked stands proud, checked
 //! seats down in its aperture. Pointer pressure drives it below either latch;
 //! release changes the latch and a stiff underdamped spring closes the motion.
 //!
-//! Disabled controls do not change their state indication. A welded-wire cage
-//! occupies the hand volume above the mechanism while leaving its elevation
-//! visible. Crown, skirt, wire, welds, and frame are physical triangle meshes;
-//! the build-time foundry compiler performs projection, visibility,
-//! illumination, and directional shadow casting once, then runtime replays its
-//! 2D vector pose atlas.
+//! Locked-out controls do not change their state indication. A welded-wire
+//! grille occupies the hand volume above the mechanism while leaving its
+//! elevation visible. Crown, skirt, wire, welds, and frame are physical
+//! triangle meshes; the build-time foundry compiler performs projection,
+//! visibility, illumination, and directional shadow casting once, then runtime
+//! replays its 2D vector pose atlas.
 //!
 //! Optional descriptions inhabit a casing-height bronze plaque with 45° edge
 //! facets and two cylindrical ties. Its parameterized plate geometry and
@@ -28,8 +28,8 @@ use super::{COUPLING_SPACING, HOT, foundry};
 
 use super::mechanism::{CouplingPorts, CouplingTarget, MechanismSize, sealed};
 use super::plunger::{
-    self, BakedGuard, BakedMesh, BakedPose, BakedShadow, BakedVertex, GuardCache, PlungerWake,
-    SpringLaw,
+    self, BakedLockoutGrille, BakedMesh, BakedPose, BakedShadow, BakedVertex, LockoutGrilleCache,
+    PlungerWake, SpringLaw,
 };
 
 #[derive(Clone, Copy)]
@@ -44,7 +44,7 @@ struct BakedCheckboxGauge {
     pose_min: f32,
     pose_max: f32,
     wire_count: u8,
-    guard: BakedGuard,
+    lockout_grille: BakedLockoutGrille,
     poses: &'static [BakedPose],
 }
 
@@ -59,7 +59,9 @@ fn spring_law(gauge: BakedCheckboxGauge) -> SpringLaw {
 }
 
 mod baked {
-    use super::{BakedCheckboxGauge, BakedGuard, BakedMesh, BakedPose, BakedShadow, BakedVertex};
+    use super::{
+        BakedCheckboxGauge, BakedLockoutGrille, BakedMesh, BakedPose, BakedShadow, BakedVertex,
+    };
 
     include!(concat!(env!("OUT_DIR"), "/checkbox_atlas.rs"));
 }
@@ -72,10 +74,10 @@ mod baked {
 /// A nonempty label is cut into a casing-height bronze plaque joined to the
 /// mechanism by two cylindrical ties. [`Checkbox::label_side`] places that
 /// plaque on either side. Disabling the surrounding `egui::Ui` installs the
-/// physical wire guard while preserving the state geometry and foundry
-/// luminance beneath it; the guard, rather than egui's conventional opacity
+/// physical Lockout Grille while preserving the state geometry and foundry
+/// luminance beneath it; the grille, rather than egui's conventional opacity
 /// fade, is the disabled affordance. [`Checkbox::size`] selects an independent
-/// build-time forge. Compact guards retain the large guard's wire, frame, and
+/// build-time forge. Compact grilles retain the large grille's wire, frame, and
 /// weld stock, removing lattice lines instead of shrinking them into
 /// alias-prone filaments.
 ///
@@ -141,10 +143,10 @@ impl<'a> Checkbox<'a> {
         self
     }
 
-    /// Select a build-time forged plunger and protective-guard gauge.
+    /// Select a build-time forged plunger and Lockout Grille gauge.
     ///
     /// The nominal 20-, 24-, or 32-point gauge governs the plunger. Its
-    /// protective guard requires a proportionally larger allocation; fixed
+    /// Lockout Grille requires a proportionally larger allocation; fixed
     /// wire stock and progressively coarser lattices keep every size crisp.
     pub const fn size(mut self, size: MechanismSize) -> Self {
         self.size = size;
@@ -392,7 +394,7 @@ fn paint(
         let _ties = painter.add(foundry::tie_pair(ports.0.right, ports.1.left));
     }
     foundry::socket_bed(painter, anatomy.socket);
-    rendered.guard.paint_floor(painter, clip);
+    rendered.lockout_grille.paint_floor(painter, clip);
     foundry::paint_compiled(painter, anatomy.socket.shrink(1.0), &rendered.button_shadow);
     foundry::paint_compiled(
         painter,
@@ -401,7 +403,7 @@ fn paint(
     );
     foundry::socket_rim(painter, anatomy.socket);
 
-    rendered.guard.paint_crown(painter, clip);
+    rendered.lockout_grille.paint_crown(painter, clip);
     if let (Some(plaque), Some(rect)) = (plaque, anatomy.plaque) {
         plaque.paint(painter, rect.center());
     }
@@ -426,7 +428,7 @@ struct RenderCache {
     origin: Option<Pos2>,
     atlas: Option<usize>,
     poses: HashMap<usize, InstalledPose>,
-    guard: GuardCache,
+    lockout_grille: LockoutGrilleCache,
 }
 
 impl RenderCache {
@@ -436,7 +438,7 @@ impl RenderCache {
         atlas: usize,
         gauge: BakedCheckboxGauge,
         pose_index: usize,
-        guarded: bool,
+        locked_out: bool,
     ) -> Rendered {
         if self.origin != Some(origin) || self.atlas != Some(atlas) {
             *self = Self {
@@ -456,15 +458,15 @@ impl RenderCache {
         Rendered {
             button: installed.button.clone(),
             button_shadow: installed.button_shadow.clone(),
-            guard: self.guard.prepare(
+            lockout_grille: self.lockout_grille.prepare(
                 origin,
                 atlas,
-                gauge.guard,
+                gauge.lockout_grille,
                 pose_index,
                 pose.elevation,
                 baked::SHADOW_EYE_Z,
                 baked::SHADOW_SLOPE,
-                guarded,
+                locked_out,
             ),
         }
     }
@@ -473,7 +475,7 @@ impl RenderCache {
 struct Rendered {
     button: Arc<egui::Mesh>,
     button_shadow: Arc<egui::Mesh>,
-    guard: plunger::RenderedGuard,
+    lockout_grille: plunger::RenderedLockoutGrille,
 }
 
 #[cfg(test)]
@@ -481,18 +483,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn cached_guard_obeys_the_current_enabled_state() {
+    fn cached_lockout_grille_obeys_the_current_enabled_state() {
         let mut cache = RenderCache::default();
         let gauge = baked::GAUGES[MechanismSize::Small.atlas_index()];
         let origin = Pos2::new(20.0, 20.0);
 
-        let guarded = cache.prepare(origin, 0, gauge, 0, true);
-        assert!(guarded.guard.installed());
+        let locked_out = cache.prepare(origin, 0, gauge, 0, true);
+        assert!(locked_out.lockout_grille.installed());
 
         let enabled = cache.prepare(origin, 0, gauge, 0, false);
-        assert!(!enabled.guard.installed());
+        assert!(!enabled.lockout_grille.installed());
 
-        let guarded_again = cache.prepare(origin, 0, gauge, 0, true);
-        assert!(guarded_again.guard.installed());
+        let locked_out_again = cache.prepare(origin, 0, gauge, 0, true);
+        assert!(locked_out_again.lockout_grille.installed());
     }
 }

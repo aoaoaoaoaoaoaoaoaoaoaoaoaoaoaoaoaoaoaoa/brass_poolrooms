@@ -84,12 +84,12 @@ const _: () = {
     assert!(FRICTION_HATCH_WIDTH >= 1.0);
 };
 
-const GUARD_HALF: f32 = 16.8;
-const GUARD_BASE: f32 = 0.72;
-const GUARD_RISE: f32 = 6.30;
-/// Fixed-stock guards need this additional crown rise as their footprint
+const LOCKOUT_GRILLE_HALF: f32 = 16.8;
+const LOCKOUT_GRILLE_BASE: f32 = 0.72;
+const LOCKOUT_GRILLE_RISE: f32 = 6.30;
+/// Fixed-stock Lockout Grilles need this additional crown rise as their footprint
 /// contracts: unlike the plunger, their wire and frame radii do not scale.
-const GUARD_STOCK_CLEARANCE_LIFT: f32 = 0.75;
+const LOCKOUT_GRILLE_STOCK_CLEARANCE_LIFT: f32 = 0.75;
 const WIRE_RADIUS: f32 = 0.645;
 const WIRE_LAYER: f32 = 0.66;
 const FRAME_RADIUS: f32 = 0.72;
@@ -267,14 +267,14 @@ struct CheckboxGauge {
     pose_min: f32,
     pose_max: f32,
     body_root: f32,
-    guard: GuardGauge,
+    lockout_grille: LockoutGrilleGauge,
 }
 
 #[derive(Clone, Copy)]
-struct GuardGauge {
-    guard_half: f32,
-    guard_base: f32,
-    guard_rise: f32,
+struct LockoutGrilleGauge {
+    half: f32,
+    base: f32,
+    rise: f32,
     wire_stations: &'static [f32],
 }
 
@@ -317,32 +317,32 @@ fn checkbox_gauge(side: u8) -> CheckboxGauge {
         pose_min: POSE_MIN * scale,
         pose_max: POSE_MAX * scale,
         body_root: BODY_ROOT * scale,
-        guard: GuardGauge {
-            guard_half: GUARD_HALF * scale,
+        lockout_grille: LockoutGrilleGauge {
+            half: LOCKOUT_GRILLE_HALF * scale,
             // Frame, mesh, and weld stock remain physically identical at every
             // gauge. Fewer wires, rather than hairline wires, make the compact
-            // guards legible after rasterization.
-            guard_base: GUARD_BASE,
-            guard_rise: GUARD_RISE * scale + GUARD_STOCK_CLEARANCE_LIFT * (1.0 - scale),
-            wire_stations: guard_wire_stations(side),
+            // Lockout Grilles legible after rasterization.
+            base: LOCKOUT_GRILLE_BASE,
+            rise: LOCKOUT_GRILLE_RISE * scale + LOCKOUT_GRILLE_STOCK_CLEARANCE_LIFT * (1.0 - scale),
+            wire_stations: lockout_grille_wire_stations(side),
         },
     }
 }
 
-fn monoglyph_guard_gauge(side: u8) -> GuardGauge {
+fn monoglyph_lockout_grille_gauge(side: u8) -> LockoutGrilleGauge {
     let scale = f32::from(side) / f32::from(MECHANISM_SIDE_LARGE);
-    GuardGauge {
-        guard_half: f32::from(side) * 0.5 - FRAME_RADIUS - 0.4,
-        guard_base: GUARD_BASE,
-        // Monoglyph travel is gauge-invariant, so every guard clears the same
+    LockoutGrilleGauge {
+        half: f32::from(side) * 0.5 - FRAME_RADIUS - 0.4,
+        base: LOCKOUT_GRILLE_BASE,
+        // Monoglyph travel is gauge-invariant, so every Lockout Grille clears the same
         // raised crown while its lattice contracts by removing wires. Fixed
-        // wire stock consumes proportionally more clearance in compact cages.
-        guard_rise: GUARD_RISE + 0.75 + 1.5 * (1.0 - scale),
-        wire_stations: guard_wire_stations(side),
+        // wire stock consumes proportionally more clearance in compact grilles.
+        rise: LOCKOUT_GRILLE_RISE + 0.75 + 1.5 * (1.0 - scale),
+        wire_stations: lockout_grille_wire_stations(side),
     }
 }
 
-const fn guard_wire_stations(side: u8) -> &'static [f32] {
+const fn lockout_grille_wire_stations(side: u8) -> &'static [f32] {
     match side {
         ..=22 => &SMALL_WIRE_STATIONS,
         23..=28 => &MEDIUM_WIRE_STATIONS,
@@ -475,20 +475,24 @@ fn bake_checkbox(path: &Path) -> io::Result<()> {
 
     for side in MECHANISM_SIDES {
         let gauge = checkbox_gauge(side);
-        let guard = guard(gauge.guard);
-        let guard_mesh = compile_bronze(&guard, 0.96);
-        let guard_floor_shadow = compile_shadow(&guard, 0.0, 46);
-        let guard_crown_shadow = compile_shadow_source(&guard, gauge.pose_max, 18);
-        emit_mesh(&mut out, &format!("GAUGE_{side}_GUARD"), &guard_mesh)?;
+        let grille = lockout_grille(gauge.lockout_grille);
+        let grille_mesh = compile_bronze(&grille, 0.96);
+        let grille_floor_shadow = compile_shadow(&grille, 0.0, 46);
+        let grille_crown_shadow = compile_shadow_source(&grille, gauge.pose_max, 18);
         emit_mesh(
             &mut out,
-            &format!("GAUGE_{side}_GUARD_FLOOR_SHADOW"),
-            &guard_floor_shadow,
+            &format!("GAUGE_{side}_LOCKOUT_GRILLE"),
+            &grille_mesh,
+        )?;
+        emit_mesh(
+            &mut out,
+            &format!("GAUGE_{side}_LOCKOUT_GRILLE_FLOOR_SHADOW"),
+            &grille_floor_shadow,
         )?;
         emit_shadow(
             &mut out,
-            &format!("GAUGE_{side}_GUARD_CROWN_SHADOW"),
-            &guard_crown_shadow,
+            &format!("GAUGE_{side}_LOCKOUT_GRILLE_CROWN_SHADOW"),
+            &grille_crown_shadow,
         )?;
 
         let poses = (0..POSE_COUNT)
@@ -534,7 +538,7 @@ fn bake_checkbox(path: &Path) -> io::Result<()> {
         let gauge = checkbox_gauge(side);
         writeln!(
             out,
-            "BakedCheckboxGauge {{ side: {}, control_height: {}, assembly_side: {}, socket_half: {}, body_half: {}, latch_up: {}, latch_down: {}, pose_min: {}, pose_max: {}, wire_count: {}, guard: BakedGuard {{ mesh: GAUGE_{side}_GUARD, floor_shadow: GAUGE_{side}_GUARD_FLOOR_SHADOW, crown_shadow: GAUGE_{side}_GUARD_CROWN_SHADOW_SOURCE }}, poses: &GAUGE_{side}_POSES }},",
+            "BakedCheckboxGauge {{ side: {}, control_height: {}, assembly_side: {}, socket_half: {}, body_half: {}, latch_up: {}, latch_down: {}, pose_min: {}, pose_max: {}, wire_count: {}, lockout_grille: BakedLockoutGrille {{ mesh: GAUGE_{side}_LOCKOUT_GRILLE, floor_shadow: GAUGE_{side}_LOCKOUT_GRILLE_FLOOR_SHADOW, crown_shadow: GAUGE_{side}_LOCKOUT_GRILLE_CROWN_SHADOW_SOURCE }}, poses: &GAUGE_{side}_POSES }},",
             gauge.side,
             scalar(gauge.control_height),
             scalar(gauge.assembly_side),
@@ -544,7 +548,7 @@ fn bake_checkbox(path: &Path) -> io::Result<()> {
             scalar(gauge.latch_down),
             scalar(gauge.pose_min),
             scalar(gauge.pose_max),
-            gauge.guard.wire_stations.len(),
+            gauge.lockout_grille.wire_stations.len(),
         )?;
     }
     writeln!(out, "];")
@@ -649,10 +653,10 @@ fn bake_monoglyph(path: &Path) -> io::Result<()> {
 
     for side in MECHANISM_SIDES {
         let gauge = momentary_gauge(side);
-        let guard = guard(monoglyph_guard_gauge(side));
-        let guard_mesh = compile_bronze(&guard, 0.96);
-        let guard_floor_shadow = compile_shadow(&guard, 0.0, 46);
-        let guard_crown_shadow = compile_shadow_source(&guard, MONOGLYPH_POSE_MAX, 18);
+        let grille = lockout_grille(monoglyph_lockout_grille_gauge(side));
+        let grille_mesh = compile_bronze(&grille, 0.96);
+        let grille_floor_shadow = compile_shadow(&grille, 0.0, 46);
+        let grille_crown_shadow = compile_shadow_source(&grille, MONOGLYPH_POSE_MAX, 18);
         let socket = compile_darkened_bronze(&momentary_socket(gauge), 1.0);
         let poses = (0..MONOGLYPH_POSE_COUNT)
             .map(|index| {
@@ -665,16 +669,20 @@ fn bake_monoglyph(path: &Path) -> io::Result<()> {
                 )
             })
             .collect::<Vec<_>>();
-        emit_mesh(&mut out, &format!("GAUGE_{side}_GUARD"), &guard_mesh)?;
         emit_mesh(
             &mut out,
-            &format!("GAUGE_{side}_GUARD_FLOOR_SHADOW"),
-            &guard_floor_shadow,
+            &format!("GAUGE_{side}_LOCKOUT_GRILLE"),
+            &grille_mesh,
+        )?;
+        emit_mesh(
+            &mut out,
+            &format!("GAUGE_{side}_LOCKOUT_GRILLE_FLOOR_SHADOW"),
+            &grille_floor_shadow,
         )?;
         emit_shadow(
             &mut out,
-            &format!("GAUGE_{side}_GUARD_CROWN_SHADOW"),
-            &guard_crown_shadow,
+            &format!("GAUGE_{side}_LOCKOUT_GRILLE_CROWN_SHADOW"),
+            &grille_crown_shadow,
         )?;
         emit_mesh(&mut out, &format!("GAUGE_{side}_SOCKET"), &socket)?;
         for (index, (_, button, shadow)) in poses.iter().enumerate() {
@@ -702,7 +710,7 @@ fn bake_monoglyph(path: &Path) -> io::Result<()> {
         let gauge = momentary_gauge(side);
         writeln!(
             out,
-            "BakedMonoglyphGauge {{ side: {side}, socket_half: {}, top_half: {}, body_half: {}, guard: BakedGuard {{ mesh: GAUGE_{side}_GUARD, floor_shadow: GAUGE_{side}_GUARD_FLOOR_SHADOW, crown_shadow: GAUGE_{side}_GUARD_CROWN_SHADOW_SOURCE }}, socket: GAUGE_{side}_SOCKET, poses: &GAUGE_{side}_POSES }},",
+            "BakedMonoglyphGauge {{ side: {side}, socket_half: {}, top_half: {}, body_half: {}, lockout_grille: BakedLockoutGrille {{ mesh: GAUGE_{side}_LOCKOUT_GRILLE, floor_shadow: GAUGE_{side}_LOCKOUT_GRILLE_FLOOR_SHADOW, crown_shadow: GAUGE_{side}_LOCKOUT_GRILLE_CROWN_SHADOW_SOURCE }}, socket: GAUGE_{side}_SOCKET, poses: &GAUGE_{side}_POSES }},",
             scalar(gauge.socket_half),
             scalar(gauge.top_half),
             scalar(gauge.body_half),
@@ -2444,17 +2452,13 @@ fn bail_sweep_per_radian(gauge: BailGauge) -> f32 {
             .sum::<f32>()
 }
 
-fn guard(gauge: GuardGauge) -> Model {
+fn lockout_grille(gauge: LockoutGrilleGauge) -> Model {
     let mut model = Model::default();
     for &x in gauge.wire_stations {
         let points = (0..=CURVE_STEPS)
             .map(|step| {
-                let y = lerp(
-                    -gauge.guard_half,
-                    gauge.guard_half,
-                    step as f32 / CURVE_STEPS as f32,
-                );
-                guard_wire_point(gauge, x, y, WIRE_LAYER)
+                let y = lerp(-gauge.half, gauge.half, step as f32 / CURVE_STEPS as f32);
+                lockout_grille_wire_point(gauge, x, y, WIRE_LAYER)
             })
             .collect::<Vec<_>>();
         model.append(tube(&points, V3::new(1.0, 0.0, 0.0), WIRE_RADIUS, false));
@@ -2462,23 +2466,19 @@ fn guard(gauge: GuardGauge) -> Model {
     for &y in gauge.wire_stations {
         let points = (0..=CURVE_STEPS)
             .map(|step| {
-                let x = lerp(
-                    -gauge.guard_half,
-                    gauge.guard_half,
-                    step as f32 / CURVE_STEPS as f32,
-                );
-                guard_wire_point(gauge, x, y, -WIRE_LAYER)
+                let x = lerp(-gauge.half, gauge.half, step as f32 / CURVE_STEPS as f32);
+                lockout_grille_wire_point(gauge, x, y, -WIRE_LAYER)
             })
             .collect::<Vec<_>>();
         model.append(tube(&points, V3::new(0.0, 1.0, 0.0), WIRE_RADIUS, false));
     }
     for &x in gauge.wire_stations {
         for &y in gauge.wire_stations {
-            model.append(sphere(guard_surface(gauge, x, y).0, WELD_RADIUS));
+            model.append(sphere(lockout_grille_surface(gauge, x, y).0, WELD_RADIUS));
         }
     }
     model.append(tube(
-        &guard_frame(gauge),
+        &lockout_grille_frame(gauge),
         V3::new(0.0, 0.0, 1.0),
         FRAME_RADIUS,
         true,
@@ -2486,12 +2486,12 @@ fn guard(gauge: GuardGauge) -> Model {
     model
 }
 
-fn guard_surface(gauge: GuardGauge, x: f32, y: f32) -> (V3, V3) {
+fn lockout_grille_surface(gauge: LockoutGrilleGauge, x: f32, y: f32) -> (V3, V3) {
     let ax = x.abs();
     let ay = y.abs();
-    let r = ax.max(ay) / gauge.guard_half;
-    let z = gauge.guard_base + gauge.guard_rise * (1.0 - r.clamp(0.0, 1.0).powi(4));
-    let slope = -4.0 * gauge.guard_rise * r.powi(3) / gauge.guard_half;
+    let r = ax.max(ay) / gauge.half;
+    let z = gauge.base + gauge.rise * (1.0 - r.clamp(0.0, 1.0).powi(4));
+    let slope = -4.0 * gauge.rise * r.powi(3) / gauge.half;
     let (dz_dx, dz_dy) = if ax >= ay {
         (slope * x.signum(), 0.0)
     } else {
@@ -2500,13 +2500,13 @@ fn guard_surface(gauge: GuardGauge, x: f32, y: f32) -> (V3, V3) {
     (V3::new(x, y, z), V3::new(-dz_dx, -dz_dy, 1.0).normalized())
 }
 
-fn guard_wire_point(gauge: GuardGauge, x: f32, y: f32, layer: f32) -> V3 {
-    let (surface, normal) = guard_surface(gauge, x, y);
-    let edge = (x.abs().max(y.abs()) / gauge.guard_half).clamp(0.0, 1.0);
+fn lockout_grille_wire_point(gauge: LockoutGrilleGauge, x: f32, y: f32, layer: f32) -> V3 {
+    let (surface, normal) = lockout_grille_surface(gauge, x, y);
+    let edge = (x.abs().max(y.abs()) / gauge.half).clamp(0.0, 1.0);
     surface + normal * layer * (1.0 - edge.powi(8))
 }
 
-fn guard_frame(gauge: GuardGauge) -> Vec<V3> {
+fn lockout_grille_frame(gauge: LockoutGrilleGauge) -> Vec<V3> {
     const SAMPLES: usize = 40;
     const POWER: f32 = 6.0;
     (0..SAMPLES)
@@ -2514,9 +2514,9 @@ fn guard_frame(gauge: GuardGauge) -> Vec<V3> {
             let theta = sample as f32 / SAMPLES as f32 * TAU;
             let (sin, cos) = theta.sin_cos();
             V3::new(
-                gauge.guard_half * cos.signum() * cos.abs().powf(2.0 / POWER),
-                gauge.guard_half * sin.signum() * sin.abs().powf(2.0 / POWER),
-                gauge.guard_base + FRAME_RADIUS,
+                gauge.half * cos.signum() * cos.abs().powf(2.0 / POWER),
+                gauge.half * sin.signum() * sin.abs().powf(2.0 / POWER),
+                gauge.base + FRAME_RADIUS,
             )
         })
         .collect()
@@ -2708,17 +2708,17 @@ fn verify_geometry() {
     assert!((fixed_half.z - HALF_Z).abs() < 1e-6);
     for side in MECHANISM_SIDES {
         let checkbox = checkbox_gauge(side);
-        verify_guard_geometry(
+        verify_lockout_grille_geometry(
             side,
-            checkbox.guard,
+            checkbox.lockout_grille,
             checkbox.body_half,
             checkbox.pose_max,
             checkbox.assembly_side * 0.5,
         );
         let monoglyph = momentary_gauge(side);
-        verify_guard_geometry(
+        verify_lockout_grille_geometry(
             side,
-            monoglyph_guard_gauge(side),
+            monoglyph_lockout_grille_gauge(side),
             monoglyph.body_half,
             MONOGLYPH_POSE_MAX,
             f32::from(side) * 0.5,
@@ -2790,16 +2790,16 @@ fn verify_geometry() {
     }
 }
 
-fn verify_guard_geometry(
+fn verify_lockout_grille_geometry(
     side: u8,
-    guard: GuardGauge,
+    grille: LockoutGrilleGauge,
     body_half: f32,
     pose_max: f32,
     footprint_half: f32,
 ) {
-    assert!(guard.guard_half + FRAME_RADIUS <= footprint_half);
+    assert!(grille.half + FRAME_RADIUS <= footprint_half);
     assert_eq!(
-        guard.wire_stations.len(),
+        grille.wire_stations.len(),
         match side {
             MECHANISM_SIDE_SMALL => 2,
             MECHANISM_SIDE_MEDIUM => 3,
@@ -2808,48 +2808,40 @@ fn verify_guard_geometry(
         }
     );
     assert!(
-        guard
+        grille
             .wire_stations
             .windows(2)
             .all(|stations| (stations[1] - stations[0] - 7.0).abs() < f32::EPSILON)
     );
-    for &x in guard.wire_stations {
+    for &x in grille.wire_stations {
         for step in 0..=CURVE_STEPS {
-            let y = lerp(
-                -guard.guard_half,
-                guard.guard_half,
-                step as f32 / CURVE_STEPS as f32,
-            );
-            let wire = guard_wire_point(guard, x, y, WIRE_LAYER);
+            let y = lerp(-grille.half, grille.half, step as f32 / CURVE_STEPS as f32);
+            let wire = lockout_grille_wire_point(grille, x, y, WIRE_LAYER);
             if x.abs() <= body_half && y.abs() <= body_half {
                 assert!(
                     wire.z - WIRE_RADIUS > pose_max,
-                    "upper guard wire collides with gauge {side} crown at ({x}, {y})"
+                    "upper Lockout Grille wire collides with gauge {side} crown at ({x}, {y})"
                 );
             }
         }
     }
-    for &y in guard.wire_stations {
+    for &y in grille.wire_stations {
         for step in 0..=CURVE_STEPS {
-            let x = lerp(
-                -guard.guard_half,
-                guard.guard_half,
-                step as f32 / CURVE_STEPS as f32,
-            );
-            let wire = guard_wire_point(guard, x, y, -WIRE_LAYER);
+            let x = lerp(-grille.half, grille.half, step as f32 / CURVE_STEPS as f32);
+            let wire = lockout_grille_wire_point(grille, x, y, -WIRE_LAYER);
             if x.abs() <= body_half && y.abs() <= body_half {
                 assert!(
                     wire.z - WIRE_RADIUS > pose_max,
-                    "lower guard wire collides with gauge {side} crown at ({x}, {y})"
+                    "lower Lockout Grille wire collides with gauge {side} crown at ({x}, {y})"
                 );
             }
         }
     }
-    for &x in guard.wire_stations {
-        for &y in guard.wire_stations {
-            let upper = guard_wire_point(guard, x, y, WIRE_LAYER);
-            let lower = guard_wire_point(guard, x, y, -WIRE_LAYER);
-            let edge = x.abs().max(y.abs()) / guard.guard_half;
+    for &x in grille.wire_stations {
+        for &y in grille.wire_stations {
+            let upper = lockout_grille_wire_point(grille, x, y, WIRE_LAYER);
+            let lower = lockout_grille_wire_point(grille, x, y, -WIRE_LAYER);
+            let edge = x.abs().max(y.abs()) / grille.half;
             let separation = 2.0 * WIRE_LAYER * (1.0 - edge.powi(8));
             assert!(((upper - lower).length() - separation).abs() < 1e-5);
             assert!((upper - lower).length() <= 2.0 * WELD_RADIUS);
