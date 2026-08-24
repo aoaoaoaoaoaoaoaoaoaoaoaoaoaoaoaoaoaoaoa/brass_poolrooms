@@ -1,0 +1,15 @@
+#!/bin/sh
+set -eu
+
+root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+port=${1:-4176}
+case "$port" in
+    ''|*[!0-9]*) printf 'invalid port: %s\n' "$port" >&2; exit 2 ;;
+esac
+if [ "$port" -gt 65535 ]; then
+    printf 'invalid port: %s\n' "$port" >&2
+    exit 2
+fi
+
+printf 'Foundry optics atelier: http://127.0.0.1:%s/web/soot-optics-swatch.html\n' "$port"
+exec python3 -m http.server "$port" --bind 127.0.0.1 --directory "$root"

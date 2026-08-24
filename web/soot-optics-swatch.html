@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0c0b09">
+    <meta
+      name="description"
+      content="Interactive WebGL2 soot, die-strike, and bronze-optics study for Brass Poolrooms monoglyphs."
+    >
+    <title>Poolrooms · soot and optics atelier</title>
+    <style>
+      @font-face {
+        font-family: "CMU Typewriter";
+        src: url("../assets/fonts/cmu-typewriter/cmuntt.ttf") format("truetype");
+        font-display: swap;
+      }
+
+      @font-face {
+        font-family: "Noto Math";
+        src: url("../assets/fonts/noto/NotoSansMath-Regular.ttf") format("truetype");
+        font-display: swap;
+      }
+
+      @font-face {
+        font-family: "Noto Symbols";
+        src: url("../assets/fonts/noto/NotoSansSymbols2-Regular.ttf") format("truetype");
+        font-display: swap;
+      }
+
+      :root {
+        color-scheme: dark;
+        font-family: "CMU Typewriter", ui-monospace, monospace;
+        background: #0c0b09;
+        color: #e2d9c6;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        min-width: 320px;
+        min-height: 100%;
+        margin: 0;
+        background:
+          linear-gradient(rgba(7, 6, 5, 0.58), rgba(7, 6, 5, 0.58)),
+          repeating-linear-gradient(0deg, transparent 0 41px, #282116 41px 42px),
+          repeating-linear-gradient(90deg, transparent 0 41px, #282116 41px 42px),
+          #0c0b09;
+      }
+
+      body {
+        padding: 24px;
+      }
+
+      #forge {
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 2;
+        pointer-events: none;
+      }
+
+      header,
+      main {
+        position: relative;
+        z-index: 1;
+        width: min(1320px, 100%);
+        margin-inline: auto;
+      }
+
+      header,
+      .study {
+        border: 1px solid #665844;
+        background: rgba(16, 14, 11, 0.94);
+      }
+
+      header {
+        padding: 18px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p,
+      dl,
+      dd {
+        margin: 0;
+      }
+
+      h1 {
+        margin-top: 5px;
+        color: #ebc597;
+        font-size: clamp(20px, 4vw, 34px);
+        font-weight: 400;
+        letter-spacing: 0.035em;
+      }
+
+      .eyebrow,
+      dt,
+      .axis,
+      .scale-key,
+      .family {
+        color: #9e9380;
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .lede {
+        max-width: 92ch;
+        margin-top: 10px;
+        color: #aaa08e;
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .diagnosis {
+        margin-top: 14px;
+        border-left: 2px solid #d65c2e;
+        background: rgba(42, 24, 15, 0.36);
+        padding: 9px 11px;
+        color: #d6c8b2;
+        font-size: 11px;
+        line-height: 1.5;
+      }
+
+      .legend {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(130px, 1fr));
+        gap: 8px;
+        margin-top: 16px;
+      }
+
+      .legend div {
+        border-top: 1px solid #4e4230;
+        padding-top: 7px;
+      }
+
+      dd {
+        margin-top: 3px;
+        color: #e2d9c6;
+        font-size: 11px;
+      }
+
+      .bench {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(280px, 1fr));
+        gap: 10px;
+        margin-top: 18px;
+      }
+
+      .specimen,
+      .verdict {
+        position: relative;
+        overflow: hidden;
+        border: 1px solid #4e4230;
+        background: rgba(10, 9, 8, 0.96);
+      }
+
+      .specimen {
+        min-height: 310px;
+        padding: 10px;
+      }
+
+      .specimen h2,
+      .verdict h2 {
+        position: relative;
+        z-index: 3;
+        color: #e2d9c6;
+        font-size: 12px;
+        font-weight: 400;
+      }
+
+      .specimen p,
+      .verdict p {
+        position: relative;
+        z-index: 3;
+        margin-top: 4px;
+        color: #9e9380;
+        font-size: 10px;
+      }
+
+      .render-target {
+        position: absolute;
+        inset: 50px 5px 34px;
+      }
+
+      .scale-key {
+        position: absolute;
+        right: 8px;
+        bottom: 7px;
+        z-index: 3;
+      }
+
+      .verdict {
+        min-height: 188px;
+        margin-top: 10px;
+        padding: 10px;
+      }
+
+      .verdict .render-target {
+        inset: 46px 5px 5px;
+      }
+
+      .selection {
+        display: block;
+        margin-top: 10px;
+        color: #ebc597;
+        font-size: 11px;
+        line-height: 1.5;
+      }
+
+      main {
+        display: grid;
+        gap: 18px;
+        margin-top: 18px;
+      }
+
+      .study {
+        padding: 12px;
+      }
+
+      .study-heading {
+        display: grid;
+        grid-template-columns: 1fr minmax(280px, 0.8fr);
+        gap: 20px;
+        align-items: end;
+        margin-bottom: 11px;
+      }
+
+      .study-heading h2 {
+        color: #ebc597;
+        font-size: 15px;
+        font-weight: 400;
+      }
+
+      .study-heading p {
+        color: #9e9380;
+        font-size: 11px;
+        line-height: 1.45;
+        text-align: right;
+      }
+
+      .swatch-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(280px, 1fr));
+        gap: 8px;
+      }
+
+      .matrix-row {
+        display: grid;
+        grid-template-columns: 130px 1fr;
+        gap: 8px;
+        margin-top: 8px;
+      }
+
+      .matrix-label {
+        border-top: 1px solid #4e4230;
+        padding-top: 9px;
+        color: #9e9380;
+        font-size: 10px;
+        line-height: 1.5;
+      }
+
+      .matrix-label strong {
+        display: block;
+        color: #e2d9c6;
+        font-size: 11px;
+        font-weight: 400;
+      }
+
+      .matrix-row .swatch-grid {
+        grid-template-columns: repeat(4, minmax(185px, 1fr));
+      }
+
+      button {
+        font: inherit;
+      }
+
+      .swatch {
+        position: relative;
+        min-height: 310px;
+        overflow: hidden;
+        border: 1px solid #4e4230;
+        border-radius: 1px;
+        color: #e2d9c6;
+        background: rgba(10, 9, 8, 0.97);
+        padding: 9px;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .swatch.coupon {
+        min-height: 370px;
+      }
+
+      .swatch:hover,
+      .swatch:focus-visible,
+      .swatch.selected {
+        border-color: #ebc597;
+        outline: none;
+      }
+
+      .swatch.selected::after {
+        position: absolute;
+        top: 7px;
+        right: 7px;
+        z-index: 4;
+        color: #ebc597;
+        content: "SELECTED";
+        font-size: 9px;
+        letter-spacing: 0.06em;
+      }
+
+      .swatch h3 {
+        position: absolute;
+        top: 9px;
+        left: 9px;
+        z-index: 3;
+        max-width: calc(100% - 72px);
+        color: #e2d9c6;
+        font-size: 12px;
+        font-weight: 400;
+      }
+
+      .swatch .family {
+        position: absolute;
+        top: 28px;
+        left: 9px;
+        z-index: 3;
+      }
+
+      .swatch .render-target {
+        inset: 46px 0 62px;
+      }
+
+      .spec-register {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 3;
+        min-height: 58px;
+        border-top: 1px solid #4e4230;
+        background: rgba(16, 14, 11, 0.97);
+        padding: 6px 8px;
+        color: #9e9380;
+        font-size: 9px;
+        line-height: 1.45;
+      }
+
+      .spec-register strong {
+        color: #d6c8b2;
+        font-weight: 400;
+      }
+
+      #fault {
+        position: fixed;
+        inset: 0;
+        z-index: 6;
+        display: none;
+        place-items: center;
+        padding: 24px;
+        color: #d65c2e;
+        background: #0c0b09;
+        text-align: center;
+      }
+
+      html[data-forge="failed"] #fault {
+        display: grid;
+      }
+
+      @media (max-width: 960px) {
+        .legend,
+        .bench,
+        .swatch-grid,
+        .matrix-row .swatch-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .study-heading {
+          grid-template-columns: 1fr;
+        }
+
+        .study-heading p {
+          text-align: left;
+        }
+
+        .matrix-row {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 520px) {
+        body {
+          padding: 10px;
+        }
+
+        .legend {
+          grid-template-columns: repeat(2, minmax(120px, 1fr));
+        }
+
+        .specimen,
+        .swatch {
+          min-height: 290px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="forge" aria-hidden="true"></canvas>
+    <header>
+      <div class="eyebrow">Foundry optics atelier · research swatch 01</div>
+      <h1>SOOT, STRIKE, AND BRONZE</h1>
+      <p class="lede">
+        The judgment target is a legible physical mark, not a comic-book contour.
+        The first study varies only the projected soot band. Later studies replace
+        the composited outline with depressed dies, then hold the winning hybrid die
+        fixed while changing the metal and its room.
+        Click any specimen to move it into the selected and native-gauge benches.
+      </p>
+      <p class="diagnosis">
+        Production currently paints eight fully black one-physical-pixel copies of
+        the glyph around every nonblack face. That is an exact square dilation of a
+        font mask, not soot deposited on three-dimensional relief. It explains both
+        the exceptional acuity and the uniformly inked silhouette.
+      </p>
+      <dl class="legend">
+        <div><dt>wₛ</dt><dd>Projected soot-band width in physical pixels</dd></div>
+        <div><dt>ρₛ</dt><dd>Linear soot reflectance; lower is darker</dd></div>
+        <div><dt>b</dt><dd>Die bevel run in screen-plane points</dd></div>
+        <div><dt>t</dt><dd>Cut depth normal to the crown</dd></div>
+      </dl>
+      <div class="bench">
+        <article class="specimen">
+          <h2>PRODUCTION COMPOSITE</h2>
+          <p>8-neighbour square dilation · wₛ 1.00 · ρₛ 0.00 · legacy bronze law</p>
+          <div class="render-target" data-fixed="production"></div>
+          <span class="scale-key">inspection trio · native M armory</span>
+        </article>
+        <article class="specimen">
+          <h2>SELECTED CANDIDATE</h2>
+          <p id="selected-spec"></p>
+          <div id="selected-render" class="render-target"></div>
+          <span class="scale-key">inspection trio · native M armory</span>
+        </article>
+      </div>
+      <article class="verdict">
+        <h2>NATIVE VERDICT STRIP</h2>
+        <p>Every representative at exact small, medium, and large mechanism gauges. No zoom credit.</p>
+        <div id="verdict-render" class="render-target" data-layout="verdict"></div>
+      </article>
+      <output id="selection" class="selection"></output>
+    </header>
+
+    <main>
+      <section class="study">
+        <div class="study-heading">
+          <div>
+            <div class="eyebrow">Controlled study A</div>
+            <h2>PERIMETER WIDTH × SOOT REFLECTANCE</h2>
+          </div>
+          <p>
+            Current flat compositing and bronze response are held fixed. Columns
+            vary wₛ; rows vary ρₛ. This isolates the UX-versus-comic-outline trade.
+          </p>
+        </div>
+        <div id="keyline-matrix"></div>
+      </section>
+
+      <section class="study">
+        <div class="study-heading">
+          <div>
+            <div class="eyebrow">Controlled study B</div>
+            <h2>DIE-STRIKE TOPOLOGIES</h2>
+          </div>
+          <p>
+            One environment-lit GGX bronze charge. The alternatives differ in
+            relief, bevel, floor, and where soot can physically collect.
+          </p>
+        </div>
+        <div id="die-grid" class="swatch-grid"></div>
+      </section>
+
+      <section class="study">
+        <div class="study-heading">
+          <div>
+            <div class="eyebrow">Controlled study C</div>
+            <h2>MATERIAL AND RASTER LAW</h2>
+          </div>
+          <p>
+            The finish-sensitive hybrid die and studio rig are fixed. Coupons add
+            sphere, cylinder, bevel, cavity, and helical stock beneath each mark.
+          </p>
+        </div>
+        <div id="optics-grid" class="swatch-grid"></div>
+      </section>
+
+      <section class="study">
+        <div class="study-heading">
+          <div>
+            <div class="eyebrow">Controlled study D</div>
+            <h2>ANALYTIC ROOM RIGS</h2>
+          </div>
+          <p>
+            Patinated GGX bronze and hybrid die are fixed. Only the reflected
+            ceiling, cards, strip, and floor change. These are lighting rigs, not
+            private widget palettes.
+          </p>
+        </div>
+        <div id="environment-grid" class="swatch-grid"></div>
+      </section>
+
+      <section class="study">
+        <div class="study-heading">
+          <div>
+            <div class="eyebrow">Apparatus limits</div>
+            <h2>WHAT THIS STUDY DOES NOT PROVE</h2>
+          </div>
+          <p>
+            Candidate selection authorizes a production forge, not direct
+            transplantation of this shader.
+          </p>
+        </div>
+        <div class="legend">
+          <div><dt>Raster</dt><dd>Canvas and egui use different native font rasterizers.</dd></div>
+          <div><dt>Relief</dt><dd>Continuous SDF height fields precede triangulated production dies.</dd></div>
+          <div><dt>Environment</dt><dd>Analytic broadened cards approximate, rather than integrate, rough IBL.</dd></div>
+          <div><dt>Legacy</dt><dd>The legacy material proxy is per-pixel here; production atlases are Gouraud-shaded in gamma space.</dd></div>
+        </div>
+      </section>
+    </main>
+
+    <div id="fault" role="alert"></div>
+    <script src="./soot-optics-swatch.js" defer></script>
+  </body>
+</html>
