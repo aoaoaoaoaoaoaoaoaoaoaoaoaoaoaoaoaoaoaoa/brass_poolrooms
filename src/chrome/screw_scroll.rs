@@ -172,14 +172,13 @@ impl ScrewScroll {
         ui: &mut egui::Ui,
         show_area: impl FnOnce(egui::ScrollArea, &mut egui::Ui) -> ScrollAreaOutput<R>,
     ) -> ScrollAreaOutput<R> {
-        let content_width = Self::content_width(self.max_size.x);
         let mut area = egui::ScrollArea::vertical()
             .scroll_bar_visibility(ScrollBarVisibility::AlwaysVisible)
             .scroll_source(ScrollSource {
                 scroll_bar: false,
                 ..ScrollSource::default()
             })
-            .max_width(content_width)
+            .max_width(self.max_size.x)
             .max_height(self.max_size.y)
             .min_scrolled_height(self.min_scrolled_height)
             .auto_shrink(self.auto_shrink)
