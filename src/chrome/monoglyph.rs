@@ -129,6 +129,7 @@ pub struct Monoglyph {
     finish: MonoglyphFinish,
     symbol: Option<Symbol>,
     focusable: bool,
+    soot_keyline: foundry::SootKeyline,
 }
 
 impl Monoglyph {
@@ -140,6 +141,7 @@ impl Monoglyph {
             finish: MonoglyphFinish::BrightCut,
             symbol: None,
             focusable: true,
+            soot_keyline: foundry::SootKeyline::PRODUCTION,
         }
     }
 
@@ -156,6 +158,7 @@ impl Monoglyph {
             finish: symbol.default_finish(),
             symbol: Some(symbol),
             focusable: true,
+            soot_keyline: foundry::SootKeyline::PRODUCTION,
         }
     }
 
@@ -183,6 +186,12 @@ impl Monoglyph {
     /// navigation.
     pub const fn focusable(mut self, focusable: bool) -> Self {
         self.focusable = focusable;
+        self
+    }
+
+    #[cfg(feature = "foundry-atelier")]
+    pub(crate) const fn study_soot(mut self, eighth_pixels: u8, srgb: u8) -> Self {
+        self.soot_keyline = foundry::SootKeyline::new(eighth_pixels, srgb);
         self
     }
 
@@ -307,6 +316,7 @@ impl Monoglyph {
                     origin,
                     self.glyph,
                     self.finish,
+                    self.soot_keyline,
                     motion.position,
                     gauge.top_half,
                 );
@@ -417,6 +427,7 @@ impl Monoglyph {
                         origin,
                         self.glyph,
                         self.finish,
+                        self.soot_keyline,
                         baked::REST,
                         gauge.top_half,
                     );
@@ -502,6 +513,7 @@ fn etch(
     origin: Pos2,
     glyph: char,
     finish: MonoglyphFinish,
+    soot_keyline: foundry::SootKeyline,
     elevation: f32,
     top_half: f32,
 ) {
@@ -513,7 +525,16 @@ fn etch(
     let pos = origin - galley.mesh_bounds.center().to_vec2();
     match finish {
         MonoglyphFinish::BrightCut => {
-            foundry::bright_cut_etch(painter, clip, pos, galley, elevation, depth, exposure);
+            foundry::bright_cut_etch(
+                painter,
+                clip,
+                pos,
+                galley,
+                elevation,
+                depth,
+                exposure,
+                soot_keyline,
+            );
         }
         MonoglyphFinish::Void => {
             foundry::flat_cut_etch(
@@ -525,6 +546,7 @@ fn etch(
                 depth,
                 foundry::EngravingFloor::Void,
                 exposure,
+                soot_keyline,
             );
         }
         MonoglyphFinish::Danger => {
@@ -537,6 +559,7 @@ fn etch(
                 depth,
                 foundry::EngravingFloor::Danger(glyph as u32),
                 exposure,
+                soot_keyline,
             );
         }
         MonoglyphFinish::Love => {
@@ -549,6 +572,7 @@ fn etch(
                 depth,
                 foundry::EngravingFloor::Love(glyph as u32),
                 exposure,
+                soot_keyline,
             );
         }
     }

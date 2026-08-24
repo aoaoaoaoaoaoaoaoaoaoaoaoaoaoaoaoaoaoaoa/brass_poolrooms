@@ -11,6 +11,7 @@ case "$gallery" in
     drag_handle_gallery) ;;
     number_input_gallery) ;;
     material_study_gallery) ;;
+    foundry_atelier) ;;
     longinus_cursor_gallery) ;;
     widget_gallery) ;;
     *) printf 'unknown gallery: %s\n' "$gallery" >&2; exit 2 ;;
@@ -19,7 +20,11 @@ esac
 mkdir -p "$out"
 target=$(cargo metadata --format-version 1 --no-deps | jq -r .target_directory)
 app="$target/debug/examples/$gallery"
-cargo build --example "$gallery"
+if [ "$gallery" = foundry_atelier ]; then
+    cargo build --features foundry-atelier --example "$gallery"
+else
+    cargo build --example "$gallery"
+fi
 
 setsid "$app" >"$out/app.log" 2>&1 &
 leader=$!
@@ -54,6 +59,8 @@ if [ "$ready" -ne 1 ]; then
     printf 'gallery never produced a nonblack frame\n' >&2
     exit 1
 fi
+sleep 0.25
+import -window "$window" "$out/initial.png"
 
 case "$gallery" in
     longinus_cursor_gallery)
@@ -180,6 +187,20 @@ case "$gallery" in
         sleep 0.02
         import -window "$window" "$out/hard-stop.png"
         xdotool mouseup 4
+        ;;
+    foundry_atelier)
+        xdotool mousemove --window "$window" 219 96 click 1
+        sleep 0.40
+        import -window "$window" "$out/soot.png"
+        xdotool mousemove --window "$window" 318 96 click 1
+        sleep 0.40
+        import -window "$window" "$out/dies.png"
+        xdotool mousemove --window "$window" 407 96 click 1
+        sleep 0.40
+        import -window "$window" "$out/material.png"
+        xdotool mousemove --window "$window" 510 96 click 1
+        sleep 0.40
+        import -window "$window" "$out/mandate.png"
         ;;
     widget_gallery)
         # The numerical wheel owns its complete smoothed impulse. Its value and

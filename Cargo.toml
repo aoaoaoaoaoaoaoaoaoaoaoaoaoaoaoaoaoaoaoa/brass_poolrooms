@@ -18,6 +18,8 @@ include = [
   "web/**",
   "docs/**",
   "scripts/gallery-service",
+  "scripts/web-atelier",
+  "scripts/web-exhibit",
   "scripts/web-gallery",
   "assets/**",
   "LICENSE*",
@@ -60,6 +62,10 @@ name = "material_study_gallery"
 required-features = ["water"]
 
 [[example]]
+name = "foundry_atelier"
+required-features = ["water", "foundry-atelier"]
+
+[[example]]
 name = "longinus_cursor_gallery"
 required-features = ["water"]
 
@@ -84,6 +90,7 @@ version = "0.14.5"
 
 [features]
 default = ["water"]
+foundry-atelier = []
 instrumentation = []
 water = ["dep:anyhow", "dep:bytemuck", "dep:egui-wgpu", "dep:web-time"]
 

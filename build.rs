@@ -4,6 +4,8 @@ use std::{env, error::Error, io, path::PathBuf};
 mod foundry_atlas;
 #[path = "src/chrome/foundry/law.rs"]
 mod foundry_law;
+#[path = "build/optics_atlas.rs"]
+mod optics_atlas;
 
 // Cargo package verification can overwrite this workspace's build-script unit
 // when both use one target directory. Retaining the compilation root turns
@@ -24,6 +26,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     println!("cargo::rerun-if-changed=build.rs");
     println!("cargo::rerun-if-changed=build/foundry_atlas.rs");
+    println!("cargo::rerun-if-changed=build/optics_atlas.rs");
     println!("cargo::rerun-if-changed=src/chrome/foundry/law.rs");
     let output = PathBuf::from(env::var("OUT_DIR")?);
     foundry_atlas::bake(
@@ -37,5 +40,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         &output.join("material_study_atlas.rs"),
         &output.join("longinus_cursor.rs"),
     )?;
+    if env::var_os("CARGO_FEATURE_FOUNDRY_ATELIER").is_some() {
+        optics_atlas::bake(
+            &output.join("optics_atelier_atlas.rs"),
+            foundry_atlas::optics_coupons(),
+        )?;
+    }
     Ok(())
 }

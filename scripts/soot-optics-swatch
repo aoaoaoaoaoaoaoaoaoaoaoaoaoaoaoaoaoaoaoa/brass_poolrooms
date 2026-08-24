@@ -11,5 +11,5 @@ if [ "$port" -gt 65535 ]; then
     exit 2
 fi
 
-printf 'Foundry optics atelier: http://127.0.0.1:%s/web/soot-optics-swatch.html\n' "$port"
+printf 'Approximate optics ideation annex: http://127.0.0.1:%s/web/soot-optics-swatch.html\n' "$port"
 exec python3 -m http.server "$port" --bind 127.0.0.1 --directory "$root"

@@ -10,6 +10,10 @@
 pub mod chrome;
 mod tide;
 
+#[cfg(feature = "foundry-atelier")]
+#[doc(hidden)]
+pub mod atelier;
+
 #[cfg(feature = "water")]
 pub mod water;
 

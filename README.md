@@ -119,7 +119,16 @@ cargo run --example corner_close_gallery
 cargo run --example drag_handle_gallery
 cargo run --example number_input_gallery
 cargo run --example longinus_cursor_gallery
+cargo run --features foundry-atelier --example foundry_atelier
 ```
+
+The feature-gated Foundry Optics Atelier is the standing material, lighting,
+soot, die, and symbol-gauge judgment surface. It renders live mechanisms and
+build-time candidate meshes through the production Rust/egui/WGPU stack, with
+native S/M/L output always visible and Medium treated as the primary gauge.
+Native WGPU is authoritative. Its fixed-size browser projection uses the same
+Rust code and can be raised separately with `scripts/web-atelier serve`; public
+promotion remains gated on controlled-DPR image comparison.
 
 The combined gallery is also the browser contract:
 

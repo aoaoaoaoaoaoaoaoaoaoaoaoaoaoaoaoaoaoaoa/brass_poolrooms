@@ -3,3 +3,4 @@ set -eu
 
 scripts/web-kit verify
 scripts/web-gallery check
+scripts/web-atelier check

@@ -1,0 +1,175 @@
+#!/bin/sh
+set -eu
+
+usage() {
+    printf 'usage: scripts/web-exhibit [widget_gallery|foundry_atelier] [build|check|serve [PORT]|serve-built [PORT]]\n' >&2
+}
+
+example=${1:-}
+[ "$#" -ge 1 ] && shift
+case "$example" in
+    widget_gallery)
+        bundle_name=web-gallery
+        source_html=web/widget-gallery.html
+        source_boot=web/widget-gallery-boot.js
+        feature=
+        default_port=4173
+        title='Poolrooms web gallery'
+        ;;
+    foundry_atelier)
+        bundle_name=foundry-atelier
+        source_html=web/foundry-atelier.html
+        source_boot=web/foundry-atelier-boot.js
+        feature=foundry-atelier
+        default_port=4181
+        title='Foundry Optics Atelier'
+        ;;
+    *) usage; exit 2 ;;
+esac
+
+action=${1:-serve}
+case "$action" in
+    build|check) [ "$#" -eq 1 ] || { usage; exit 2; } ;;
+    serve|serve-built) [ "$#" -le 2 ] || { usage; exit 2; } ;;
+    *) usage; exit 2 ;;
+esac
+
+case "$action" in
+    serve|serve-built)
+        port=${2:-${PORT:-$default_port}}
+        case "$port" in
+            ''|*[!0-9]*) printf 'invalid port: %s\n' "$port" >&2; exit 2 ;;
+        esac
+        if [ "$port" -gt 65535 ] || { [ "$action" = serve-built ] && [ "$port" -eq 0 ]; }; then
+            printf 'invalid port: %s\n' "$port" >&2
+            exit 2
+        fi
+        ;;
+esac
+
+target=$(cargo metadata --format-version 1 --no-deps | jq -r .target_directory)
+out="$target/$bundle_name"
+wasm="$target/wasm32-unknown-unknown/release/examples/$example.wasm"
+
+verify_bundle() {
+    bundle=$1
+    test -s "$bundle/index.html"
+    test -s "$bundle/boot.js"
+    test -s "$bundle/poolrooms.js"
+    test -s "$bundle/poolrooms_bg.wasm"
+    grep -Fq 'src="./boot.js"' "$bundle/index.html"
+    grep -Fq 'import init from "./poolrooms.js"' "$bundle/boot.js"
+    grep -Fq 'await navigator.gpu.requestAdapter({' "$bundle/boot.js"
+    grep -Fq '"swiftshader"' "$bundle/boot.js"
+    grep -Fq 'wasm.__wbindgen_start();' "$bundle/poolrooms.js"
+}
+
+if [ "$action" != serve-built ]; then
+    if [ -n "$feature" ]; then
+        cargo build --release --target wasm32-unknown-unknown --features "$feature" --example "$example"
+    else
+        cargo build --release --target wasm32-unknown-unknown --example "$example"
+    fi
+
+    stage=$(mktemp -d "$target/.$bundle_name.XXXXXXXX")
+    previous="$target/.$bundle_name.previous"
+    cleanup() {
+        rm -rf "$stage"
+        if [ ! -e "$out" ] && [ -e "$previous" ]; then
+            mv "$previous" "$out"
+        fi
+    }
+    trap cleanup EXIT HUP INT TERM
+
+    wasm-bindgen \
+        --target web \
+        --no-typescript \
+        --remove-name-section \
+        --remove-producers-section \
+        --out-dir "$stage" \
+        --out-name poolrooms \
+        "$wasm"
+    install -Dm644 "$source_html" "$stage/index.html"
+    install -Dm644 "$source_boot" "$stage/boot.js"
+    verify_bundle "$stage"
+
+    rm -rf "$previous"
+    if [ -e "$out" ]; then
+        mv "$out" "$previous"
+    fi
+    mv "$stage" "$out"
+    rm -rf "$previous"
+    trap - EXIT HUP INT TERM
+elif [ ! -d "$out" ]; then
+    printf 'no built exhibit at %s; run the build action first\n' "$out" >&2
+    exit 1
+else
+    verify_bundle "$out"
+fi
+
+printf '%s: %s\n' "$title" "$out"
+
+case "$action" in
+    serve|serve-built)
+        printf '%s\n' 'Linux Chromium may require the Unsafe WebGPU and Vulkan flags; see README.md.'
+        if [ "$action" = serve-built ]; then
+            bind_policy=fixed
+        else
+            bind_policy=elastic
+        fi
+        exec python3 - "$out" "$port" "$bind_policy" <<'PY'
+import errno
+import os
+import socket
+import sys
+from functools import partial
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+
+root, raw_port, bind_policy = sys.argv[1:]
+host = "127.0.0.1"
+requested = int(raw_port)
+
+
+class ExhibitHandler(SimpleHTTPRequestHandler):
+    def end_headers(self):
+        self.send_header("Cache-Control", "no-cache")
+        super().end_headers()
+
+
+handler = partial(ExhibitHandler, directory=root)
+
+
+def notify_ready(url):
+    address = os.environ.get("NOTIFY_SOCKET")
+    if not address:
+        return
+    if address.startswith("@"):
+        address = "\0" + address[1:]
+    with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as notifier:
+        notifier.connect(address)
+        notifier.sendall(f"READY=1\nSTATUS=Serving {url}".encode())
+
+
+try:
+    server = ThreadingHTTPServer((host, requested), handler)
+except OSError as error:
+    if error.errno != errno.EADDRINUSE:
+        raise
+    if bind_policy == "fixed":
+        print(f"Fixed exhibit port {requested} is occupied.", file=sys.stderr, flush=True)
+        raise SystemExit(98) from None
+    server = ThreadingHTTPServer((host, 0), handler)
+    print(f"Port {requested} is occupied; selected {server.server_address[1]}.", flush=True)
+
+url = f"http://{host}:{server.server_address[1]}"
+notify_ready(url)
+print(f"Serving {url}", flush=True)
+try:
+    server.serve_forever()
+except KeyboardInterrupt:
+    pass
+finally:
+    server.server_close()
+PY
+        ;;
+esac

@@ -18,6 +18,32 @@ pub(crate) const ABYSS: Color32 = Color32::from_rgb(3, 3, 4);
 pub(crate) const CONTROL_STOCK_DIAMETER: f32 = 14.0;
 pub(crate) const RIM_RADIUS: f32 = 1.0;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct SootKeyline {
+    eighth_pixels: u8,
+    srgb: u8,
+}
+
+impl SootKeyline {
+    pub(crate) const PRODUCTION: Self = Self::new(8, 0);
+
+    pub(crate) const fn new(eighth_pixels: u8, srgb: u8) -> Self {
+        assert!(eighth_pixels > 0, "a soot keyline must expose material");
+        Self {
+            eighth_pixels,
+            srgb,
+        }
+    }
+
+    const fn width_pixels(self) -> f32 {
+        self.eighth_pixels as f32 / 8.0
+    }
+
+    const fn color(self) -> Color32 {
+        Color32::from_gray(self.srgb)
+    }
+}
+
 const STAMP_GAUGE: f32 = 1.0;
 const PLAQUE_RISE: f32 = 2.0;
 const PLAQUE_BEVEL_RUN: f32 = PLAQUE_RISE;
@@ -135,11 +161,12 @@ pub(crate) fn bright_cut_etch(
     surface_z: f32,
     depth: f32,
     exposure: f32,
+    keyline: SootKeyline,
 ) {
     let incision = painter.with_clip_rect(clip);
     let light_fall = depth * (-LIGHT_Y / LIGHT_Z) * perspective_scale(surface_z);
     let wall = pos + Vec2::new(0.0, light_fall);
-    paint_soot_keyline(&incision, wall, &galley);
+    paint_soot_keyline(&incision, wall, &galley, keyline);
     incision.galley_with_override_text_color(
         pos - Vec2::new(0.0, light_fall * 0.20),
         galley.clone(),
@@ -166,6 +193,7 @@ pub(crate) fn flat_cut_etch(
     depth: f32,
     floor: EngravingFloor,
     exposure: f32,
+    keyline: SootKeyline,
 ) {
     let incision = painter.with_clip_rect(clip);
     let wall_run = FLAT_CUT_BEVEL_RUN * perspective_scale(surface_z);
@@ -190,7 +218,7 @@ pub(crate) fn flat_cut_etch(
         EngravingFloor::Love(seed) => (LOVE_PAINT, seed),
     };
     let paint = albedo.gamma_multiply(exposure);
-    paint_soot_keyline(&incision, pos, &galley);
+    paint_soot_keyline(&incision, pos, &galley, keyline);
     let _floor = incision.add(Shape::galley(
         pos,
         painted_galley(galley, paint, seed),
@@ -198,8 +226,13 @@ pub(crate) fn flat_cut_etch(
     ));
 }
 
-fn paint_soot_keyline(painter: &egui::Painter, pos: Pos2, galley: &Arc<Galley>) {
-    let pixel = painter.pixels_per_point().recip();
+fn paint_soot_keyline(
+    painter: &egui::Painter,
+    pos: Pos2,
+    galley: &Arc<Galley>,
+    keyline: SootKeyline,
+) {
+    let run = keyline.width_pixels() / painter.pixels_per_point();
     for [x, y] in [
         [-1.0, -1.0],
         [0.0, -1.0],
@@ -211,9 +244,9 @@ fn paint_soot_keyline(painter: &egui::Painter, pos: Pos2, galley: &Arc<Galley>) 
         [1.0, 1.0],
     ] {
         painter.galley_with_override_text_color(
-            pos + Vec2::new(x * pixel, y * pixel),
+            pos + Vec2::new(x * run, y * run),
             galley.clone(),
-            Color32::BLACK,
+            keyline.color(),
         );
     }
 }

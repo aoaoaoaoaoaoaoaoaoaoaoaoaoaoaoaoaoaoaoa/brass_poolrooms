@@ -2,4 +2,4 @@
 set -eu
 
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
-exec "$root/scripts/web-exhibit" widget_gallery "$@"
+exec "$root/scripts/web-exhibit" foundry_atelier "$@"
