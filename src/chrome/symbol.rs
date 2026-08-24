@@ -17,6 +17,14 @@ pub enum Symbol {
     /// Its heavy plus cut is centered and D₄-symmetric, and is shared with
     /// [`Self::Increment`].
     Add,
+    /// Navigate or point downward.
+    ArrowDown,
+    /// Navigate or point leftward.
+    ArrowLeft,
+    /// Navigate or point rightward.
+    ArrowRight,
+    /// Navigate or point upward.
+    ArrowUp,
     /// Collapse an open disclosure.
     Collapse,
     /// Confirm or accept a pending operation.
@@ -73,8 +81,12 @@ pub enum Symbol {
 
 impl Symbol {
     /// Complete armory in stable presentation order.
-    pub const ALL: [Self; 21] = [
+    pub const ALL: [Self; 25] = [
         Self::Add,
+        Self::ArrowLeft,
+        Self::ArrowRight,
+        Self::ArrowUp,
+        Self::ArrowDown,
         Self::Remove,
         Self::Delete,
         Self::Duplicate,
@@ -101,6 +113,10 @@ impl Symbol {
     pub const fn glyph(self) -> char {
         match self {
             Self::Add | Self::Increment => '✚',
+            Self::ArrowDown => '↓',
+            Self::ArrowLeft => '←',
+            Self::ArrowRight => '→',
+            Self::ArrowUp => '↑',
             Self::Collapse => '▾',
             Self::Confirm => '✓',
             Self::Copy => '🗐',
@@ -133,6 +149,10 @@ impl Symbol {
             Self::Delete => MonoglyphFinish::Danger,
             Self::Heart => MonoglyphFinish::Love,
             Self::Add
+            | Self::ArrowDown
+            | Self::ArrowLeft
+            | Self::ArrowRight
+            | Self::ArrowUp
             | Self::Collapse
             | Self::Confirm
             | Self::Copy
@@ -158,6 +178,10 @@ impl Symbol {
     pub const fn name(self) -> &'static str {
         match self {
             Self::Add => "ADD",
+            Self::ArrowDown => "DOWN",
+            Self::ArrowLeft => "LEFT",
+            Self::ArrowRight => "RIGHT",
+            Self::ArrowUp => "UP",
             Self::Collapse => "COLLAPSE",
             Self::Confirm => "CONFIRM",
             Self::Copy => "COPY",

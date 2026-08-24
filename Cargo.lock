@@ -2522,3 +2522,19 @@ dependencies = [
  "quote",
  "syn 2.0.119",
 ]
+
+[[patch.unused]]
+name = "egui-demo"
+version = "0.9.13"
+
+[[patch.unused]]
+name = "egui-tester"
+version = "0.9.13"
+
+[[patch.unused]]
+name = "egui-tester-witness"
+version = "0.9.13"
+
+[[patch.unused]]
+name = "eternalist-apps"
+version = "0.10.0"
