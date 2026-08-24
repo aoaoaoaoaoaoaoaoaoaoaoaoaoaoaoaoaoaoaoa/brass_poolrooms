@@ -70,6 +70,11 @@ pub use sort_toggle::{SortDetent, SortToggle, SortToggleResponse, SortToggleWake
 pub use symbol::Symbol;
 pub use wheel::take_control_wheel;
 
+#[cfg(feature = "foundry-atelier")]
+pub(crate) use foundry::{DieTopology, StudyEtch, StudyEtchPalette};
+#[cfg(feature = "foundry-atelier")]
+pub(crate) use monoglyph::paint_study_etch;
+
 const CMU_TYPEWRITER: &[u8] = include_bytes!("../assets/fonts/cmu-typewriter/cmuntt.ttf");
 const NOTO_MATH: &[u8] = include_bytes!("../assets/fonts/noto/NotoSansMath-Regular.ttf");
 const NOTO_SYMBOLS: &[u8] = include_bytes!("../assets/fonts/noto/NotoSansSymbols2-Regular.ttf");

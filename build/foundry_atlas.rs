@@ -456,11 +456,32 @@ pub(crate) fn bake(
     bake_longinus_cursor(longinus_cursor_path)
 }
 
-pub(crate) fn optics_coupons() -> [Model; 2] {
-    [
-        monoglyph_plunger(MONOGLYPH_REST, momentary_gauge(MECHANISM_SIDE_LARGE)),
-        bail_plate(bail_gauge(MECHANISM_SIDE_LARGE)),
-    ]
+pub(crate) struct OpticsCoupons {
+    pub(crate) buttons: [Model; 3],
+    pub(crate) sockets: [Model; 3],
+    pub(crate) plate: Model,
+    pub(crate) screw: Model,
+}
+
+pub(crate) fn optics_coupons() -> OpticsCoupons {
+    let gauges = MECHANISM_SIDES.map(momentary_gauge);
+    OpticsCoupons {
+        buttons: gauges.map(|gauge| monoglyph_plunger(MONOGLYPH_REST, gauge)),
+        sockets: gauges.map(momentary_socket),
+        plate: bail_plate(bail_gauge(MECHANISM_SIDE_LARGE)),
+        screw: optics_screw(),
+    }
+}
+
+fn optics_screw() -> Model {
+    let mut screw = Model::default();
+    for turn in -2..=1 {
+        screw.append(scroll_screw(0.0).transformed(
+            |position| position + V3::new(0.0, turn as f32 * SCROLL_LEAD, 0.0),
+            |normal| normal,
+        ));
+    }
+    screw
 }
 
 fn bake_checkbox(path: &Path) -> io::Result<()> {

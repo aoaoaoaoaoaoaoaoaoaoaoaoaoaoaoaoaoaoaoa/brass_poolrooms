@@ -42,6 +42,116 @@ impl SootKeyline {
     const fn color(self) -> Color32 {
         Color32::from_gray(self.srgb)
     }
+
+    #[cfg(feature = "foundry-atelier")]
+    const fn scaled(self, numerator: u8, denominator: u8) -> Self {
+        Self::new(
+            self.eighth_pixels
+                .saturating_mul(numerator)
+                .div_ceil(denominator),
+            self.srgb,
+        )
+    }
+}
+
+#[cfg(feature = "foundry-atelier")]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum DieTopology {
+    #[default]
+    Production,
+    Keyline,
+    FlatBottom,
+    ShadowWall,
+    Radiused,
+    Hybrid,
+    Inlay,
+    Raised,
+    Washed,
+}
+
+#[cfg(feature = "foundry-atelier")]
+impl DieTopology {
+    pub(crate) const ALL: [Self; 9] = [
+        Self::Production,
+        Self::Keyline,
+        Self::FlatBottom,
+        Self::ShadowWall,
+        Self::Radiused,
+        Self::Hybrid,
+        Self::Inlay,
+        Self::Raised,
+        Self::Washed,
+    ];
+
+    pub(crate) const fn name(self) -> &'static str {
+        match self {
+            Self::Production => "PRODUCTION",
+            Self::Keyline => "FULL PERIMETER",
+            Self::FlatBottom => "FLAT-BOTTOM STAMP",
+            Self::ShadowWall => "SHADOW-WALL DEPOSITION",
+            Self::Radiused => "RADIUSED PUNCH",
+            Self::Hybrid => "FINISH-SENSITIVE HYBRID",
+            Self::Inlay => "SHALLOW FLUSH INLAY",
+            Self::Raised => "RAISED PUNCH CAMEO",
+            Self::Washed => "OXIDE-WASHED BOWL",
+        }
+    }
+
+    pub(crate) const fn register(self) -> &'static str {
+        match self {
+            Self::Production => "current square-offset composite",
+            Self::Keyline => "full soot perimeter · no relief",
+            Self::FlatBottom => "steep bronze wall · sooted floor toe",
+            Self::ShadowWall => "soot confined to the key-occluded wall",
+            Self::Radiused => "graduated bowl wall · soft toe occlusion",
+            Self::Hybrid => "bright V-cut · painted flat floor",
+            Self::Inlay => "near-flush fill · narrow contact occlusion",
+            Self::Raised => "positive relief · sooted die shoulder",
+            Self::Washed => "radiused strike · broken oxide deposition",
+        }
+    }
+}
+
+#[cfg(feature = "foundry-atelier")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct StudyEtchPalette {
+    pub(crate) surface: Color32,
+    pub(crate) key_wall: Color32,
+    pub(crate) lee_wall: Color32,
+    pub(crate) flank: Color32,
+}
+
+#[cfg(feature = "foundry-atelier")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct StudyEtch {
+    pub(crate) topology: DieTopology,
+    pub(crate) palette: StudyEtchPalette,
+    pub(crate) keyline: SootKeyline,
+}
+
+#[cfg(feature = "foundry-atelier")]
+impl StudyEtch {
+    pub(crate) const fn new(
+        topology: DieTopology,
+        palette: StudyEtchPalette,
+        eighth_pixels: u8,
+        srgb: u8,
+    ) -> Self {
+        Self {
+            topology,
+            palette,
+            keyline: SootKeyline::new(eighth_pixels, srgb),
+        }
+    }
+}
+
+#[cfg(feature = "foundry-atelier")]
+#[derive(Clone, Copy)]
+pub(crate) enum StudyFloor {
+    Bright,
+    Void,
+    Danger(u32),
+    Love(u32),
 }
 
 const STAMP_GAUGE: f32 = 1.0;
@@ -223,6 +333,208 @@ pub(crate) fn flat_cut_etch(
         pos,
         painted_galley(galley, paint, seed),
         rough_paint(paint, seed, 0, 0),
+    ));
+}
+
+#[cfg(feature = "foundry-atelier")]
+pub(crate) fn study_etch(
+    painter: &egui::Painter,
+    clip: Rect,
+    pos: Pos2,
+    galley: Arc<Galley>,
+    treatment: StudyEtch,
+    floor: StudyFloor,
+) {
+    let incision = painter.with_clip_rect(clip);
+    let pixel = 1.0 / painter.pixels_per_point();
+    if treatment.topology == DieTopology::Production {
+        let wall = 0.42 * pixel;
+        match floor {
+            StudyFloor::Bright => {
+                let face = pos + Vec2::new(0.0, wall);
+                paint_soot_keyline(&incision, face, &galley, treatment.keyline);
+                incision.galley_with_override_text_color(
+                    pos - Vec2::new(0.0, wall * 0.2),
+                    galley.clone(),
+                    treatment.palette.lee_wall,
+                );
+                paint_study_floor(&incision, face, galley, floor, treatment.palette.key_wall);
+            }
+            StudyFloor::Void | StudyFloor::Danger(_) | StudyFloor::Love(_) => {
+                incision.galley_with_override_text_color(
+                    pos - Vec2::new(0.0, wall * 0.18),
+                    galley.clone(),
+                    treatment.palette.lee_wall,
+                );
+                incision.galley_with_override_text_color(
+                    pos + Vec2::new(0.0, wall),
+                    galley.clone(),
+                    treatment.palette.key_wall,
+                );
+                if !matches!(floor, StudyFloor::Void) {
+                    paint_soot_keyline(&incision, pos, &galley, treatment.keyline);
+                }
+                paint_study_floor(&incision, pos, galley, floor, treatment.palette.surface);
+            }
+        }
+        return;
+    }
+
+    let wall = match treatment.topology {
+        DieTopology::Production | DieTopology::Keyline | DieTopology::Inlay => 0.0,
+        DieTopology::FlatBottom | DieTopology::ShadowWall | DieTopology::Hybrid => 0.62,
+        DieTopology::Radiused | DieTopology::Washed => 0.78,
+        DieTopology::Raised => 0.54,
+    } * pixel;
+
+    match treatment.topology {
+        DieTopology::Production => unreachable!("production returns before prototype dispatch"),
+        DieTopology::Keyline => {
+            paint_soot_keyline(&incision, pos, &galley, treatment.keyline);
+            paint_study_floor(&incision, pos, galley, floor, treatment.palette.surface);
+        }
+        DieTopology::FlatBottom => {
+            incision.galley_with_override_text_color(
+                pos - Vec2::new(0.0, wall * 0.28),
+                galley.clone(),
+                treatment.palette.lee_wall,
+            );
+            incision.galley_with_override_text_color(
+                pos + Vec2::new(0.0, wall),
+                galley.clone(),
+                treatment.palette.key_wall,
+            );
+            paint_soot_keyline(&incision, pos, &galley, treatment.keyline.scaled(2, 3));
+            paint_study_floor(&incision, pos, galley, floor, treatment.palette.surface);
+        }
+        DieTopology::ShadowWall => {
+            incision.galley_with_override_text_color(
+                pos + Vec2::new(0.0, treatment.keyline.width_pixels() * pixel),
+                galley.clone(),
+                treatment.keyline.color(),
+            );
+            incision.galley_with_override_text_color(
+                pos - Vec2::new(0.0, wall * 0.24),
+                galley.clone(),
+                treatment.palette.lee_wall,
+            );
+            incision.galley_with_override_text_color(
+                pos + Vec2::new(0.0, wall * 0.66),
+                galley.clone(),
+                treatment.palette.key_wall,
+            );
+            paint_study_floor(&incision, pos, galley, floor, treatment.palette.surface);
+        }
+        DieTopology::Radiused => {
+            paint_radiused_wall(&incision, pos, &galley, wall, treatment.palette);
+            paint_soot_keyline(&incision, pos, &galley, treatment.keyline.scaled(1, 2));
+            paint_study_floor(&incision, pos, galley, floor, treatment.palette.flank);
+        }
+        DieTopology::Hybrid => {
+            if matches!(floor, StudyFloor::Bright) {
+                incision.galley_with_override_text_color(
+                    pos + Vec2::new(0.0, treatment.keyline.width_pixels() * pixel),
+                    galley.clone(),
+                    treatment.keyline.color(),
+                );
+                incision.galley_with_override_text_color(
+                    pos + Vec2::new(0.0, wall),
+                    galley.clone(),
+                    treatment.palette.key_wall,
+                );
+            } else {
+                incision.galley_with_override_text_color(
+                    pos - Vec2::new(0.0, wall * 0.22),
+                    galley.clone(),
+                    treatment.palette.lee_wall,
+                );
+                incision.galley_with_override_text_color(
+                    pos + Vec2::new(0.0, wall * 0.74),
+                    galley.clone(),
+                    treatment.palette.key_wall,
+                );
+                paint_soot_keyline(&incision, pos, &galley, treatment.keyline.scaled(2, 3));
+            }
+            paint_study_floor(&incision, pos, galley, floor, treatment.palette.flank);
+        }
+        DieTopology::Inlay => {
+            paint_soot_keyline(&incision, pos, &galley, treatment.keyline.scaled(1, 3));
+            paint_study_floor(&incision, pos, galley, floor, treatment.palette.flank);
+        }
+        DieTopology::Raised => {
+            incision.galley_with_override_text_color(
+                pos + Vec2::new(0.0, treatment.keyline.width_pixels() * pixel),
+                galley.clone(),
+                treatment.keyline.color(),
+            );
+            incision.galley_with_override_text_color(
+                pos + Vec2::new(0.0, wall),
+                galley.clone(),
+                treatment.palette.lee_wall,
+            );
+            incision.galley_with_override_text_color(
+                pos - Vec2::new(0.0, wall * 0.82),
+                galley.clone(),
+                treatment.palette.key_wall,
+            );
+            paint_study_floor(&incision, pos, galley, floor, treatment.palette.flank);
+        }
+        DieTopology::Washed => {
+            paint_radiused_wall(&incision, pos, &galley, wall, treatment.palette);
+            for (step, alpha) in [(0.45, 0.78), (0.72, 0.46), (1.0, 0.24)] {
+                incision.galley_with_override_text_color(
+                    pos + Vec2::new(wall * step * 0.32, wall * step),
+                    galley.clone(),
+                    treatment.keyline.color().gamma_multiply(alpha),
+                );
+            }
+            paint_study_floor(&incision, pos, galley, floor, treatment.palette.flank);
+        }
+    }
+}
+
+#[cfg(feature = "foundry-atelier")]
+fn paint_radiused_wall(
+    painter: &egui::Painter,
+    pos: Pos2,
+    galley: &Arc<Galley>,
+    run: f32,
+    palette: StudyEtchPalette,
+) {
+    for (offset, color) in [
+        (Vec2::new(0.0, -run), palette.lee_wall),
+        (Vec2::new(-run * 0.64, -run * 0.42), palette.flank),
+        (Vec2::new(run * 0.64, run * 0.42), palette.flank),
+        (Vec2::new(0.0, run), palette.key_wall),
+    ] {
+        painter.galley_with_override_text_color(pos + offset, galley.clone(), color);
+    }
+}
+
+#[cfg(feature = "foundry-atelier")]
+fn paint_study_floor(
+    painter: &egui::Painter,
+    pos: Pos2,
+    galley: Arc<Galley>,
+    floor: StudyFloor,
+    bright: Color32,
+) {
+    let (albedo, seed) = match floor {
+        StudyFloor::Bright => {
+            painter.galley_with_override_text_color(pos, galley, bright);
+            return;
+        }
+        StudyFloor::Void => {
+            painter.galley_with_override_text_color(pos, galley, Color32::BLACK);
+            return;
+        }
+        StudyFloor::Danger(seed) => (DANGER_PAINT, seed),
+        StudyFloor::Love(seed) => (LOVE_PAINT, seed),
+    };
+    let _floor = painter.add(Shape::galley(
+        pos,
+        painted_galley(galley, albedo, seed),
+        rough_paint(albedo, seed, 0, 0),
     ));
 }
 

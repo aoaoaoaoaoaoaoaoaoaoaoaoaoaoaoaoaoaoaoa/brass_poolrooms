@@ -189,16 +189,32 @@ case "$gallery" in
         xdotool mouseup 4
         ;;
     foundry_atelier)
-        xdotool mousemove --window "$window" 219 96 click 1
+        xdotool mousemove --window "$window" 184 157 click 1
+        sleep 0.40
+        import -window "$window" "$out/current-brass.png"
+        if cmp -s "$out/initial.png" "$out/current-brass.png"; then
+            printf 'brass-charge selection produced no presented-frame change\n' >&2
+            exit 1
+        fi
+        xdotool mousemove --window "$window" 290 157 click 1
+        xdotool mousemove --window "$window" 360 214 click 1
+        sleep 0.40
+        import -window "$window" "$out/furnace-room.png"
+        xdotool mousemove --window "$window" 260 214 click 1
+        xdotool mousemove --window "$window" 414 243 click 1
+        sleep 0.40
+        import -window "$window" "$out/flat-bottom.png"
+        xdotool mousemove --window "$window" 568 243 click 1
+        xdotool mousemove --window "$window" 210 429 click 1
+        sleep 0.40
+        import -window "$window" "$out/topologies.png"
+        xdotool mousemove --window "$window" 310 429 click 1
         sleep 0.40
         import -window "$window" "$out/soot.png"
-        xdotool mousemove --window "$window" 318 96 click 1
+        xdotool mousemove --window "$window" 420 429 click 1
         sleep 0.40
-        import -window "$window" "$out/dies.png"
-        xdotool mousemove --window "$window" 407 96 click 1
-        sleep 0.40
-        import -window "$window" "$out/material.png"
-        xdotool mousemove --window "$window" 510 96 click 1
+        import -window "$window" "$out/production.png"
+        xdotool mousemove --window "$window" 560 429 click 1
         sleep 0.40
         import -window "$window" "$out/mandate.png"
         ;;

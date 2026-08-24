@@ -124,8 +124,11 @@ cargo run --features foundry-atelier --example foundry_atelier
 
 The feature-gated Foundry Optics Atelier is the standing material, lighting,
 soot, die, and symbol-gauge judgment surface. It renders live mechanisms and
-build-time candidate meshes through the production Rust/egui/WGPU stack, with
-native S/M/L output always visible and Medium treated as the primary gauge.
+build-time candidate meshes through the production Rust/egui/WGPU stack. One
+register drives the complete S/M/L symbol witness and shared crown, bevel,
+sphere, barrel, and lead-screw coupons across every brass-charge × tool-mark ×
+light-room combination. A separate bench compares all die-stroke topologies
+under that same selection. Medium remains the primary gauge.
 Native WGPU is authoritative. Its fixed-size browser projection uses the same
 Rust code and can be raised separately with `scripts/web-atelier serve`; public
 promotion remains gated on controlled-DPR image comparison.

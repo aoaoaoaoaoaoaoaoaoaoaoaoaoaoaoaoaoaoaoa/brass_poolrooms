@@ -5,12 +5,16 @@
 use std::sync::Arc;
 
 use crate::{
-    chrome::{self, ForgedMesh, ForgedVertex, MechanismSize, Monoglyph, MonoglyphFinish, Symbol},
+    chrome::{
+        self, DieTopology, ForgedMesh, ForgedVertex, MechanismSize, Monoglyph, MonoglyphFinish,
+        StudyEtch, StudyEtchPalette, Symbol,
+    },
     egui::{self, Align2, Color32, FontId, Pos2, Rect, Sense, Shape, Stroke, StrokeKind, Vec2},
 };
 
 type BakedVertex = ForgedVertex;
 type BakedMesh = ForgedMesh;
+type BakedColor = [u8; 4];
 
 #[derive(Clone, Copy)]
 struct BakedStudyCell {
@@ -20,10 +24,12 @@ struct BakedStudyCell {
 
 #[derive(Clone, Copy)]
 struct BakedOpticsCell {
-    button: BakedMesh,
+    buttons: [BakedMesh; 3],
+    sockets: [BakedMesh; 3],
     plate: BakedMesh,
     sphere: BakedMesh,
     cylinder: BakedMesh,
+    screw: BakedMesh,
 }
 
 mod material_atlas {
@@ -33,7 +39,7 @@ mod material_atlas {
 }
 
 mod optics_atlas {
-    use super::{BakedMesh, BakedOpticsCell, BakedVertex};
+    use super::{BakedColor, BakedMesh, BakedOpticsCell, BakedVertex};
 
     include!(concat!(env!("OUT_DIR"), "/optics_atelier_atlas.rs"));
 }
@@ -53,29 +59,153 @@ const DIFFICULT_SYMBOLS: [Symbol; 7] = [
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 enum Bench {
     #[default]
-    Witness,
+    Forge,
+    Topologies,
     Soot,
-    Dies,
-    Material,
+    Legacy,
     Mandate,
 }
 
 impl Bench {
     const ALL: [Self; 5] = [
-        Self::Witness,
+        Self::Forge,
+        Self::Topologies,
         Self::Soot,
-        Self::Dies,
-        Self::Material,
+        Self::Legacy,
         Self::Mandate,
     ];
 
     const fn name(self) -> &'static str {
         match self {
-            Self::Witness => "PRODUCTION WITNESS",
-            Self::Soot => "SOOT KEYLINES",
-            Self::Dies => "DIE TOOLING",
-            Self::Material => "MATERIAL LAW",
+            Self::Forge => "JUDGMENT SURFACE",
+            Self::Topologies => "DIE TOPOLOGIES",
+            Self::Soot => "SOOT MATRIX",
+            Self::Legacy => "PRODUCTION CONTROL",
             Self::Mandate => "WORKING MANDATE",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum BrassCharge {
+    Current,
+    Warm,
+    Yellow,
+    Pale,
+}
+
+impl BrassCharge {
+    const ALL: [Self; 4] = [Self::Current, Self::Warm, Self::Yellow, Self::Pale];
+
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Current => "CURRENT",
+            Self::Warm => "WARM",
+            Self::Yellow => "YELLOW",
+            Self::Pale => "PALE",
+        }
+    }
+
+    const fn atlas_index(self) -> usize {
+        match self {
+            Self::Current => 0,
+            Self::Warm => 1,
+            Self::Yellow => 2,
+            Self::Pale => 3,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ToolMark {
+    Isotropic,
+    Horizontal,
+    Vertical,
+}
+
+impl ToolMark {
+    const ALL: [Self; 3] = [Self::Isotropic, Self::Horizontal, Self::Vertical];
+
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Isotropic => "ISOTROPIC",
+            Self::Horizontal => "HORIZONTAL",
+            Self::Vertical => "VERTICAL",
+        }
+    }
+
+    const fn atlas_index(self) -> usize {
+        match self {
+            Self::Isotropic => 0,
+            Self::Horizontal => 1,
+            Self::Vertical => 2,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum LightRoom {
+    Black,
+    Overhead,
+    Furnace,
+}
+
+impl LightRoom {
+    const ALL: [Self; 3] = [Self::Black, Self::Overhead, Self::Furnace];
+
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Black => "BLACK",
+            Self::Overhead => "OVERHEAD CARD",
+            Self::Furnace => "FURNACE LINE",
+        }
+    }
+
+    const fn atlas_index(self) -> usize {
+        match self {
+            Self::Black => 0,
+            Self::Overhead => 1,
+            Self::Furnace => 2,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+enum FinishLaw {
+    #[default]
+    Semantic,
+    BrightCut,
+    Void,
+    Danger,
+    Love,
+}
+
+impl FinishLaw {
+    const ALL: [Self; 5] = [
+        Self::Semantic,
+        Self::BrightCut,
+        Self::Void,
+        Self::Danger,
+        Self::Love,
+    ];
+
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Semantic => "SEMANTIC",
+            Self::BrightCut => "BRIGHT CUT",
+            Self::Void => "VOID",
+            Self::Danger => "DANGER",
+            Self::Love => "LOVE",
+        }
+    }
+
+    const fn resolve(self, symbol: Symbol) -> MonoglyphFinish {
+        match self {
+            Self::Semantic => symbol.default_finish(),
+            Self::BrightCut => MonoglyphFinish::BrightCut,
+            Self::Void => MonoglyphFinish::Void,
+            Self::Danger => MonoglyphFinish::Danger,
+            Self::Love => MonoglyphFinish::Love,
         }
     }
 }
@@ -84,13 +214,27 @@ impl Bench {
 pub struct FoundryOpticsAtelier {
     bench: Bench,
     soot_symbol: Symbol,
+    charge: BrassCharge,
+    tool_mark: ToolMark,
+    room: LightRoom,
+    topology: DieTopology,
+    finish: FinishLaw,
+    soot_width: u8,
+    soot_srgb: u8,
 }
 
 impl Default for FoundryOpticsAtelier {
     fn default() -> Self {
         Self {
-            bench: Bench::Witness,
+            bench: Bench::Forge,
             soot_symbol: Symbol::Settings,
+            charge: BrassCharge::Yellow,
+            tool_mark: ToolMark::Isotropic,
+            room: LightRoom::Overhead,
+            topology: DieTopology::ShadowWall,
+            finish: FinishLaw::Semantic,
+            soot_width: 8,
+            soot_srgb: 10,
         }
     }
 }
@@ -103,6 +247,8 @@ impl FoundryOpticsAtelier {
             "native-scale verdicts · production fonts and meshes · egui tessellation · WGPU composite",
         ));
         ui.add_space(12.0);
+        self.control_panel(ui);
+        ui.add_space(12.0);
         let _tabs = ui.horizontal_wrapped(|ui| {
             for bench in Bench::ALL {
                 let _tab = ui.selectable_value(&mut self.bench, bench, bench.name());
@@ -111,19 +257,99 @@ impl FoundryOpticsAtelier {
         ui.add_space(18.0);
 
         match self.bench {
-            Bench::Witness => production_witness(ui),
+            Bench::Forge => self.forge_bench(ui),
+            Bench::Topologies => self.topology_bench(ui),
             Bench::Soot => self.soot_bench(ui),
-            Bench::Dies => self.die_bench(ui),
-            Bench::Material => material_bench(ui),
+            Bench::Legacy => legacy_bench(ui),
             Bench::Mandate => working_mandate(ui),
         }
+    }
+
+    fn control_panel(&mut self, ui: &mut egui::Ui) {
+        let _panel = egui::Frame::new()
+            .fill(chrome::SURFACE)
+            .stroke(Stroke::new(1.0_f32, chrome::EDGE_STRONG))
+            .inner_margin(12)
+            .show(ui, |ui| {
+                let _title = ui.label(chrome::eyebrow("CENTRAL FOUNDRY REGISTER"));
+                let _selection = ui.label(chrome::muted(format!(
+                    "LINEAR-LIGHT BLINN · {} BRASS · {} TOOL · {} · {} · {}",
+                    self.charge.name(),
+                    self.tool_mark.name(),
+                    self.room.name(),
+                    self.topology.name(),
+                    self.finish.name(),
+                )));
+                ui.add_space(8.0);
+                selector_axis(
+                    ui,
+                    "BRASS CHARGE",
+                    &mut self.charge,
+                    BrassCharge::ALL,
+                    |x| x.name(),
+                );
+                selector_axis(ui, "TOOL MARK", &mut self.tool_mark, ToolMark::ALL, |x| {
+                    x.name()
+                });
+                selector_axis(ui, "LIGHT ROOM", &mut self.room, LightRoom::ALL, |x| {
+                    x.name()
+                });
+                selector_axis(
+                    ui,
+                    "DIE TOPOLOGY",
+                    &mut self.topology,
+                    DieTopology::ALL,
+                    |x| x.name(),
+                );
+                selector_axis(ui, "FACE FINISH", &mut self.finish, FinishLaw::ALL, |x| {
+                    x.name()
+                });
+                selector_axis(
+                    ui,
+                    "SOOT WIDTH",
+                    &mut self.soot_width,
+                    SOOT_WIDTHS,
+                    |x| match x {
+                        4 => "0.50 PX",
+                        6 => "0.75 PX",
+                        8 => "1.00 PX",
+                        10 => "1.25 PX",
+                        _ => unreachable!("the soot-width register is closed"),
+                    },
+                );
+                selector_axis(
+                    ui,
+                    "SOOT TONE",
+                    &mut self.soot_srgb,
+                    SOOT_SRGB,
+                    |x| match x {
+                        0 => "sRGB 0",
+                        10 => "sRGB 10",
+                        26 => "sRGB 26",
+                        46 => "sRGB 46",
+                        _ => unreachable!("the soot-tone register is closed"),
+                    },
+                );
+                let _register = ui.label(chrome::muted(self.topology.register()));
+            });
+    }
+
+    fn forge_bench(&self, ui: &mut egui::Ui) {
+        heading(
+            ui,
+            "SHARED GEOMETRY COUPONS",
+            "Every coupon and symbol crown below is selected from the same complete alloy × tool-mark × room atlas.",
+        );
+        geometry_coupons(ui, self.candidate_index());
+        ui.add_space(18.0);
+        study_witness(ui, self);
     }
 
     fn soot_bench(&mut self, ui: &mut egui::Ui) {
         heading(
             ui,
             "SOOT KEYLINE CALIBRATION",
-            "The candidates alter the real monoglyph painter. Width is measured in physical pixels; tone is the exact 8-bit sRGB value submitted to egui.",
+            "Width is measured in physical pixels; tone is the exact 8-bit sRGB value submitted to the same egui glyph-atlas composite used by the selected die prototype.",
         );
         let _symbols = ui.horizontal_wrapped(|ui| {
             let _label = ui.label(chrome::eyebrow("DIE"));
@@ -143,22 +369,22 @@ impl FoundryOpticsAtelier {
                     ))),
                 );
                 for eighth_pixels in SOOT_WIDTHS {
-                    soot_cell(ui, self.soot_symbol, eighth_pixels, srgb);
+                    study_soot_cell(ui, self, eighth_pixels, srgb);
                 }
             });
             ui.add_space(6.0);
         }
         ui.add_space(8.0);
         let _note = ui.label(chrome::muted(
-            "The 1.00 px / sRGB 0 cell is production. Fractional candidates remain subpixel offsets in the same font-atlas composite; they are not SDF reconstructions.",
+            "Fractional candidates remain subpixel offsets in the production font-atlas composite; they are not SDF reconstructions.",
         ));
     }
 
-    fn die_bench(&mut self, ui: &mut egui::Ui) {
+    fn topology_bench(&mut self, ui: &mut egui::Ui) {
         heading(
             ui,
-            "GLYPH DIE TOOLING",
-            "This bench isolates the current hinted font outline from finish and gauge. It is the admission surface for authored S/M/L cuts, not evidence that one Unicode outline should serve every die.",
+            "DIE STROKE TOPOLOGIES",
+            "All nine stroke families share the selected alloy, tool mark, room, finish, soot, font atlas, and S/M/L gauges. Select a family here to send it to the complete witness.",
         );
         let _symbols = ui.horizontal_wrapped(|ui| {
             let _label = ui.label(chrome::eyebrow("MARK"));
@@ -167,8 +393,12 @@ impl FoundryOpticsAtelier {
             }
         });
         ui.add_space(14.0);
-        for finish in MonoglyphFinish::ALL {
-            die_finish_row(ui, self.soot_symbol, finish);
+        for row in DieTopology::ALL.chunks(3) {
+            let _row = ui.horizontal_top(|ui| {
+                for &topology in row {
+                    topology_cell(ui, self, topology);
+                }
+            });
             ui.add_space(8.0);
         }
         ui.add_space(12.0);
@@ -177,18 +407,352 @@ impl FoundryOpticsAtelier {
             .stroke(Stroke::new(1.0_f32, chrome::HOT))
             .inner_margin(10)
             .show(ui, |ui| {
-                let _title = ui.label(chrome::eyebrow("SHADOWED-STAMP FRONTIER"));
+                let _title = ui.label(chrome::eyebrow("RELIEF-COMPILER BOUNDARY"));
                 let _body = ui.label(chrome::muted(
-                    "The directional stamp remains an ideation result until the Foundry owns a real outline-to-relief compiler. The next lawful step is a mask/contour source that admits symbol-specific S/M/L cuts, then bakes wall normals, toe occlusion, and floor material through the selected lighting law.",
+                    "These are exact screen-space prototypes: production glyph masks, egui tessellation, and WGPU compositing with tabulated relief passes. They compare topology honestly at native size, but become physical dies only after the Foundry compiles authored S/M/L contours into wall normals, toe occlusion, and floor geometry.",
                 ));
             });
     }
+
+    fn candidate_index(&self) -> usize {
+        debug_assert_eq!(optics_atlas::CHARGE_COUNT, BrassCharge::ALL.len());
+        let index = (self.charge.atlas_index() * optics_atlas::GRAIN_COUNT
+            + self.tool_mark.atlas_index())
+            * optics_atlas::ROOM_COUNT
+            + self.room.atlas_index();
+        debug_assert!(index < optics_atlas::CANDIDATE_COUNT);
+        index
+    }
+
+    fn treatment(&self, topology: DieTopology, soot_width: u8, soot_srgb: u8) -> StudyEtch {
+        let colors = optics_atlas::ETCH_PALETTES[self.candidate_index()];
+        StudyEtch::new(
+            topology,
+            StudyEtchPalette {
+                surface: color(colors[0]),
+                key_wall: color(colors[1]),
+                lee_wall: color(colors[2]),
+                flank: color(colors[3]),
+            },
+            soot_width,
+            soot_srgb,
+        )
+    }
+}
+
+fn selector_axis<T: Copy + PartialEq, const N: usize>(
+    ui: &mut egui::Ui,
+    label: &str,
+    selected: &mut T,
+    options: [T; N],
+    name: impl Fn(T) -> &'static str,
+) {
+    let _axis = ui.horizontal_wrapped(|ui| {
+        let _label = ui.add_sized([110.0, 18.0], egui::Label::new(chrome::eyebrow(label)));
+        for option in options {
+            let _choice = ui.selectable_value(selected, option, name(option));
+        }
+    });
+}
+
+fn color([r, g, b, a]: BakedColor) -> Color32 {
+    Color32::from_rgba_unmultiplied(r, g, b, a)
 }
 
 fn heading(ui: &mut egui::Ui, title: &str, law: &str) {
     let _title = ui.label(chrome::title(title));
     let _law = ui.label(chrome::muted(law));
     ui.add_space(14.0);
+}
+
+fn geometry_coupons(ui: &mut egui::Ui, candidate_index: usize) {
+    let cell = optics_atlas::CELLS[candidate_index];
+    let (rect, _response) =
+        ui.allocate_exact_size(Vec2::new(ui.available_width(), 132.0), Sense::hover());
+    let painter = ui.painter_at(rect);
+    let _bed = painter.rect_filled(rect, 1.0, chrome::SURFACE);
+    let _edge = painter.rect_stroke(
+        rect,
+        1.0,
+        Stroke::new(1.0_f32, chrome::EDGE),
+        StrokeKind::Inside,
+    );
+    let step = rect.width() / 5.0;
+    let centers = (0..5).map(|index| rect.left() + step * (index as f32 + 0.5));
+    for (center, name) in centers
+        .clone()
+        .zip(["CROWN", "BEVEL", "SPHERE", "BARREL", "SCREW"])
+    {
+        let _label = painter.text(
+            Pos2::new(center, rect.top() + 11.0),
+            Align2::CENTER_TOP,
+            name,
+            FontId::monospace(10.5),
+            chrome::MUTED,
+        );
+    }
+    let centers = centers.collect::<Vec<_>>();
+    let origin_y = rect.top() + 80.0;
+    let button_origin = Pos2::new(centers[0], origin_y);
+    let socket = Rect::from_center_size(button_origin, Vec2::splat(32.0));
+    let _void = painter.rect_filled(socket, 1.0, Color32::from_rgb(2, 2, 3));
+    paint_mesh(
+        &painter,
+        socket.shrink(1.0),
+        optics_atlas::BUTTON_SHADOWS[2],
+        button_origin,
+    );
+    paint_mesh(&painter, socket.shrink(1.0), cell.buttons[2], button_origin);
+    paint_mesh(&painter, socket, cell.sockets[2], button_origin);
+    paint_mesh(
+        &painter,
+        rect.shrink(1.0),
+        optics_atlas::PLATE_SHADOW,
+        Pos2::new(centers[1], origin_y),
+    );
+    paint_mesh(
+        &painter,
+        rect.shrink(1.0),
+        cell.plate,
+        Pos2::new(centers[1], origin_y),
+    );
+    paint_mesh(
+        &painter,
+        rect.shrink(1.0),
+        cell.sphere,
+        Pos2::new(centers[2], origin_y),
+    );
+    paint_mesh(
+        &painter,
+        rect.shrink(1.0),
+        cell.cylinder,
+        Pos2::new(centers[3], origin_y),
+    );
+    paint_mesh(
+        &painter,
+        rect.shrink(1.0),
+        cell.screw,
+        Pos2::new(centers[4], origin_y),
+    );
+    let _law = painter.text(
+        Pos2::new(rect.center().x, rect.bottom() - 12.0),
+        Align2::CENTER_CENTER,
+        "same candidate law · actual-size meshes",
+        FontId::monospace(10.5),
+        chrome::MUTED,
+    );
+}
+
+fn study_witness(ui: &mut egui::Ui, atelier: &FoundryOpticsAtelier) {
+    heading(
+        ui,
+        "COMPLETE SYMBOL WITNESS",
+        "Medium is the primary reading gauge; Small remains an admission question. Every mark uses the selected topology and finish law.",
+    );
+    let candidate = optics_atlas::CELLS[atelier.candidate_index()];
+    let treatment = atelier.treatment(atelier.topology, atelier.soot_width, atelier.soot_srgb);
+    let column_count = 3;
+    let band = Symbol::ALL.len().div_ceil(column_count);
+    ui.columns(column_count, |columns| {
+        for (column, symbols) in columns.iter_mut().zip(Symbol::ALL.chunks(band)) {
+            gauge_header(column);
+            column.add_space(8.0);
+            for &symbol in symbols {
+                study_symbol_row(
+                    column,
+                    symbol,
+                    &candidate,
+                    atelier.finish.resolve(symbol),
+                    treatment,
+                );
+                column.add_space(7.0);
+            }
+        }
+    });
+    ui.add_space(14.0);
+    let _warning = egui::Frame::new()
+        .fill(chrome::SURFACE)
+        .stroke(Stroke::new(1.0_f32, chrome::EDGE))
+        .inner_margin(10)
+        .show(ui, |ui| {
+            let _title = ui.label(chrome::eyebrow("SMALL-GAUGE ADMISSION"));
+            let _body = ui.label(chrome::muted(
+                "Settings, save, rename, delete, and other fine dies must earn Small individually. This witness exposes failure; it does not grant admission.",
+            ));
+        });
+}
+
+fn study_symbol_row(
+    ui: &mut egui::Ui,
+    symbol: Symbol,
+    candidate: &BakedOpticsCell,
+    finish: MonoglyphFinish,
+    treatment: StudyEtch,
+) {
+    let _row = ui.horizontal(|ui| {
+        let _name = ui.add_sized(
+            [84.0, MechanismSize::Large.side()],
+            egui::Label::new(chrome::eyebrow(symbol.name())),
+        );
+        for size in MechanismSize::ALL {
+            let _cell = egui::Frame::new()
+                .fill(if size == MechanismSize::Medium {
+                    chrome::SURFACE
+                } else {
+                    Color32::TRANSPARENT
+                })
+                .inner_margin(4)
+                .show(ui, |ui| {
+                    let response = study_monoglyph(ui, symbol, size, candidate, finish, treatment);
+                    let _hover = response.on_hover_text(format!(
+                        "{} · {} · {} · {}",
+                        symbol.name(),
+                        size_name(size),
+                        finish.name(),
+                        treatment.topology.name(),
+                    ));
+                });
+        }
+    });
+}
+
+fn study_monoglyph(
+    ui: &mut egui::Ui,
+    symbol: Symbol,
+    size: MechanismSize,
+    candidate: &BakedOpticsCell,
+    finish: MonoglyphFinish,
+    treatment: StudyEtch,
+) -> egui::Response {
+    let side = size.side();
+    let (rect, response) = ui.allocate_exact_size(Vec2::splat(side), Sense::hover());
+    let origin = pixel_center(rect, side, ui.pixels_per_point());
+    let socket = Rect::from_center_size(origin, Vec2::splat(side));
+    let painter = ui.painter();
+    let gauge = gauge_index(size);
+    let _void = painter.rect_filled(socket, 1.0, Color32::from_rgb(2, 2, 3));
+    paint_mesh(
+        painter,
+        socket.shrink(1.0),
+        optics_atlas::BUTTON_SHADOWS[gauge],
+        origin,
+    );
+    paint_mesh(
+        painter,
+        socket.shrink(1.0),
+        candidate.buttons[gauge],
+        origin,
+    );
+    chrome::paint_study_etch(
+        painter,
+        socket.shrink(1.0),
+        origin,
+        symbol.glyph(),
+        finish,
+        treatment,
+        3.25,
+        side * 0.5 * (89.0 / 132.0),
+    );
+    paint_mesh(painter, socket, candidate.sockets[gauge], origin);
+    response
+}
+
+fn pixel_center(rect: Rect, side: f32, pixels_per_point: f32) -> Pos2 {
+    let casing_side = side - 2.0;
+    let physical_side = (casing_side * pixels_per_point).round() as u32;
+    let phase = if physical_side.is_multiple_of(2) {
+        0.0
+    } else {
+        0.5
+    };
+    let snap = |coordinate: f32| {
+        ((coordinate * pixels_per_point - phase).round() + phase) / pixels_per_point
+    };
+    Pos2::new(snap(rect.center().x), snap(rect.center().y))
+}
+
+const fn gauge_index(size: MechanismSize) -> usize {
+    match size {
+        MechanismSize::Small => 0,
+        MechanismSize::Medium => 1,
+        MechanismSize::Large => 2,
+    }
+}
+
+fn topology_cell(ui: &mut egui::Ui, atelier: &mut FoundryOpticsAtelier, topology: DieTopology) {
+    let selected = atelier.topology == topology;
+    let candidate = optics_atlas::CELLS[atelier.candidate_index()];
+    let treatment = atelier.treatment(topology, atelier.soot_width, atelier.soot_srgb);
+    let finish = atelier.finish.resolve(atelier.soot_symbol);
+    let _cell = egui::Frame::new()
+        .fill(chrome::SURFACE)
+        .stroke(Stroke::new(
+            if selected { 1.5 } else { 1.0 },
+            if selected { chrome::HOT } else { chrome::EDGE },
+        ))
+        .inner_margin(10)
+        .show(ui, |ui| {
+            let _column = ui.vertical(|ui| {
+                ui.set_width(326.0);
+                let _select = ui.selectable_value(&mut atelier.topology, topology, topology.name());
+                let _register = ui.label(chrome::muted(topology.register()));
+                ui.add_space(7.0);
+                let _gauges = ui.horizontal(|ui| {
+                    for size in MechanismSize::ALL {
+                        let _button = study_monoglyph(
+                            ui,
+                            atelier.soot_symbol,
+                            size,
+                            &candidate,
+                            finish,
+                            treatment,
+                        );
+                        ui.add_space(9.0);
+                    }
+                });
+            });
+        });
+}
+
+fn study_soot_cell(ui: &mut egui::Ui, atelier: &FoundryOpticsAtelier, eighth_pixels: u8, srgb: u8) {
+    let selected = eighth_pixels == atelier.soot_width && srgb == atelier.soot_srgb;
+    let candidate = optics_atlas::CELLS[atelier.candidate_index()];
+    let treatment = atelier.treatment(atelier.topology, eighth_pixels, srgb);
+    let finish = atelier.finish.resolve(atelier.soot_symbol);
+    let _cell = egui::Frame::new()
+        .fill(chrome::SURFACE)
+        .stroke(Stroke::new(
+            if selected { 1.5 } else { 1.0 },
+            if selected { chrome::HOT } else { chrome::EDGE },
+        ))
+        .inner_margin(8)
+        .show(ui, |ui| {
+            ui.set_width(176.0);
+            let _label = ui.label(chrome::eyebrow(format!(
+                "{:.2} PX · sRGB {srgb}{}",
+                f32::from(eighth_pixels) / 8.0,
+                if selected { " · SELECTED" } else { "" },
+            )));
+            ui.add_space(6.0);
+            let _specimens = ui.horizontal(|ui| {
+                for size in MechanismSize::ALL {
+                    let response = study_monoglyph(
+                        ui,
+                        atelier.soot_symbol,
+                        size,
+                        &candidate,
+                        finish,
+                        treatment,
+                    );
+                    let _hover = response.on_hover_text(format!(
+                        "{} · {} · {:.2} physical-pixel soot · sRGB {srgb}",
+                        atelier.soot_symbol.name(),
+                        size_name(size),
+                        f32::from(eighth_pixels) / 8.0,
+                    ));
+                }
+            });
+        });
 }
 
 fn production_witness(ui: &mut egui::Ui) {
@@ -261,80 +825,6 @@ fn symbol_row(ui: &mut egui::Ui, symbol: Symbol) {
     });
 }
 
-fn soot_cell(ui: &mut egui::Ui, symbol: Symbol, eighth_pixels: u8, srgb: u8) {
-    let production = eighth_pixels == 8 && srgb == 0;
-    let _cell = egui::Frame::new()
-        .fill(chrome::SURFACE)
-        .stroke(Stroke::new(
-            if production { 1.5 } else { 1.0 },
-            if production {
-                chrome::HOT
-            } else {
-                chrome::EDGE
-            },
-        ))
-        .inner_margin(8)
-        .show(ui, |ui| {
-            ui.set_width(176.0);
-            let _label = ui.label(chrome::eyebrow(format!(
-                "{:.2} PX · sRGB {srgb}{}",
-                f32::from(eighth_pixels) / 8.0,
-                if production { " · PRODUCTION" } else { "" }
-            )));
-            ui.add_space(6.0);
-            let _specimens = ui.horizontal(|ui| {
-                for size in MechanismSize::ALL {
-                    let _button = Monoglyph::symbol(symbol)
-                        .size(size)
-                        .study_soot(eighth_pixels, srgb)
-                        .show(ui)
-                        .on_hover_text(format!(
-                            "{} · {} · {:.2} physical-pixel keyline · sRGB {srgb}",
-                            symbol.name(),
-                            size_name(size),
-                            f32::from(eighth_pixels) / 8.0
-                        ));
-                }
-            });
-        });
-}
-
-fn die_finish_row(ui: &mut egui::Ui, symbol: Symbol, finish: MonoglyphFinish) {
-    let _row = egui::Frame::new()
-        .fill(chrome::SURFACE)
-        .stroke(Stroke::new(1.0_f32, chrome::EDGE))
-        .inner_margin(10)
-        .show(ui, |ui| {
-            let _content = ui.horizontal(|ui| {
-                let _finish = ui.add_sized(
-                    [130.0, MechanismSize::Large.side()],
-                    egui::Label::new(chrome::eyebrow(finish.name())),
-                );
-                for size in MechanismSize::ALL {
-                    let _button = Monoglyph::symbol(symbol)
-                        .finish(finish)
-                        .size(size)
-                        .show(ui)
-                        .on_hover_text(format!(
-                            "{} · {} · {}",
-                            symbol.name(),
-                            finish.name(),
-                            size_name(size)
-                        ));
-                    ui.add_space(10.0);
-                }
-                let _register = ui.label(chrome::muted(match finish {
-                    MonoglyphFinish::BrightCut => {
-                        "fresh-bronze key-facing wall · soot-black groove floor"
-                    }
-                    MonoglyphFinish::Void => "steep wall · soot-black flat floor",
-                    MonoglyphFinish::Danger => "steep wall · vermilion floor · soot primer",
-                    MonoglyphFinish::Love => "steep wall · pink floor · soot primer",
-                }));
-            });
-        });
-}
-
 const fn size_name(size: MechanismSize) -> &'static str {
     match size {
         MechanismSize::Small => "SMALL",
@@ -343,21 +833,9 @@ const fn size_name(size: MechanismSize) -> &'static str {
     }
 }
 
-fn material_bench(ui: &mut egui::Ui) {
-    heading(
-        ui,
-        "LINEAR-LIGHT BRASS HYPOTHESES",
-        "One variable changes within each row. Illumination is evaluated in linear light with a filmic shoulder, then baked to the same egui meshes used by production.",
-    );
-    optics_group(ui, "CHARGE · ISOTROPIC · BLACK ROOM", &[0, 1, 2, 3]);
-    optics_group(ui, "TOOL MARK · YELLOW BRASS · BLACK ROOM", &[2, 4, 5]);
-    optics_group(ui, "LIGHT RIG · YELLOW BRASS · ISOTROPIC", &[2, 6, 7]);
-    optics_group(ui, "PROVOCATION · TWO VARIABLES", &[8]);
-    let _limit = ui.label(chrome::muted(
-        "Candidate illumination is linear at Foundry vertices; egui still performs Gouraud interpolation on encoded colors. These are exact candidate meshes, not a claim of a fully linear framebuffer.",
-    ));
+fn legacy_bench(ui: &mut egui::Ui) {
+    production_witness(ui);
     ui.add_space(24.0);
-
     let production = material_coordinate(
         material_atlas::PRODUCTION_ROW,
         material_atlas::PRODUCTION_COLUMN,
@@ -376,78 +854,6 @@ fn material_bench(ui: &mut egui::Ui) {
     let _caveat = ui.label(chrome::muted(
         "This inherited forge varies heuristic Blinn-Phong contrast and exposure. It remains the production witness, not the new linear-light brass hypothesis.",
     ));
-}
-
-fn optics_group(ui: &mut egui::Ui, name: &str, candidates: &[usize]) {
-    let _name = ui.label(chrome::eyebrow(name));
-    ui.add_space(5.0);
-    let _row = ui.horizontal(|ui| {
-        for &index in candidates {
-            optics_coupon(ui, index);
-        }
-    });
-    ui.add_space(12.0);
-}
-
-fn optics_coupon(ui: &mut egui::Ui, index: usize) {
-    let (rect, _response) = ui.allocate_exact_size(Vec2::new(236.0, 94.0), Sense::hover());
-    let painter = ui.painter_at(rect);
-    let _bed = painter.rect_filled(rect, 1.0, chrome::SURFACE);
-    let _edge = painter.rect_stroke(
-        rect,
-        1.0,
-        Stroke::new(1.0_f32, chrome::EDGE),
-        StrokeKind::Inside,
-    );
-    let _name = painter.text(
-        rect.left_top() + Vec2::new(9.0, 8.0),
-        Align2::LEFT_TOP,
-        optics_atlas::NAMES[index],
-        FontId::monospace(10.5),
-        chrome::TEXT,
-    );
-    let button_origin = Pos2::new(rect.left() + 42.0, rect.top() + 59.0);
-    let plate_origin = Pos2::new(rect.left() + 85.0, rect.top() + 59.0);
-    let socket = Rect::from_center_size(button_origin, Vec2::splat(32.0));
-    let _void = painter.rect_filled(socket, 1.0, Color32::from_rgb(2, 2, 3));
-    paint_mesh(
-        &painter,
-        socket.shrink(1.0),
-        optics_atlas::BUTTON_SHADOW,
-        button_origin,
-    );
-    paint_mesh(
-        &painter,
-        rect.shrink(1.0),
-        optics_atlas::PLATE_SHADOW,
-        plate_origin,
-    );
-    let candidate = optics_atlas::CELLS[index];
-    paint_mesh(
-        &painter,
-        socket.shrink(1.0),
-        candidate.button,
-        button_origin,
-    );
-    paint_mesh(&painter, rect.shrink(1.0), candidate.plate, plate_origin);
-    paint_mesh(
-        &painter,
-        rect.shrink(1.0),
-        candidate.sphere,
-        Pos2::new(rect.left() + 143.0, rect.top() + 59.0),
-    );
-    paint_mesh(
-        &painter,
-        rect.shrink(1.0),
-        candidate.cylinder,
-        Pos2::new(rect.left() + 198.0, rect.top() + 59.0),
-    );
-    let _rim = painter.rect_stroke(
-        socket,
-        1.0,
-        Stroke::new(1.0_f32, chrome::EDGE),
-        StrokeKind::Inside,
-    );
 }
 
 fn paint_material_matrix(painter: &egui::Painter, canvas: Rect) {

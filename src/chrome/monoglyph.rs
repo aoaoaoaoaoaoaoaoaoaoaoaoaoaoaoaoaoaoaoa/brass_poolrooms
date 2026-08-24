@@ -189,12 +189,6 @@ impl Monoglyph {
         self
     }
 
-    #[cfg(feature = "foundry-atelier")]
-    pub(crate) const fn study_soot(mut self, eighth_pixels: u8, srgb: u8) -> Self {
-        self.soot_keyline = foundry::SootKeyline::new(eighth_pixels, srgb);
-        self
-    }
-
     /// Lay out, actuate, and paint the complete square mechanism.
     ///
     /// The response dereferences to [`egui::Response`] and carries the signed
@@ -576,4 +570,29 @@ fn etch(
             );
         }
     }
+}
+
+#[cfg(feature = "foundry-atelier")]
+pub(crate) fn paint_study_etch(
+    painter: &egui::Painter,
+    clip: Rect,
+    origin: Pos2,
+    glyph: char,
+    finish: MonoglyphFinish,
+    treatment: foundry::StudyEtch,
+    elevation: f32,
+    top_half: f32,
+) {
+    let depth = finish.depth();
+    let floor_scale = foundry::perspective_scale(elevation - depth);
+    let font = FontId::monospace(top_half * 2.0 * ETCH_EM_PER_CROWN * floor_scale);
+    let galley = painter.layout_no_wrap(glyph.to_string(), font, egui::Color32::PLACEHOLDER);
+    let pos = origin - galley.mesh_bounds.center().to_vec2();
+    let floor = match finish {
+        MonoglyphFinish::BrightCut => foundry::StudyFloor::Bright,
+        MonoglyphFinish::Void => foundry::StudyFloor::Void,
+        MonoglyphFinish::Danger => foundry::StudyFloor::Danger(glyph as u32),
+        MonoglyphFinish::Love => foundry::StudyFloor::Love(glyph as u32),
+    };
+    foundry::study_etch(painter, clip, pos, galley, treatment, floor);
 }
