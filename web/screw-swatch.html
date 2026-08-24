@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0c0b09">
+    <meta
+      name="description"
+      content="Interactive WebGL2 lead-screw thread study for Brass Poolrooms."
+    >
+    <title>Poolrooms · lead-screw thread study</title>
+    <style>
+      @font-face {
+        font-family: "CMU Typewriter";
+        src: url("../assets/fonts/cmu-typewriter/cmuntt.ttf") format("truetype");
+        font-display: swap;
+      }
+
+      :root {
+        color-scheme: dark;
+        font-family: "CMU Typewriter", ui-monospace, monospace;
+        background: #0c0b09;
+        color: #e2d9c6;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        min-width: 320px;
+        min-height: 100%;
+        margin: 0;
+        background:
+          linear-gradient(rgba(7, 6, 5, 0.56), rgba(7, 6, 5, 0.56)),
+          repeating-linear-gradient(0deg, transparent 0 41px, #282116 41px 42px),
+          repeating-linear-gradient(90deg, transparent 0 41px, #282116 41px 42px),
+          #0c0b09;
+      }
+
+      body {
+        padding: 24px;
+      }
+
+      #forge {
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 2;
+        pointer-events: none;
+      }
+
+      header,
+      main {
+        position: relative;
+        z-index: 1;
+        width: min(1320px, 100%);
+        margin-inline: auto;
+      }
+
+      header {
+        border: 1px solid #8e7d64;
+        background: rgba(17, 15, 12, 0.94);
+        padding: 18px;
+      }
+
+      .eyebrow,
+      dt,
+      .minor-label,
+      .axis-label,
+      .pose-label {
+        color: #9e9380;
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      p,
+      dl,
+      dd {
+        margin: 0;
+      }
+
+      h1 {
+        margin-top: 5px;
+        color: #ebc597;
+        font-size: clamp(20px, 4vw, 34px);
+        font-weight: 400;
+        letter-spacing: 0.035em;
+      }
+
+      .lede {
+        max-width: 78ch;
+        margin-top: 10px;
+        color: #9e9380;
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .legend {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(120px, 1fr));
+        gap: 8px;
+        margin-top: 16px;
+      }
+
+      .legend div {
+        border-top: 1px solid #4e4230;
+        padding-top: 7px;
+      }
+
+      dd {
+        margin-top: 3px;
+        color: #e2d9c6;
+        font-size: 12px;
+      }
+
+      .bench {
+        display: grid;
+        grid-template-columns: minmax(260px, 1fr) minmax(260px, 1fr);
+        gap: 12px;
+        margin-top: 18px;
+      }
+
+      .specimen {
+        position: relative;
+        min-height: 268px;
+        overflow: hidden;
+        border: 1px solid #4e4230;
+        background: rgba(13, 12, 10, 0.92);
+        padding: 10px;
+      }
+
+      .specimen h2 {
+        position: relative;
+        z-index: 3;
+        color: #e2d9c6;
+        font-size: 13px;
+        font-weight: 400;
+      }
+
+      .specimen p {
+        position: relative;
+        z-index: 3;
+        margin-top: 4px;
+        color: #9e9380;
+        font-size: 11px;
+      }
+
+      .render-target {
+        position: absolute;
+        inset: 48px 8px 8px;
+      }
+
+      .pose-bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+        margin-top: 12px;
+      }
+
+      button {
+        font: inherit;
+      }
+
+      .pose {
+        min-height: 29px;
+        border: 1px solid #4e4230;
+        border-radius: 1px;
+        color: #9e9380;
+        background: #0d0c0a;
+        padding: 5px 9px;
+        cursor: pointer;
+      }
+
+      .pose:hover,
+      .pose:focus-visible,
+      .pose[aria-pressed="true"] {
+        border-color: #ebc597;
+        color: #ebc597;
+        outline: none;
+      }
+
+      .selection {
+        display: flex;
+        flex: 1 1 320px;
+        justify-content: flex-end;
+        color: #e2d9c6;
+        font-size: 12px;
+      }
+
+      main {
+        display: grid;
+        gap: 18px;
+        margin-top: 18px;
+      }
+
+      .diameter-table {
+        border: 1px solid #4e4230;
+        background: rgba(17, 15, 12, 0.9);
+        padding: 12px;
+      }
+
+      .table-heading {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 10px;
+      }
+
+      .table-heading h2 {
+        color: #ebc597;
+        font-size: 15px;
+        font-weight: 400;
+      }
+
+      .swatch-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(160px, 1fr));
+        gap: 8px;
+      }
+
+      .swatch {
+        position: relative;
+        min-height: 250px;
+        overflow: hidden;
+        border: 1px solid #4e4230;
+        border-radius: 1px;
+        color: #e2d9c6;
+        background: rgba(13, 12, 10, 0.96);
+        padding: 0;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .swatch:hover,
+      .swatch:focus-visible,
+      .swatch.selected {
+        border-color: #ebc597;
+        outline: none;
+      }
+
+      .swatch .render-target {
+        inset: 0 0 48px;
+      }
+
+      .swatch-spec {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 3;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2px 8px;
+        min-height: 48px;
+        border-top: 1px solid #4e4230;
+        background: rgba(17, 15, 12, 0.96);
+        padding: 6px 8px;
+        font-size: 11px;
+      }
+
+      .swatch-spec span:nth-child(even) {
+        color: #9e9380;
+        text-align: right;
+      }
+
+      .scale-key {
+        position: absolute;
+        right: 7px;
+        bottom: 53px;
+        z-index: 3;
+        color: #665844;
+        font-size: 9px;
+        letter-spacing: 0.04em;
+      }
+
+      #fault {
+        position: fixed;
+        inset: 0;
+        z-index: 5;
+        display: none;
+        place-items: center;
+        padding: 24px;
+        color: #d65c2e;
+        background: #0c0b09;
+        text-align: center;
+      }
+
+      html[data-forge="failed"] #fault {
+        display: grid;
+      }
+
+      @media (max-width: 920px) {
+        .legend,
+        .swatch-grid {
+          grid-template-columns: repeat(2, minmax(150px, 1fr));
+        }
+
+        .bench {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 520px) {
+        body {
+          padding: 10px;
+        }
+
+        .legend,
+        .swatch-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .selection {
+          justify-content: flex-start;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="forge" aria-hidden="true"></canvas>
+    <header>
+      <div class="eyebrow">Lead-screw foundry study</div>
+      <h1>INTEGRAL THREAD SWATCHES</h1>
+      <p class="lede">
+        The production shaft uses a round helical cord on a smooth cylinder.
+        These specimens replace it with one integral triangular helical surface.
+        Geometry is shown at 5× inspection scale and at the actual 1× CSS-pixel gauge.
+      </p>
+      <dl class="legend">
+        <div><dt>P</dt><dd>Axial pitch and lead</dd></div>
+        <div><dt>h</dt><dd>Radial thread depth</dd></div>
+        <div><dt>d₁</dt><dd>Minor diameter at root</dd></div>
+        <div><dt>d</dt><dd>Major diameter, d₁ + 2h</dd></div>
+      </dl>
+      <div class="bench">
+        <article class="specimen">
+          <h2>CURRENT ROUND-CORD THREAD</h2>
+          <p>P 6.23 · shaft Ø3.10 · cord Ø0.96</p>
+          <div class="render-target" data-kind="cord"></div>
+        </article>
+        <article class="specimen">
+          <h2>SELECTED INTEGRAL THREAD</h2>
+          <p id="selected-spec"></p>
+          <div id="selected-render" class="render-target" data-kind="integral"></div>
+        </article>
+      </div>
+      <div class="pose-bar" role="group" aria-label="Nut position">
+        <span class="pose-label">Nut pose</span>
+        <button class="pose" type="button" data-pose="bare" aria-pressed="true">THREAD ONLY</button>
+        <button class="pose" type="button" data-pose="top" aria-pressed="false">TOP DOCK</button>
+        <button class="pose" type="button" data-pose="middle" aria-pressed="false">MID TRAVEL</button>
+        <button class="pose" type="button" data-pose="bottom" aria-pressed="false">BOTTOM DOCK</button>
+        <output id="selection" class="selection"></output>
+      </div>
+    </header>
+    <main id="tables"></main>
+    <div id="fault" role="alert"></div>
+    <script src="./screw-swatch.js" defer></script>
+  </body>
+</html>
