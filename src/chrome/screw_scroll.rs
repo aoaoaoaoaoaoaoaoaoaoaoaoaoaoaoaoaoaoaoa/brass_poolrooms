@@ -83,6 +83,16 @@ impl ScrewScroll {
         }
     }
 
+    /// Return the content span inside a complete scroll-surface width.
+    ///
+    /// Virtualized layouts that calculate child geometry before [`Self::show_rows`]
+    /// must use this projection so their final column does not enter the fixed
+    /// screw gutter.
+    pub const fn content_width(surface_width: f32) -> f32 {
+        let content = surface_width - (BAR_WIDTH + INNER_MARGIN);
+        if content < 1.0 { 1.0 } else { content }
+    }
+
     /// Assign a stable identity within the enclosing UI.
     pub fn id_salt(mut self, salt: impl egui::AsIdSalt) -> Self {
         self.id_salt = Some(IdSalt::new(salt));
@@ -162,8 +172,7 @@ impl ScrewScroll {
         ui: &mut egui::Ui,
         show_area: impl FnOnce(egui::ScrollArea, &mut egui::Ui) -> ScrollAreaOutput<R>,
     ) -> ScrollAreaOutput<R> {
-        let allocated = BAR_WIDTH + INNER_MARGIN;
-        let content_width = (self.max_size.x - allocated).max(1.0);
+        let content_width = Self::content_width(self.max_size.x);
         let mut area = egui::ScrollArea::vertical()
             .scroll_bar_visibility(ScrollBarVisibility::AlwaysVisible)
             .scroll_source(ScrollSource {

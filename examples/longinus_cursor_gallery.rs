@@ -55,7 +55,7 @@ fn cursor_field(ui: &mut egui::Ui, label: &str, cursor: CustomCursorImage) {
             .show(ui, |ui| {
                 let (rect, response) = ui.allocate_exact_size(Vec2::splat(320.0), Sense::hover());
                 let scale = rect.width() / f32::from(cursor.size[0]);
-                for (index, pixel) in cursor.rgba.chunks_exact(4).enumerate() {
+                for (index, pixel) in cursor.rgba.as_chunks::<4>().0.iter().enumerate() {
                     if pixel[3] == 0 {
                         continue;
                     }

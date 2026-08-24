@@ -9,6 +9,7 @@ use std::{
 const TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
 const W: u32 = 640;
 const H: u32 = 360;
+const CELL_BYTES: usize = SIM_BYTES as usize;
 
 #[test]
 fn water_engine_preserves_recovery_stability_isolation_and_lifecycle() -> Result<()> {
@@ -360,7 +361,7 @@ impl Field {
     }
 
     fn assert_clean(&self) -> Result<()> {
-        for (cell, chunk) in self.bytes.chunks_exact(SIM_BYTES as usize).enumerate() {
+        for (cell, chunk) in self.bytes.as_chunks::<CELL_BYTES>().0.iter().enumerate() {
             for channel in 0..2 {
                 let at = channel * 4;
                 let value =
@@ -402,7 +403,9 @@ impl Field {
     fn assert_stirred(&self, floor: f32) -> Result<()> {
         let peak = self
             .bytes
-            .chunks_exact(SIM_BYTES as usize)
+            .as_chunks::<CELL_BYTES>()
+            .0
+            .iter()
             .flat_map(|cell| [channel(cell, 0).abs(), channel(cell, 1).abs()])
             .fold(0.0_f32, f32::max);
         if peak <= floor {
@@ -414,7 +417,9 @@ impl Field {
     fn assert_quiet_everywhere(&self, ceiling: f32) -> Result<()> {
         let peak = self
             .bytes
-            .chunks_exact(SIM_BYTES as usize)
+            .as_chunks::<CELL_BYTES>()
+            .0
+            .iter()
             .flat_map(|cell| [channel(cell, 0).abs(), channel(cell, 1).abs()])
             .fold(0.0_f32, f32::max);
         if peak > ceiling {

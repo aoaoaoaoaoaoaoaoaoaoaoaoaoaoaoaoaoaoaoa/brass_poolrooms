@@ -231,7 +231,7 @@ fn painted_galley(mut galley: Arc<Galley>, albedo: Color32, seed: u32) -> Arc<Ga
         let mut painted = Mesh::with_texture(source.texture_id);
 
         if glyph_vertices.len() % 4 == 0 {
-            for (glyph_index, quad) in glyph_vertices.chunks_exact(4).enumerate() {
+            for (glyph_index, quad) in glyph_vertices.as_chunks::<4>().0.iter().enumerate() {
                 subdivide_painted_quad(
                     &mut painted,
                     quad,

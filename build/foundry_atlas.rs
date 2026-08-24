@@ -1229,7 +1229,7 @@ fn raster_cursor(mesh: &Compiled, hotspot: [f32; 2]) -> (Vec<u8>, [u16; 2]) {
         .collect::<Vec<_>>();
     let sample_side = CURSOR_SIDE * CURSOR_SAMPLES;
     let mut samples = vec![[0_u8; 4]; sample_side * sample_side];
-    for triangle in mesh.indices().chunks_exact(3) {
+    for triangle in mesh.indices().as_chunks::<3>().0 {
         let tri = [
             vertices[triangle[0] as usize],
             vertices[triangle[1] as usize],
@@ -2446,7 +2446,7 @@ fn bail_sweep_per_radian(gauge: BailGauge) -> f32 {
         * profile
             .windows(2)
             .map(|span| {
-                let radius = (span[0].y + span[1].y) * 0.5;
+                let radius = f32::midpoint(span[0].y, span[1].y);
                 radius * (span[1] - span[0]).length()
             })
             .sum::<f32>()
