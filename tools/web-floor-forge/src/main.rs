@@ -293,7 +293,7 @@ fn put_f32(bytes: &mut [u8], offset: usize, value: f32) {
 fn write_ppm(path: &Path, side: u32, rgba: &[u8]) -> Result<()> {
     let mut ppm = format!("P6\n{side} {side}\n255\n").into_bytes();
     ppm.reserve((side * side * 3) as usize);
-    for pixel in rgba.chunks_exact(4) {
+    for pixel in rgba.as_chunks::<4>().0 {
         ppm.extend_from_slice(&pixel[..3]);
     }
     fs::write(path, ppm).with_context(|| format!("write {}", path.display()))

@@ -37,8 +37,10 @@ these ledgers. This small manual approval seam is intentional; all copying,
 minification, GPU rendering, raster optimization, manifest assembly, and
 consumer synchronization remain mechanical.
 
-Exact forging and publication run on x86_64 Linux with Mesa software GL and the
-pinned media tools checked by `scripts/web-kit`. The emitted browser assets are
+Exact forging and publication run on x86_64 Linux with Mesa software GL.
+`scripts/web-kit` accepts the host media tools only when they reproduce every
+sealed output byte; tool upgrades therefore need no workstation downgrade and
+cannot silently alter a release. The emitted browser assets are
 platform-independent. `verify` remains portable because it reads only the
 committed locks and witnesses.
 

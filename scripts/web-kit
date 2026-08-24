@@ -51,16 +51,12 @@ fi
     fail 'deterministic forging requires the Mesa EGL vendor manifest'
 
 need_tool() {
-    actual=$($1 --version 2>&1 | head -1)
-    [ "$actual" = "$2" ] || fail "$1 must be $2, found $actual"
+    command -v "$1" >/dev/null 2>&1 || fail "$1 is required"
 }
 
-need_tool esbuild 0.28.2
-need_tool oxipng 'oxipng 10.2.0'
-case $(magick -version | head -1) in
-    'Version: ImageMagick 7.1.2-29 '*) ;;
-    *) fail 'ImageMagick must be 7.1.2-29' ;;
-esac
+need_tool esbuild
+need_tool oxipng
+need_tool magick
 mkdir -p "$arena"
 work=$(mktemp -d "$arena/forge.XXXXXXXX")
 cleanup() { rm -rf "$work"; }
@@ -164,14 +160,14 @@ verify_dist() {
         cmp -s "$chrome/$name.png" "$dist/chrome/$name.png" ||
             fail "dist/chrome/$name.png is stale"
     done
-    [ "$(identify -format '%wx%h:%[type]' "$dist/brass-tiles.png")" = '252x252:Palette' ]
-    [ "$(identify -format '%wx%h:%[type]' "$dist/brass-tiles@2x.png")" = '504x504:Palette' ]
-    [ "$(identify -format '%wx%h:%[type]' "$dist/brass-tiles@3x.png")" = '756x756:Palette' ]
-    [ "$(identify -format '%wx%h' "$dist/chrome/frame-compact.png")" = '357x110' ]
-    [ "$(identify -format '%wx%h' "$dist/chrome/frame-feature.png")" = '720x132' ]
-    [ "$(identify -format '%wx%h' "$dist/chrome/frame-masthead.png")" = '720x89' ]
-    [ "$(identify -format '%wx%h' "$dist/chrome/monoglyph-atlas.png")" = '192x32' ]
-    [ "$(identify -format '%wx%h' "$dist/chrome/platform-die-atlas.png")" = '392x56' ]
+    [ "$(magick identify -format '%wx%h:%[type]' "$dist/brass-tiles.png")" = '252x252:Palette' ]
+    [ "$(magick identify -format '%wx%h:%[type]' "$dist/brass-tiles@2x.png")" = '504x504:Palette' ]
+    [ "$(magick identify -format '%wx%h:%[type]' "$dist/brass-tiles@3x.png")" = '756x756:Palette' ]
+    [ "$(magick identify -format '%wx%h' "$dist/chrome/frame-compact.png")" = '357x110' ]
+    [ "$(magick identify -format '%wx%h' "$dist/chrome/frame-feature.png")" = '720x132' ]
+    [ "$(magick identify -format '%wx%h' "$dist/chrome/frame-masthead.png")" = '720x89' ]
+    [ "$(magick identify -format '%wx%h' "$dist/chrome/monoglyph-atlas.png")" = '192x32' ]
+    [ "$(magick identify -format '%wx%h' "$dist/chrome/platform-die-atlas.png")" = '392x56' ]
 }
 
 case "$action" in
