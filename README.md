@@ -133,6 +133,18 @@ Native WGPU is authoritative. Its fixed-size browser projection uses the same
 Rust code and can be raised separately with `scripts/web-atelier serve`; public
 promotion remains gated on controlled-DPR image comparison.
 
+Install the fixed-address atelier as a systemd user service with:
+
+```sh
+scripts/atelier-service install        # http://127.0.0.1:4181
+scripts/atelier-service install 8080   # choose another fixed port
+```
+
+The installer builds the browser bundle, installs and enables
+`brass-poolrooms-foundry-atelier.service`, and serves later atomic atelier
+builds without a restart. Use `scripts/atelier-service status` or
+`scripts/atelier-service uninstall` to inspect or remove it.
+
 The combined gallery is also the browser contract:
 
 ```sh

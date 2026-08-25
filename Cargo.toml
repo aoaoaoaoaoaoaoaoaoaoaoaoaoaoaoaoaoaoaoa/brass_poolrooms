@@ -17,6 +17,8 @@ include = [
   "examples/**",
   "web/**",
   "docs/**",
+  "scripts/atelier-service",
+  "scripts/exhibit-service",
   "scripts/gallery-service",
   "scripts/web-atelier",
   "scripts/web-exhibit",
