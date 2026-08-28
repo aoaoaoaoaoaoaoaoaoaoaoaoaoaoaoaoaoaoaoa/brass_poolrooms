@@ -49,3 +49,6 @@
 - **Tension**: the finite water forcing induced while the pointer rests over a
   tension-bearing mechanism. A **wake** is the water evidence emitted by actual
   mechanism motion.
+- **Type role**: one semantic rung in the application type scale. The role owns
+  its hidden metric; a mechanism's forged inscription remains gauge-owned
+  physical typography rather than an application type role.

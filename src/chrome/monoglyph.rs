@@ -501,6 +501,10 @@ impl CouplingTarget for MonoglyphResponse {
 /// Signed swept volume from a monoglyph plunger.
 pub type MonoglyphWake = PlungerWake;
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "a monoglyph's point size is derived from its exact physical crown gauge and perspective depth"
+)]
 fn etch(
     painter: &egui::Painter,
     clip: Rect,
@@ -573,6 +577,10 @@ fn etch(
 }
 
 #[cfg(feature = "foundry-atelier")]
+#[allow(
+    clippy::disallowed_methods,
+    reason = "the atelier study must retain the production monoglyph's crown-derived typographic projection"
+)]
 pub(crate) fn paint_study_etch(
     painter: &egui::Painter,
     clip: Rect,

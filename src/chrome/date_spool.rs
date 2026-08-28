@@ -1148,6 +1148,10 @@ fn print_label(painter: &egui::Painter, spool: Spool, tape_w: f32, t_center: f32
     let _glyphs = painter.add(shape);
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "the DateSpool bends a gauge-derived font onto physical tape; application type roles do not govern forged tape printing"
+)]
 fn lay_out(
     painter: &egui::Painter,
     spool: Spool,

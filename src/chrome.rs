@@ -42,6 +42,7 @@ mod screw_scroll;
 mod section;
 mod sort_toggle;
 mod symbol;
+mod typography;
 mod wheel;
 
 pub use checkbox::{Checkbox, CheckboxResponse, CheckboxWake, LabelSide};
@@ -68,6 +69,7 @@ pub use screw_scroll::ScrewScroll;
 pub use section::{FoldFlux, FoldWake, Section, SectionResponse, section};
 pub use sort_toggle::{SortDetent, SortToggle, SortToggleResponse, SortToggleWake};
 pub use symbol::Symbol;
+pub use typography::TypeRole;
 pub use wheel::take_control_wheel;
 
 #[cfg(feature = "foundry-atelier")]
@@ -144,6 +146,7 @@ pub fn install(ctx: &egui::Context) {
         widget.corner_radius = egui::CornerRadius::same(1);
     }
     ctx.all_styles_mut(|style| {
+        typography::install(style);
         style.visuals = visuals.clone();
         style.spacing.item_spacing = Vec2::splat(6.0);
         style.spacing.button_padding = Vec2::new(7.0, 3.0);
@@ -266,8 +269,8 @@ pub fn exact_activation(ui: &egui::Ui, response: &egui::Response) -> bool {
 }
 
 pub fn section_title(text: impl Into<String>) -> RichText {
-    RichText::new(text)
-        .size(13.0)
+    TypeRole::Body
+        .text(text)
         .strong()
         .color(HOT)
         .text_style(egui::TextStyle::Button)
@@ -468,18 +471,18 @@ fn glyph_weight(ch: char) -> f32 {
 }
 
 pub fn eyebrow(text: impl Into<String>) -> RichText {
-    RichText::new(text.into())
-        .size(11.0)
+    TypeRole::Caption
+        .text(text)
         .color(MUTED)
         .text_style(egui::TextStyle::Small)
 }
 
 pub fn title(text: impl Into<String>) -> RichText {
-    RichText::new(text.into()).size(17.0).strong().color(TEXT)
+    TypeRole::Title.text(text).strong().color(TEXT)
 }
 
 pub fn muted(text: impl Into<String>) -> RichText {
-    RichText::new(text.into()).size(12.0).color(MUTED)
+    TypeRole::Supporting.text(text).color(MUTED)
 }
 
 pub fn note(ui: &mut egui::Ui, text: impl Into<String>) -> egui::Response {

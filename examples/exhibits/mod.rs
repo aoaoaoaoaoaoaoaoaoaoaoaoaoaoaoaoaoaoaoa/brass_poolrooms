@@ -3,11 +3,40 @@ use brass_poolrooms::{
         self, Checkbox, CornerClose, Coupled, CouplingGap, DateReels, DateSpool, DragHandle,
         ForgePin, GregorianDay, Keycap, LabelSide, MechanismSize, MnemonicText, Monoglyph,
         MonoglyphFinish, NumberInput, Rail, ScrewScroll, Section, SortDetent, SortToggle, Symbol,
-        WheelPlane,
+        TypeRole, WheelPlane,
     },
     egui,
     water::Surface,
 };
+
+#[derive(Default)]
+pub struct Typography;
+
+impl Typography {
+    pub fn show(&mut self, ui: &mut egui::Ui) {
+        let _title = ui.label(chrome::title("APPLICATION TYPE ROLES"));
+        let _law = ui.label(chrome::muted(
+            "semantic hierarchy · hidden metrics · caption is the application floor",
+        ));
+        ui.add_space(16.0);
+        for role in TypeRole::ALL {
+            let _row = ui.horizontal(|ui| {
+                let _name = ui.add_sized(
+                    [112.0, 22.0],
+                    egui::Label::new(chrome::eyebrow(role.name())),
+                );
+                let _sample = ui.label(role.text(match role {
+                    TypeRole::Instrument => "supplementary spatial mark",
+                    TypeRole::Caption => "terse metadata and legends",
+                    TypeRole::Supporting => "secondary prose remains readable",
+                    TypeRole::Body => "ordinary labels, values, controls, and prose",
+                    TypeRole::Heading => "A SURFACE WITHIN THE APPLICATION",
+                    TypeRole::Title => "A SUBSTANTIAL PANE",
+                }));
+            });
+        }
+    }
+}
 
 #[derive(Default)]
 pub struct Scrolls;

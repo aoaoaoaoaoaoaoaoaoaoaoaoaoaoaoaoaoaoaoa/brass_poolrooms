@@ -133,6 +133,34 @@ Native WGPU is authoritative. Its fixed-size browser projection uses the same
 Rust code and can be raised separately with `scripts/web-atelier serve`; public
 promotion remains gated on controlled-DPR image comparison.
 
+## Typography
+
+`chrome::install` owns the application type scale as well as the embedded font
+stack. Ordinary egui body, button, heading, monospace, and small styles are
+mapped onto that scale, so most layout code should make no sizing decision at
+all. When a caller must state hierarchy explicitly, it chooses a
+`chrome::TypeRole`; the role's metric remains private to Poolrooms.
+
+Use the least prominent role that tells the truth. `Title` names an application
+or substantial pane, `Heading` introduces a surface within it, `Body` carries
+ordinary controls and prose, `Supporting` carries secondary prose and status,
+and `Caption` carries terse metadata or legends. `Instrument` is the sole
+smaller role: it is reserved for supplementary spatial marks in maps, plots,
+and similar canvases. It may never carry an action, fault, instruction, or the
+only statement of a user-visible fact.
+
+Do not reduce type to make a layout fit. Shorten the copy, wrap it, disclose it,
+or revise the layout. Raw `RichText::size` and `FontId` construction are
+production escapes, not an alternate scale; isolate a necessary dynamic
+spatial projection behind one narrowly named boundary and justify it against
+its native-size witness. Typography forged into a mechanism remains governed
+by that mechanism's exact gauge rather than by `TypeRole`.
+
+The scale is expressed in egui logical points. Diagnose an incorrect platform
+`pixels_per_point` coordinate independently; inflating application roles to
+compensate for a broken monitor scale would merely move the defect between
+displays.
+
 Install the fixed-address atelier as a systemd user service with:
 
 ```sh

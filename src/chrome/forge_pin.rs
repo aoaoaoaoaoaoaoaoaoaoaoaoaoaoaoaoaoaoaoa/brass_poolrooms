@@ -209,6 +209,10 @@ impl ForgePin {
     }
 
     /// Paint the pin above its coordinate, heating the bronze when `seized`.
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "ForgePin inscriptions are gauge-owned physical typography and the explicit override remains part of that mechanism contract"
+    )]
     pub fn paint(&self, painter: &Painter, seized: bool) {
         let gauge = gauge(self.size);
         let bulb = self.bulb();

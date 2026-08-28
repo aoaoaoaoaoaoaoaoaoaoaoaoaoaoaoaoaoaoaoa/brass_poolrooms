@@ -10,11 +10,13 @@ use anyhow::Result;
 use brass_poolrooms::{chrome, egui, water::Surface};
 use exhibits::{
     Checkboxes, Closures, Dates, Handles, Legends, Numbers, Pins, Scrolls, Sliders, Sorts, Symbols,
+    Typography,
 };
 use support::Exhibit;
 
 #[derive(Default)]
 struct Menagerie {
+    typography: Typography,
     scrolls: Scrolls,
     closures: Closures,
     handles: Handles,
@@ -46,6 +48,8 @@ impl Exhibit for Menagerie {
                             "one foundry · one physical universe · one living water table",
                         ));
                         ui.add_space(28.0);
+                        self.typography.show(ui);
+                        ui.add_space(42.0);
                         self.scrolls.show(ui);
                         ui.add_space(42.0);
                         self.closures.show(ui, water);

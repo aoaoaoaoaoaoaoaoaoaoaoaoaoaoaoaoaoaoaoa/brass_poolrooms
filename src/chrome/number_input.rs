@@ -16,7 +16,7 @@ use std::{
 };
 
 use egui::{
-    Align, Color32, CursorIcon, FontId, Id, Key, Modifiers, Pos2, Rect, Sense, Vec2, WidgetInfo,
+    Align, Color32, CursorIcon, Id, Key, Modifiers, Pos2, Rect, Sense, Vec2, WidgetInfo,
     emath::Numeric,
     text::{CCursor, CCursorRange},
 };
@@ -30,7 +30,6 @@ use super::{
 const DEFAULT_REGISTER_WIDTH: f32 = 68.0;
 const MIN_REGISTER_WIDTH: f32 = 42.0;
 const CASING_GAUGE: f32 = 2.0;
-const REGISTER_FONT_SIZE: f32 = 13.0;
 const MAX_PRECISION: usize = 15;
 const ROTOR_STIFFNESS: f32 = 520.0;
 const ROTOR_DAMPING: f32 = 25.0;
@@ -287,7 +286,7 @@ where
                 register_aperture.center(),
                 egui::Align2::CENTER_CENTER,
                 text,
-                FontId::monospace(REGISTER_FONT_SIZE),
+                super::TypeRole::Body.monospace(),
                 HOT,
             );
             if enabled
@@ -442,7 +441,7 @@ where
         aperture,
         egui::TextEdit::singleline(&mut text)
             .id(id)
-            .font(FontId::monospace(REGISTER_FONT_SIZE))
+            .font(super::TypeRole::Body.monospace())
             .text_color(HOT)
             .background_color(Color32::TRANSPARENT)
             .frame(egui::Frame::NONE)
