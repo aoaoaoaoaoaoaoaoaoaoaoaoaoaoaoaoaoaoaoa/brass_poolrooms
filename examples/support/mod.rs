@@ -25,6 +25,8 @@ pub trait Exhibit {
     const TITLE: &'static str;
     const SIZE: [f64; 2];
 
+    fn install(&self, _ctx: &egui::Context) {}
+
     fn ui(&mut self, ui: &mut egui::Ui, water: &mut Surface);
 }
 
@@ -41,6 +43,7 @@ pub fn run(app: impl Exhibit + 'static) -> Result<()> {
     console_error_panic_hook::set_once();
     let ctx = egui::Context::default();
     chrome::install(&ctx);
+    app.install(&ctx);
     let event_loop = EventLoop::<Spark>::with_user_event()
         .build()
         .context("build gallery event loop")?;
@@ -129,9 +132,10 @@ impl<A: Exhibit> Boiler<A> {
             output.platform_output,
         );
         let primitives = self.ctx.tessellate(output.shapes, output.pixels_per_point);
+        let tooltip_rects = tooltip_rects(&self.ctx);
         let water = self
             .water
-            .frame(&self.ctx, output.pixels_per_point, &[], None);
+            .frame(&self.ctx, output.pixels_per_point, &tooltip_rects, None);
         if water.wants_repaint() {
             rig.window.request_redraw();
         }
@@ -165,6 +169,17 @@ impl<A: Exhibit> Boiler<A> {
             rig.window.request_redraw();
         }
     }
+}
+
+fn tooltip_rects(ctx: &egui::Context) -> Vec<egui::Rect> {
+    ctx.memory(|memory| {
+        memory
+            .layer_ids()
+            .filter(|layer| layer.order == egui::Order::Tooltip && memory.areas().is_visible(layer))
+            .filter_map(|layer| memory.area_rect(layer.id))
+            .filter(egui::Rect::is_positive)
+            .collect()
+    })
 }
 
 impl<A: Exhibit> ApplicationHandler<Spark> for Boiler<A> {

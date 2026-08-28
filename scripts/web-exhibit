@@ -2,7 +2,7 @@
 set -eu
 
 usage() {
-    printf 'usage: scripts/web-exhibit [widget_gallery|foundry_atelier] [build|check|serve [PORT]|serve-built [PORT]]\n' >&2
+    printf 'usage: scripts/web-exhibit [widget_gallery|foundry_atelier|font_raster_atelier] [build|check|serve [PORT]|serve-built [PORT]]\n' >&2
 }
 
 example=${1:-}
@@ -23,6 +23,14 @@ case "$example" in
         feature=foundry-atelier
         default_port=4181
         title='Foundry Optics Atelier'
+        ;;
+    font_raster_atelier)
+        bundle_name=font-raster-atelier
+        source_html=web/font-raster-atelier.html
+        source_boot=web/font-raster-atelier-boot.js
+        feature=
+        default_port=4182
+        title='Font Raster Atelier'
         ;;
     *) usage; exit 2 ;;
 esac

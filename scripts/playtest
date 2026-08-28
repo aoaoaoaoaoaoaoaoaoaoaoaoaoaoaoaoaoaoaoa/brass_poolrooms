@@ -12,6 +12,7 @@ case "$gallery" in
     number_input_gallery) ;;
     material_study_gallery) ;;
     foundry_atelier) ;;
+    font_raster_atelier) ;;
     longinus_cursor_gallery) ;;
     widget_gallery) ;;
     *) printf 'unknown gallery: %s\n' "$gallery" >&2; exit 2 ;;
@@ -217,6 +218,28 @@ case "$gallery" in
         xdotool mousemove --window "$window" 560 429 click 1
         sleep 0.40
         import -window "$window" "$out/mandate.png"
+        ;;
+    font_raster_atelier)
+        xdotool mousemove --sync --window "$window" 540 114
+        sleep 0.10
+        xdotool mousedown 1
+        sleep 0.05
+        xdotool mouseup 1
+        sleep 0.25
+        import -window "$window" "$out/gamma-65.png"
+        if cmp -s "$out/initial.png" "$out/gamma-65.png"; then
+            printf 'font-transfer selection produced no presented-frame change\n' >&2
+            exit 1
+        fi
+        xdotool mousemove --sync --window "$window" 220 114
+        xdotool mousedown 1
+        sleep 0.05
+        xdotool mouseup 1
+        sleep 0.25
+        import -window "$window" "$out/emphasis.png"
+        xdotool mousemove --sync --window "$window" 190 408
+        sleep 1.00
+        import -window "$window" "$out/tooltip.png"
         ;;
     widget_gallery)
         # The numerical wheel owns its complete smoothed impulse. Its value and

@@ -120,6 +120,7 @@ cargo run --example drag_handle_gallery
 cargo run --example number_input_gallery
 cargo run --example longinus_cursor_gallery
 cargo run --features foundry-atelier --example foundry_atelier
+cargo run --example font_raster_atelier
 ```
 
 The feature-gated Foundry Optics Atelier is the standing material, lighting,
@@ -132,6 +133,17 @@ under that same selection. Medium remains the primary gauge.
 Native WGPU is authoritative. Its fixed-size browser projection uses the same
 Rust code and can be raised separately with `scripts/web-atelier serve`; public
 promotion remains gated on controlled-DPR image comparison.
+
+The standing Font Raster Atelier crosses the production and plausible UI faces
+with egui's useful hinting and fractional-positioning laws. It includes every
+semantic type role, real regular/emphasis faces, difficult-character and symbol
+witnesses, physical quarter-pixel phases, coverage transfer laws, and the
+production tooltip optical path. Run the native authority with
+`cargo run --example font_raster_atelier`; its browser transport is
+`scripts/web-exhibit font_raster_atelier serve`. The browser contains no HTML
+text specimens: Rust constructs the font atlas and egui meshes, and WGPU draws
+the fixed canvas. Browser compositor and DPR parity still require measurement
+before treating a browser screenshot as proof of native pixels.
 
 ## Typography
 
@@ -319,7 +331,12 @@ whose own geometry names the visible tile lattice can register the same floor
 to one grout intersection and square pitch, both in egui logical points:
 
 ```rust
-use brass_poolrooms::water::{Floor, FloorRegistration};
+use brass_poolrooms::water::{Floor, FloorRegistration, Surface, Wetness};
+# use brass_poolrooms::egui::{Rect, pos2};
+# let basin = Rect::from_min_max(pos2(0.0, 0.0), pos2(320.0, 240.0));
+# let board = basin;
+# let cell_pitch = 16.0;
+# let mut surface = Surface::new(Wetness::Wet);
 
 let floor = Floor::shallow(basin)
     .registered(FloorRegistration::square(board.min, cell_pitch));

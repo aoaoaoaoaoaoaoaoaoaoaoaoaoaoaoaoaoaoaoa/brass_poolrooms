@@ -63,7 +63,7 @@ impl TypeRole {
         reason = "TypeRole is the sole owner of application font metrics"
     )]
     pub fn proportional(self) -> FontId {
-        FontId::new(self.points(), FontFamily::Proportional)
+        self.in_family(FontFamily::Proportional)
     }
 
     /// Construct a monospace font at this role's canonical metric.
@@ -72,7 +72,20 @@ impl TypeRole {
         reason = "TypeRole is the sole owner of application font metrics"
     )]
     pub fn monospace(self) -> FontId {
-        FontId::new(self.points(), FontFamily::Monospace)
+        self.in_family(FontFamily::Monospace)
+    }
+
+    /// Construct a font in a named family at this role's canonical metric.
+    ///
+    /// This is principally useful to font and rasterization judgment surfaces.
+    /// Applications should ordinarily inherit the family installed by
+    /// [`crate::chrome::install`].
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "TypeRole remains the sole owner of application font metrics"
+    )]
+    pub fn in_family(self, family: FontFamily) -> FontId {
+        FontId::new(self.points(), family)
     }
 
     pub(super) const fn points(self) -> f32 {

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en" data-poolrooms="booting">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0c0b09">
+    <meta
+      name="description"
+      content="Native-scale WGPU judgment surface for Poolrooms fonts, semantic sizes, raster profiles, coverage transfer, pixel phase, and tooltip optics."
+    >
+    <title>Poolrooms · Font Raster Atelier</title>
+    <style>
+      html,
+      body {
+        min-width: 1280px;
+        min-height: 920px;
+        margin: 0;
+        overflow: auto;
+        background: #0c0b09;
+      }
+
+      body {
+        display: grid;
+        place-items: start center;
+      }
+
+      #poolrooms {
+        display: block;
+        width: 1280px;
+        height: 920px;
+        outline: none;
+        touch-action: none;
+      }
+
+      #status {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        color: #a98556;
+        background: #0c0b09;
+        font: 12px/1.5 ui-monospace, monospace;
+        letter-spacing: 0.12em;
+        transition: opacity 180ms ease;
+        pointer-events: none;
+      }
+
+      html[data-poolrooms="ready"] #status {
+        opacity: 0;
+      }
+
+      html[data-poolrooms="failed"] #status {
+        color: #d29a72;
+        padding: 2rem;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas
+      id="poolrooms"
+      width="1280"
+      height="920"
+      aria-label="Font Raster Atelier"
+    ></canvas>
+    <div id="status" role="status">RASTERIZING NATIVE-SCALE FONT WITNESSES</div>
+    <noscript>This atelier requires JavaScript and WebGPU.</noscript>
+    <script type="module" src="./boot.js"></script>
+  </body>
+</html>
