@@ -10,7 +10,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use brass_poolrooms::{
     chrome::{self, NumberInput, ScrewScroll, TypeRole},
-    egui::{self, Color32, FontData, FontDefinitions, FontFamily, FontId, FontTweak, RichText},
+    egui::{self, FontData, FontDefinitions, FontFamily, FontId, FontTweak, RichText},
     water::{Surface, Wetness},
 };
 use egui::epaint::{
@@ -18,11 +18,6 @@ use egui::epaint::{
     text::{HintingTarget, SmoothHinting},
 };
 use support::Exhibit;
-
-const CELL_WIDTH: f32 = 166.0;
-const CELL_HEIGHT: f32 = 96.0;
-const HEADER_HEIGHT: f32 = 48.0;
-const ROW_LABEL_WIDTH: f32 = 184.0;
 
 const CMU_REGULAR: &[u8] = include_bytes!("../assets/fonts/cmu-typewriter/cmuntt.ttf");
 const CMU_EMPHASIS: &[u8] = include_bytes!("../assets/fonts/atelier/cmu-typewriter/cmuntb.otf");
@@ -441,9 +436,9 @@ impl Exhibit for FontRasterAtelier {
                         self.header(ui);
                         self.controls(ui);
                         ui.add_space(10.0);
+                        self.target_selectors(ui);
+                        ui.add_space(10.0);
                         self.focus_bench(ui, water);
-                        ui.add_space(14.0);
-                        self.matrix(ui);
                         ui.add_space(24.0);
                     });
             });
@@ -556,39 +551,47 @@ impl FontRasterAtelier {
             });
     }
 
-    fn matrix(&mut self, ui: &mut egui::Ui) {
-        let scale = self.scale;
-        let _heading = ui.label(TypeRole::Heading.text("COMPLETE FACE × RASTER WITNESS"));
-        let _instructions = ui.label(TypeRole::Caption.text(
-            "Rows are faces; columns are raster laws. Click a specimen for the complete bench above.",
-        ));
-        let _horizontal = egui::ScrollArea::horizontal()
-            .id_salt("font-raster-matrix-x")
-            .auto_shrink([false, true])
+    fn target_selectors(&mut self, ui: &mut egui::Ui) {
+        let _frame = egui::Frame::new()
+            .fill(chrome::SURFACE)
+            .stroke(egui::Stroke::new(1.0, chrome::EDGE_STRONG))
+            .inner_margin(10)
             .show(ui, |ui| {
-                let _table = egui::Grid::new("font-raster-matrix")
-                    .num_columns(PROFILES.len() + 1)
-                    .spacing(egui::vec2(3.0, 3.0))
-                    .show(ui, |ui| {
-                        matrix_corner(ui);
-                        for (profile_index, profile) in PROFILES.iter().copied().enumerate() {
-                            matrix_column_header(ui, profile, self.profile == profile_index);
-                        }
-                        ui.end_row();
-
-                        for (face_index, face) in FACES.iter().copied().enumerate() {
-                            matrix_row_header(ui, face, self.face == face_index);
-                            for (profile_index, profile) in PROFILES.iter().copied().enumerate() {
-                                let selected =
-                                    self.face == face_index && self.profile == profile_index;
-                                if matrix_cell(ui, face, profile, selected, scale).clicked() {
-                                    self.face = face_index;
-                                    self.profile = profile_index;
-                                }
+                let _selectors = ui.horizontal(|ui| {
+                    let _face_label = ui.label(TypeRole::Caption.text("FACE"));
+                    let _face = egui::ComboBox::from_id_salt("font-raster-face")
+                        .width(230.0)
+                        .height(620.0)
+                        .selected_text(TypeRole::Body.text(FACES[self.face].name))
+                        .show_ui(ui, |ui| {
+                            for (index, face) in FACES.iter().copied().enumerate() {
+                                let _choice = ui.selectable_value(
+                                    &mut self.face,
+                                    index,
+                                    TypeRole::Body.text(face.name),
+                                );
                             }
-                            ui.end_row();
-                        }
-                    });
+                        });
+                    let _separator = ui.separator();
+                    let _profile_label = ui.label(TypeRole::Caption.text("RASTER LAW"));
+                    let _profile = egui::ComboBox::from_id_salt("font-raster-profile")
+                        .width(190.0)
+                        .height(260.0)
+                        .selected_text(TypeRole::Body.text(PROFILES[self.profile].name))
+                        .show_ui(ui, |ui| {
+                            for (index, profile) in PROFILES.iter().copied().enumerate() {
+                                let _choice = ui.selectable_value(
+                                    &mut self.profile,
+                                    index,
+                                    TypeRole::Body.text(profile.name),
+                                );
+                            }
+                        });
+                });
+                let _selection = ui.label(TypeRole::Instrument.text(format!(
+                    "{} · {}",
+                    FACES[self.face].province, PROFILES[self.profile].province,
+                )));
             });
     }
 }
@@ -709,157 +712,6 @@ const fn role_index(role: TypeRole) -> usize {
 )]
 fn specimen_font(points: f32, family: FontFamily) -> FontId {
     FontId::new(points, family)
-}
-
-fn matrix_cell(
-    ui: &mut egui::Ui,
-    face: Face,
-    profile: RasterProfile,
-    selected: bool,
-    scale: SpecimenScale,
-) -> egui::Response {
-    let (rect, response) =
-        ui.allocate_exact_size(egui::vec2(CELL_WIDTH, CELL_HEIGHT), egui::Sense::click());
-    let hovered = response.hovered();
-    let fill = if selected {
-        Color32::from_rgb(44, 36, 25)
-    } else if hovered {
-        chrome::RAISED
-    } else {
-        chrome::CONTROL
-    };
-    let stroke = if selected || hovered {
-        egui::Stroke::new(1.0, chrome::HOT)
-    } else {
-        egui::Stroke::new(1.0, chrome::EDGE)
-    };
-    let _shape = ui
-        .painter()
-        .rect(rect, 1.0, fill, stroke, egui::StrokeKind::Inside);
-    let family = family(face, profile);
-    let painter = ui.painter().with_clip_rect(rect.shrink(1.0));
-    for (offset, text, font, color) in [
-        (
-            6.0,
-            "Edit trail · 42 km",
-            scale.font(TypeRole::Body, family.clone()),
-            chrome::TEXT,
-        ),
-        (
-            28.0,
-            "Il1 0OQ rn mw",
-            scale.font(TypeRole::Supporting, family.clone()),
-            chrome::TEXT,
-        ),
-        (
-            49.0,
-            "↶ ↷ ↗ ⚙ ♥ ✓ ∑ μ",
-            scale.font(TypeRole::Caption, family.clone()),
-            chrome::HOT,
-        ),
-        (
-            69.0,
-            "CFG 03:17 +42.75",
-            scale.font(TypeRole::Instrument, family),
-            chrome::MUTED,
-        ),
-    ] {
-        let _bounds = painter.text(
-            rect.left_top() + egui::vec2(7.0, offset),
-            egui::Align2::LEFT_TOP,
-            text,
-            font,
-            color,
-        );
-    }
-    response
-}
-
-fn matrix_corner(ui: &mut egui::Ui) {
-    let rect = matrix_header_plate(ui, ROW_LABEL_WIDTH, false);
-    let painter = ui.painter().with_clip_rect(rect.shrink(1.0));
-    let _face = painter.text(
-        rect.left_top() + egui::vec2(7.0, 6.0),
-        egui::Align2::LEFT_TOP,
-        "FACE ↓",
-        TypeRole::Caption.proportional(),
-        chrome::TEXT,
-    );
-    let _law = painter.text(
-        rect.left_top() + egui::vec2(7.0, 25.0),
-        egui::Align2::LEFT_TOP,
-        "RASTER LAW →",
-        TypeRole::Instrument.proportional(),
-        chrome::MUTED,
-    );
-}
-
-fn matrix_column_header(ui: &mut egui::Ui, profile: RasterProfile, selected: bool) {
-    let rect = matrix_header_plate(ui, CELL_WIDTH, selected);
-    let painter = ui.painter().with_clip_rect(rect.shrink(1.0));
-    let _name = painter.text(
-        rect.left_top() + egui::vec2(7.0, 6.0),
-        egui::Align2::LEFT_TOP,
-        profile.name,
-        TypeRole::Caption.proportional(),
-        if selected { chrome::HOT } else { chrome::TEXT },
-    );
-    let _province = painter.text(
-        rect.left_top() + egui::vec2(7.0, 25.0),
-        egui::Align2::LEFT_TOP,
-        profile.province,
-        TypeRole::Instrument.proportional(),
-        chrome::MUTED,
-    );
-}
-
-fn matrix_row_header(ui: &mut egui::Ui, face: Face, selected: bool) {
-    let (rect, _response) = ui.allocate_exact_size(
-        egui::vec2(ROW_LABEL_WIDTH, CELL_HEIGHT),
-        egui::Sense::hover(),
-    );
-    let stroke = if selected {
-        egui::Stroke::new(1.0, chrome::HOT)
-    } else {
-        egui::Stroke::new(1.0, chrome::EDGE_STRONG)
-    };
-    let _plate = ui
-        .painter()
-        .rect(rect, 1.0, chrome::SURFACE, stroke, egui::StrokeKind::Inside);
-    let painter = ui.painter().with_clip_rect(rect.shrink(1.0));
-    let _name = painter.text(
-        rect.left_top() + egui::vec2(8.0, 9.0),
-        egui::Align2::LEFT_TOP,
-        face.name,
-        TypeRole::Caption.proportional(),
-        if selected { chrome::HOT } else { chrome::TEXT },
-    );
-    let _province = painter.text(
-        rect.left_top() + egui::vec2(8.0, 30.0),
-        egui::Align2::LEFT_TOP,
-        face.province,
-        TypeRole::Instrument.proportional(),
-        chrome::MUTED,
-    );
-}
-
-fn matrix_header_plate(ui: &mut egui::Ui, width: f32, selected: bool) -> egui::Rect {
-    let (rect, _response) =
-        ui.allocate_exact_size(egui::vec2(width, HEADER_HEIGHT), egui::Sense::hover());
-    let stroke = if selected {
-        egui::Stroke::new(1.0, chrome::HOT)
-    } else {
-        egui::Stroke::new(1.0, chrome::EDGE_STRONG)
-    };
-    let fill = if selected {
-        chrome::RAISED
-    } else {
-        chrome::SURFACE
-    };
-    let _plate = ui
-        .painter()
-        .rect(rect, 1.0, fill, stroke, egui::StrokeKind::Inside);
-    rect
 }
 
 fn family(face: Face, profile: RasterProfile) -> FontFamily {

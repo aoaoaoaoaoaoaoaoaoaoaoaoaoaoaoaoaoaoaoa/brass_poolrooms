@@ -229,7 +229,35 @@ case "$gallery" in
         import -window "$window" "$out/mandate.png"
         ;;
     font_raster_atelier)
-        xdotool mousemove --sync --window "$window" 185 253 click --repeat 2 1
+        xdotool mousemove --sync --window "$window" 180 198 click 1
+        sleep 0.25
+        import -window "$window" "$out/face-menu.png"
+        if cmp -s "$out/initial.png" "$out/face-menu.png"; then
+            printf 'face selector did not open\n' >&2
+            exit 1
+        fi
+        xdotool mousemove --sync --window "$window" 180 256 click 1
+        sleep 0.25
+        import -window "$window" "$out/face-selected.png"
+        if cmp -s "$out/initial.png" "$out/face-selected.png"; then
+            printf 'face selection produced no presented-frame change\n' >&2
+            exit 1
+        fi
+        xdotool mousemove --sync --window "$window" 475 198 click 1
+        sleep 0.25
+        import -window "$window" "$out/raster-menu.png"
+        if cmp -s "$out/face-selected.png" "$out/raster-menu.png"; then
+            printf 'raster-law selector did not open\n' >&2
+            exit 1
+        fi
+        xdotool mousemove --sync --window "$window" 475 256 click 1
+        sleep 0.25
+        import -window "$window" "$out/raster-selected.png"
+        if cmp -s "$out/face-selected.png" "$out/raster-selected.png"; then
+            printf 'raster-law selection produced no presented-frame change\n' >&2
+            exit 1
+        fi
+        xdotool mousemove --sync --window "$window" 185 336 click --repeat 2 1
         sleep 0.12
         xdotool key --window "$window" ctrl+a
         sleep 0.05
@@ -252,7 +280,7 @@ case "$gallery" in
         xdotool mouseup 1
         sleep 0.25
         import -window "$window" "$out/emphasis.png"
-        xdotool mousemove --sync --window "$window" 190 478
+        xdotool mousemove --sync --window "$window" 190 563
         sleep 1.00
         import -window "$window" "$out/tooltip.png"
         ;;

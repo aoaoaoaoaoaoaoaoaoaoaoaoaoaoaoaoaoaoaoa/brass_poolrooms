@@ -135,12 +135,12 @@ Rust code and can be raised separately with `scripts/web-atelier serve`; public
 promotion remains gated on controlled-DPR image comparison.
 
 The standing Font Raster Atelier crosses a lineage-audited Computer Modern and
-Courier corpus with egui's useful hinting and fractional-positioning laws. Its
-tabular witness includes every semantic type role, real regular/emphasis faces,
-difficult characters and symbols, physical quarter-pixel phases, coverage
-transfer laws, and the production tooltip optical path. Six exact numerical
-registers tune the semantic type scale jointly across the focus bench and every
-face × raster cell. Run the native authority with
+Courier corpus with egui's useful hinting and fractional-positioning laws.
+Compact face and raster-law selectors drive a complete witness containing every
+semantic type role, real regular/emphasis faces, difficult characters and
+symbols, physical quarter-pixel phases, coverage transfer laws, and the
+production tooltip optical path. Six exact numerical registers tune the
+semantic type scale jointly across that witness. Run the native authority with
 `cargo run --example font_raster_atelier`; its browser transport is
 `scripts/web-exhibit font_raster_atelier serve`. The browser contains no HTML
 text specimens: Rust constructs the font atlas and egui meshes, and WGPU draws
