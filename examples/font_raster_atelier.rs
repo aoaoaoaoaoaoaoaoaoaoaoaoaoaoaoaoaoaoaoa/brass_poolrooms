@@ -9,8 +9,8 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use brass_poolrooms::{
-    chrome::{self, ScrewScroll, TypeRole},
-    egui::{self, Color32, FontData, FontDefinitions, FontFamily, FontTweak, RichText},
+    chrome::{self, NumberInput, ScrewScroll, TypeRole},
+    egui::{self, Color32, FontData, FontDefinitions, FontFamily, FontId, FontTweak, RichText},
     water::{Surface, Wetness},
 };
 use egui::epaint::{
@@ -19,12 +19,34 @@ use egui::epaint::{
 };
 use support::Exhibit;
 
-const CELL_WIDTH: f32 = 158.0;
+const CELL_WIDTH: f32 = 166.0;
 const CELL_HEIGHT: f32 = 96.0;
-const ROW_LABEL_WIDTH: f32 = 150.0;
+const HEADER_HEIGHT: f32 = 48.0;
+const ROW_LABEL_WIDTH: f32 = 184.0;
 
 const CMU_REGULAR: &[u8] = include_bytes!("../assets/fonts/cmu-typewriter/cmuntt.ttf");
 const CMU_EMPHASIS: &[u8] = include_bytes!("../assets/fonts/atelier/cmu-typewriter/cmuntb.otf");
+const CM_GRADE_0: &[u8] = include_bytes!(
+    "../assets/fonts/atelier/cm-graded/ComputerModernGradedG0Typewriter10Regular.otf"
+);
+const CM_GRADE_10: &[u8] = include_bytes!(
+    "../assets/fonts/atelier/cm-graded/ComputerModernGradedG10Typewriter10Regular.otf"
+);
+const CM_GRADE_19: &[u8] = include_bytes!(
+    "../assets/fonts/atelier/cm-graded/ComputerModernGradedG19Typewriter10Regular.otf"
+);
+const CM_GRADE_32: &[u8] = include_bytes!(
+    "../assets/fonts/atelier/cm-graded/ComputerModernGradedG32Typewriter10Regular.otf"
+);
+const CM_GRADE_44: &[u8] = include_bytes!(
+    "../assets/fonts/atelier/cm-graded/ComputerModernGradedG44Typewriter10Regular.otf"
+);
+const CM_GRADE_57: &[u8] = include_bytes!(
+    "../assets/fonts/atelier/cm-graded/ComputerModernGradedG57Typewriter10Regular.otf"
+);
+const CM_GRADE_72: &[u8] = include_bytes!(
+    "../assets/fonts/atelier/cm-graded/ComputerModernGradedG72Typewriter10Regular.otf"
+);
 const NOTO_MATH: &[u8] = include_bytes!("../assets/fonts/noto/NotoSansMath-Regular.ttf");
 const NOTO_SYMBOLS: &[u8] = include_bytes!("../assets/fonts/noto/NotoSansSymbols2-Regular.ttf");
 
@@ -46,67 +68,163 @@ const FACES: &[Face] = &[
         emphasis: CMU_EMPHASIS,
     },
     Face {
-        slug: "ia-mono",
-        name: "IA WRITER MONO",
-        province: "strict mono candidate",
-        regular: include_bytes!("../assets/fonts/atelier/ia-writer/iAWriterMonoS-Regular.ttf"),
-        emphasis: include_bytes!("../assets/fonts/atelier/ia-writer/iAWriterMonoS-Bold.ttf"),
+        slug: "cmu-typewriter-light",
+        name: "CMU TYPEWRITER LIGHT",
+        province: "same CM Unicode family · light / bold",
+        regular: include_bytes!("../assets/fonts/atelier/cmu-typewriter/cmunbtl.otf"),
+        emphasis: CMU_EMPHASIS,
     },
     Face {
-        slug: "ia-duo",
-        name: "IA WRITER DUO",
-        province: "duospaced candidate",
-        regular: include_bytes!("../assets/fonts/atelier/ia-writer/iAWriterDuoS-Regular.ttf"),
-        emphasis: include_bytes!("../assets/fonts/atelier/ia-writer/iAWriterDuoS-Bold.ttf"),
+        slug: "cm-graded-0",
+        name: "CM GRADED · G0",
+        province: "exact CM metrics · grade 0",
+        regular: CM_GRADE_0,
+        emphasis: CM_GRADE_0,
     },
     Face {
-        slug: "ia-quattro",
-        name: "IA WRITER QUATTRO",
-        province: "four-width candidate",
-        regular: include_bytes!("../assets/fonts/atelier/ia-writer/iAWriterQuattroS-Regular.ttf"),
-        emphasis: include_bytes!("../assets/fonts/atelier/ia-writer/iAWriterQuattroS-Bold.ttf"),
+        slug: "cm-graded-10",
+        name: "CM GRADED · G10",
+        province: "exact CM metrics · grade 10",
+        regular: CM_GRADE_10,
+        emphasis: CM_GRADE_10,
     },
     Face {
-        slug: "plex-mono",
-        name: "IBM PLEX MONO",
-        province: "text / medium candidate",
-        regular: include_bytes!("../assets/fonts/atelier/ibm-plex/IBMPlexMono-Text.ttf"),
-        emphasis: include_bytes!("../assets/fonts/atelier/ibm-plex/IBMPlexMono-Medium.ttf"),
+        slug: "cm-graded-19",
+        name: "CM GRADED · G19",
+        province: "package default · grade 19",
+        regular: CM_GRADE_19,
+        emphasis: CM_GRADE_19,
     },
     Face {
-        slug: "plex-sans",
-        name: "IBM PLEX SANS",
-        province: "proportional candidate",
-        regular: include_bytes!("../assets/fonts/atelier/ibm-plex/IBMPlexSans-Text.ttf"),
-        emphasis: include_bytes!("../assets/fonts/atelier/ibm-plex/IBMPlexSans-Medium.ttf"),
+        slug: "cm-graded-32",
+        name: "CM GRADED · G32",
+        province: "exact CM metrics · grade 32",
+        regular: CM_GRADE_32,
+        emphasis: CM_GRADE_32,
     },
     Face {
-        slug: "jetbrains-mono",
-        name: "JETBRAINS MONO",
-        province: "screen mono candidate",
-        regular: include_bytes!("../assets/fonts/atelier/jetbrains-mono/JetBrainsMono-Regular.ttf"),
-        emphasis: include_bytes!("../assets/fonts/atelier/jetbrains-mono/JetBrainsMono-Medium.ttf"),
+        slug: "cm-graded-44",
+        name: "CM GRADED · G44",
+        province: "exact CM metrics · grade 44",
+        regular: CM_GRADE_44,
+        emphasis: CM_GRADE_44,
+    },
+    Face {
+        slug: "cm-graded-57",
+        name: "CM GRADED · G57",
+        province: "exact CM metrics · grade 57",
+        regular: CM_GRADE_57,
+        emphasis: CM_GRADE_57,
+    },
+    Face {
+        slug: "cm-graded-72",
+        name: "CM GRADED · G72",
+        province: "exact CM metrics · grade 72",
+        regular: CM_GRADE_72,
+        emphasis: CM_GRADE_72,
+    },
+    Face {
+        slug: "latin-modern-mono-8",
+        name: "LATIN MODERN MONO 8",
+        province: "small optical master · direct CM",
+        regular: include_bytes!("../assets/fonts/atelier/latin-modern/lmmono8-regular.otf"),
+        emphasis: include_bytes!("../assets/fonts/atelier/latin-modern/lmmono8-regular.otf"),
+    },
+    Face {
+        slug: "latin-modern-mono-9",
+        name: "LATIN MODERN MONO 9",
+        province: "small optical master · direct CM",
+        regular: include_bytes!("../assets/fonts/atelier/latin-modern/lmmono9-regular.otf"),
+        emphasis: include_bytes!("../assets/fonts/atelier/latin-modern/lmmono9-regular.otf"),
+    },
+    Face {
+        slug: "latin-modern-mono-10",
+        name: "LATIN MODERN MONO 10",
+        province: "direct CM outline descendant",
+        regular: include_bytes!("../assets/fonts/atelier/latin-modern/lmmono10-regular.otf"),
+        emphasis: include_bytes!("../assets/fonts/atelier/latin-modern/lmmono10-regular.otf"),
+    },
+    Face {
+        slug: "latin-modern-mono-12",
+        name: "LATIN MODERN MONO 12",
+        province: "larger CM optical master",
+        regular: include_bytes!("../assets/fonts/atelier/latin-modern/lmmono12-regular.otf"),
+        emphasis: include_bytes!("../assets/fonts/atelier/latin-modern/lmmono12-regular.otf"),
+    },
+    Face {
+        slug: "latin-modern-mono-light-10",
+        name: "LATIN MODERN MONO LIGHT",
+        province: "CM light / bold pair",
+        regular: include_bytes!("../assets/fonts/atelier/latin-modern/lmmonolt10-regular.otf"),
+        emphasis: include_bytes!("../assets/fonts/atelier/latin-modern/lmmonolt10-bold.otf"),
+    },
+    Face {
+        slug: "latin-modern-mono-light-condensed-10",
+        name: "LATIN MODERN MONO CONDENSED",
+        province: "CM light condensed master",
+        regular: include_bytes!("../assets/fonts/atelier/latin-modern/lmmonoltcond10-regular.otf"),
+        emphasis: include_bytes!("../assets/fonts/atelier/latin-modern/lmmonoltcond10-regular.otf"),
+    },
+    Face {
+        slug: "new-cm-mono-10",
+        name: "NEW CM MONO 10",
+        province: "expanded CM regular / book",
+        regular: include_bytes!(
+            "../assets/fonts/atelier/new-computer-modern/NewCMMono10-Regular.otf"
+        ),
+        emphasis: include_bytes!(
+            "../assets/fonts/atelier/new-computer-modern/NewCMMono10-Book.otf"
+        ),
     },
     Face {
         slug: "courier-prime",
         name: "COURIER PRIME",
-        province: "typewriter candidate",
+        province: "screenplay Courier redrawing",
         regular: include_bytes!("../assets/fonts/atelier/courier-prime/CourierPrime-Regular.ttf"),
         emphasis: include_bytes!("../assets/fonts/atelier/courier-prime/CourierPrime-Bold.ttf"),
     },
     Face {
-        slug: "noto-math",
-        name: "NOTO SANS MATH",
-        province: "production math fallback",
-        regular: NOTO_MATH,
-        emphasis: NOTO_MATH,
+        slug: "courier-prime-code",
+        name: "COURIER PRIME CODE",
+        province: "code-tuned Courier Prime",
+        regular: include_bytes!(
+            "../assets/fonts/atelier/courier-prime-code/CourierPrimeCode-Regular.ttf"
+        ),
+        emphasis: include_bytes!(
+            "../assets/fonts/atelier/courier-prime-code/CourierPrimeCode-Regular.ttf"
+        ),
     },
     Face {
-        slug: "noto-symbols",
-        name: "NOTO SANS SYMBOLS 2",
-        province: "production symbol fallback",
-        regular: NOTO_SYMBOLS,
-        emphasis: NOTO_SYMBOLS,
+        slug: "tex-gyre-cursor",
+        name: "TEX GYRE CURSOR",
+        province: "extended Nimbus / Courier",
+        regular: include_bytes!(
+            "../assets/fonts/atelier/tex-gyre-cursor/texgyrecursor-regular.otf"
+        ),
+        emphasis: include_bytes!("../assets/fonts/atelier/tex-gyre-cursor/texgyrecursor-bold.otf"),
+    },
+    Face {
+        slug: "nimbus-mono-ps",
+        name: "NIMBUS MONO PS",
+        province: "URW Courier master",
+        regular: include_bytes!("../assets/fonts/atelier/nimbus-mono/NimbusMonoPS-Regular.otf"),
+        emphasis: include_bytes!("../assets/fonts/atelier/nimbus-mono/NimbusMonoPS-Bold.otf"),
+    },
+    Face {
+        slug: "liberation-mono",
+        name: "LIBERATION MONO",
+        province: "Courier New metric branch",
+        regular: include_bytes!(
+            "../assets/fonts/atelier/liberation-mono/LiberationMono-Regular.ttf"
+        ),
+        emphasis: include_bytes!("../assets/fonts/atelier/liberation-mono/LiberationMono-Bold.ttf"),
+    },
+    Face {
+        slug: "cousine",
+        name: "COUSINE",
+        province: "ChromeOS Courier metric branch",
+        regular: include_bytes!("../assets/fonts/atelier/cousine/Cousine-Regular.ttf"),
+        emphasis: include_bytes!("../assets/fonts/atelier/cousine/Cousine-Bold.ttf"),
     },
 ];
 
@@ -266,6 +384,29 @@ impl Transfer {
     }
 }
 
+#[derive(Clone, Copy)]
+struct SpecimenScale {
+    points: [f32; TypeRole::ALL.len()],
+}
+
+impl Default for SpecimenScale {
+    fn default() -> Self {
+        Self {
+            points: TypeRole::ALL.map(|role| role.proportional().size),
+        }
+    }
+}
+
+impl SpecimenScale {
+    fn points(self, role: TypeRole) -> f32 {
+        self.points[role_index(role)]
+    }
+
+    fn font(self, role: TypeRole, family: FontFamily) -> FontId {
+        specimen_font(self.points(role), family)
+    }
+}
+
 #[derive(Default)]
 struct FontRasterAtelier {
     face: usize,
@@ -273,6 +414,7 @@ struct FontRasterAtelier {
     weight: Weight,
     transfer: Transfer,
     wet: bool,
+    scale: SpecimenScale,
 }
 
 impl Exhibit for FontRasterAtelier {
@@ -299,7 +441,7 @@ impl Exhibit for FontRasterAtelier {
                         self.header(ui);
                         self.controls(ui);
                         ui.add_space(10.0);
-                        self.focus_bench(ui);
+                        self.focus_bench(ui, water);
                         ui.add_space(14.0);
                         self.matrix(ui);
                         ui.add_space(24.0);
@@ -353,6 +495,13 @@ impl FontRasterAtelier {
                     }
                     let _separator = ui.separator();
                     let _response = ui.checkbox(&mut self.wet, "PRODUCTION WATER");
+                    let _separator = ui.separator();
+                    if ui
+                        .button(TypeRole::Caption.text("RESET SEMANTIC SIZES"))
+                        .clicked()
+                    {
+                        self.scale = SpecimenScale::default();
+                    }
                 });
             });
         if before_weight != self.weight || before_transfer != self.transfer {
@@ -362,10 +511,11 @@ impl FontRasterAtelier {
         }
     }
 
-    fn focus_bench(&self, ui: &mut egui::Ui) {
+    fn focus_bench(&mut self, ui: &mut egui::Ui, water: &mut Surface) {
         let face = FACES[self.face];
         let profile = PROFILES[self.profile];
         let family = family(face, profile);
+        let scale = &mut self.scale;
         let _frame = egui::Frame::new()
             .fill(chrome::CONTROL)
             .stroke(egui::Stroke::new(1.0, chrome::EDGE))
@@ -380,25 +530,26 @@ impl FontRasterAtelier {
                 });
                 ui.add_space(4.0);
                 ui.columns(2, |columns| {
-                    role_witness(&mut columns[0], family.clone());
-                    diagnostic_witness(&mut columns[1], family.clone());
+                    role_witness(&mut columns[0], family.clone(), scale, water);
+                    diagnostic_witness(&mut columns[1], family.clone(), *scale);
                 });
                 ui.add_space(6.0);
-                phase_witness(ui, family.clone());
+                phase_witness(ui, family.clone(), *scale);
                 ui.add_space(4.0);
                 let response = ui.label(
                     TypeRole::Body
                         .text("HOVER: production tooltip optical path")
                         .color(chrome::HOT),
                 );
+                let body = scale.font(TypeRole::Body, family.clone());
+                let supporting = scale.font(TypeRole::Supporting, family.clone());
                 let _response = response.on_hover_ui(move |ui| {
                     let _primary = ui.label(
-                        RichText::new("Hover help: Ctrl+, opens settings · Il1 0OQ 8B")
-                            .font(TypeRole::Body.in_family(family.clone())),
+                        RichText::new("Hover help: Ctrl+, opens settings · Il1 0OQ 8B").font(body),
                     );
                     let _secondary = ui.label(
                         RichText::new("Fine strokes, punctuation, and warm low-contrast ink.")
-                            .font(TypeRole::Supporting.in_family(family))
+                            .font(supporting)
                             .color(chrome::MUTED),
                     );
                 });
@@ -406,62 +557,81 @@ impl FontRasterAtelier {
     }
 
     fn matrix(&mut self, ui: &mut egui::Ui) {
+        let scale = self.scale;
         let _heading = ui.label(TypeRole::Heading.text("COMPLETE FACE × RASTER WITNESS"));
         let _instructions = ui.label(TypeRole::Caption.text(
-            "Click a specimen for the complete role, pixel-phase, symbol, and tooltip bench above.",
+            "Rows are faces; columns are raster laws. Click a specimen for the complete bench above.",
         ));
         let _horizontal = egui::ScrollArea::horizontal()
             .id_salt("font-raster-matrix-x")
             .auto_shrink([false, true])
             .show(ui, |ui| {
-                let _header = ui.horizontal(|ui| {
-                    let _label = ui.allocate_ui(egui::vec2(ROW_LABEL_WIDTH, 28.0), |ui| {
-                        let _face = ui.label(TypeRole::Caption.text("FACE"));
-                    });
-                    for profile in PROFILES {
-                        let _profile = ui.allocate_ui(egui::vec2(CELL_WIDTH, 28.0), |ui| {
-                            let _name = ui.label(TypeRole::Caption.text(profile.name));
-                        });
-                    }
-                });
-                for (face_index, face) in FACES.iter().copied().enumerate() {
-                    let _row = ui.horizontal(|ui| {
-                        let _label =
-                            ui.allocate_ui(egui::vec2(ROW_LABEL_WIDTH, CELL_HEIGHT), |ui| {
-                                let _name = ui.label(TypeRole::Caption.text(face.name));
-                                let _province = ui.label(
-                                    TypeRole::Instrument
-                                        .text(face.province)
-                                        .color(chrome::MUTED),
-                                );
-                            });
+                let _table = egui::Grid::new("font-raster-matrix")
+                    .num_columns(PROFILES.len() + 1)
+                    .spacing(egui::vec2(3.0, 3.0))
+                    .show(ui, |ui| {
+                        matrix_corner(ui);
                         for (profile_index, profile) in PROFILES.iter().copied().enumerate() {
-                            let selected = self.face == face_index && self.profile == profile_index;
-                            if matrix_cell(ui, face, profile, selected).clicked() {
-                                self.face = face_index;
-                                self.profile = profile_index;
+                            matrix_column_header(ui, profile, self.profile == profile_index);
+                        }
+                        ui.end_row();
+
+                        for (face_index, face) in FACES.iter().copied().enumerate() {
+                            matrix_row_header(ui, face, self.face == face_index);
+                            for (profile_index, profile) in PROFILES.iter().copied().enumerate() {
+                                let selected =
+                                    self.face == face_index && self.profile == profile_index;
+                                if matrix_cell(ui, face, profile, selected, scale).clicked() {
+                                    self.face = face_index;
+                                    self.profile = profile_index;
+                                }
                             }
+                            ui.end_row();
                         }
                     });
-                }
             });
     }
 }
 
-fn role_witness(ui: &mut egui::Ui, family: FontFamily) {
-    for (role, text) in [
-        (TypeRole::Instrument, "10.5 · ridge 1,842 m · 03:17"),
-        (TypeRole::Caption, "12 · CONFIGURATION FILE"),
-        (TypeRole::Supporting, "13 · No matching sessions"),
-        (TypeRole::Body, "14 · Edit trail and save changes"),
-        (TypeRole::Heading, "15 · TRAIL CREATOR"),
-        (TypeRole::Title, "18 · CODEX WRANGLER"),
-    ] {
-        let _line = ui.label(RichText::new(text).font(role.in_family(family.clone())));
-    }
+fn role_witness(
+    ui: &mut egui::Ui,
+    family: FontFamily,
+    scale: &mut SpecimenScale,
+    water: &mut Surface,
+) {
+    let _grid = egui::Grid::new("semantic-size-witness")
+        .num_columns(3)
+        .spacing(egui::vec2(5.0, 3.0))
+        .show(ui, |ui| {
+            semantic_header(ui, "SEMANTIC ROLE", 112.0);
+            semantic_header(ui, "POINTS", 84.0);
+            semantic_header(ui, "WITNESS", 250.0);
+            ui.end_row();
+
+            for (index, (role, text)) in [
+                (TypeRole::Instrument, "ridge 1,842 m · 03:17"),
+                (TypeRole::Caption, "CONFIGURATION FILE"),
+                (TypeRole::Supporting, "No matching sessions"),
+                (TypeRole::Body, "Edit trail and save changes"),
+                (TypeRole::Heading, "TRAIL CREATOR"),
+                (TypeRole::Title, "CODEX WRANGLER"),
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                semantic_header(ui, role.name(), 112.0);
+                let register = NumberInput::new(&mut scale.points[index], 8.0..=32.0, 0.25, 2)
+                    .register_width(60.0)
+                    .show(ui)
+                    .on_hover_text("scroll by 0.25 pt · double-click register for exact entry");
+                water.number_input(&register);
+                let _witness = ui.label(RichText::new(text).font(scale.font(role, family.clone())));
+                ui.end_row();
+            }
+        });
 }
 
-fn diagnostic_witness(ui: &mut egui::Ui, family: FontFamily) {
+fn diagnostic_witness(ui: &mut egui::Ui, family: FontFamily, scale: SpecimenScale) {
     for (role, text, color) in [
         (TypeRole::Body, "Il1 0OQ 5S 2Z rn m wvw", chrome::TEXT),
         (
@@ -480,13 +650,13 @@ fn diagnostic_witness(ui: &mut egui::Ui, family: FontFamily) {
     ] {
         let _line = ui.label(
             RichText::new(text)
-                .font(role.in_family(family.clone()))
+                .font(scale.font(role, family.clone()))
                 .color(color),
         );
     }
 }
 
-fn phase_witness(ui: &mut egui::Ui, family: FontFamily) {
+fn phase_witness(ui: &mut egui::Ui, family: FontFamily, scale: SpecimenScale) {
     let _heading =
         ui.label(TypeRole::Caption.text("PHYSICAL X PHASE · 0.00 / 0.25 / 0.50 / 0.75 PIXEL"));
     let ppp = ui.pixels_per_point();
@@ -498,10 +668,47 @@ fn phase_witness(ui: &mut egui::Ui, family: FontFamily) {
             egui::pos2(x, rect.top()),
             egui::Align2::LEFT_TOP,
             format!("{phase:.2}px · Il1 EDIT 012 ↗"),
-            TypeRole::Body.in_family(family.clone()),
+            scale.font(TypeRole::Body, family.clone()),
             chrome::TEXT,
         );
     }
+}
+
+fn semantic_header(ui: &mut egui::Ui, text: &str, width: f32) {
+    let (rect, _response) = ui.allocate_exact_size(egui::vec2(width, 24.0), egui::Sense::hover());
+    let _plate = ui.painter().rect(
+        rect,
+        1.0,
+        chrome::SURFACE,
+        egui::Stroke::new(1.0, chrome::EDGE_STRONG),
+        egui::StrokeKind::Inside,
+    );
+    let _text = ui.painter().text(
+        rect.left_center() + egui::vec2(6.0, 0.0),
+        egui::Align2::LEFT_CENTER,
+        text,
+        TypeRole::Instrument.proportional(),
+        chrome::MUTED,
+    );
+}
+
+const fn role_index(role: TypeRole) -> usize {
+    match role {
+        TypeRole::Instrument => 0,
+        TypeRole::Caption => 1,
+        TypeRole::Supporting => 2,
+        TypeRole::Body => 3,
+        TypeRole::Heading => 4,
+        TypeRole::Title => 5,
+    }
+}
+
+#[allow(
+    clippy::disallowed_methods,
+    reason = "the atelier is the deliberate numerical escape for type-scale research"
+)]
+fn specimen_font(points: f32, family: FontFamily) -> FontId {
+    FontId::new(points, family)
 }
 
 fn matrix_cell(
@@ -509,6 +716,7 @@ fn matrix_cell(
     face: Face,
     profile: RasterProfile,
     selected: bool,
+    scale: SpecimenScale,
 ) -> egui::Response {
     let (rect, response) =
         ui.allocate_exact_size(egui::vec2(CELL_WIDTH, CELL_HEIGHT), egui::Sense::click());
@@ -529,31 +737,129 @@ fn matrix_cell(
         .painter()
         .rect(rect, 1.0, fill, stroke, egui::StrokeKind::Inside);
     let family = family(face, profile);
-    let _content = ui.scope_builder(
-        egui::UiBuilder::new()
-            .max_rect(rect.shrink2(egui::vec2(6.0, 5.0)))
-            .layout(egui::Layout::top_down(egui::Align::LEFT)),
-        |ui| {
-            ui.spacing_mut().item_spacing.y = 1.0;
-            let _body = ui.label(
-                RichText::new("Edit trail · 42 km").font(TypeRole::Body.in_family(family.clone())),
-            );
-            let _hard = ui.label(
-                RichText::new("Il1 0OQ rn mw").font(TypeRole::Supporting.in_family(family.clone())),
-            );
-            let _symbols = ui.label(
-                RichText::new("↶ ↷ ↗ ⚙ ♥ ✓ ∑ μ")
-                    .font(TypeRole::Caption.in_family(family.clone()))
-                    .color(chrome::HOT),
-            );
-            let _caption = ui.label(
-                RichText::new("CFG 03:17 +42.75")
-                    .font(TypeRole::Instrument.in_family(family))
-                    .color(chrome::MUTED),
-            );
-        },
-    );
+    let painter = ui.painter().with_clip_rect(rect.shrink(1.0));
+    for (offset, text, font, color) in [
+        (
+            6.0,
+            "Edit trail · 42 km",
+            scale.font(TypeRole::Body, family.clone()),
+            chrome::TEXT,
+        ),
+        (
+            28.0,
+            "Il1 0OQ rn mw",
+            scale.font(TypeRole::Supporting, family.clone()),
+            chrome::TEXT,
+        ),
+        (
+            49.0,
+            "↶ ↷ ↗ ⚙ ♥ ✓ ∑ μ",
+            scale.font(TypeRole::Caption, family.clone()),
+            chrome::HOT,
+        ),
+        (
+            69.0,
+            "CFG 03:17 +42.75",
+            scale.font(TypeRole::Instrument, family),
+            chrome::MUTED,
+        ),
+    ] {
+        let _bounds = painter.text(
+            rect.left_top() + egui::vec2(7.0, offset),
+            egui::Align2::LEFT_TOP,
+            text,
+            font,
+            color,
+        );
+    }
     response
+}
+
+fn matrix_corner(ui: &mut egui::Ui) {
+    let rect = matrix_header_plate(ui, ROW_LABEL_WIDTH, false);
+    let painter = ui.painter().with_clip_rect(rect.shrink(1.0));
+    let _face = painter.text(
+        rect.left_top() + egui::vec2(7.0, 6.0),
+        egui::Align2::LEFT_TOP,
+        "FACE ↓",
+        TypeRole::Caption.proportional(),
+        chrome::TEXT,
+    );
+    let _law = painter.text(
+        rect.left_top() + egui::vec2(7.0, 25.0),
+        egui::Align2::LEFT_TOP,
+        "RASTER LAW →",
+        TypeRole::Instrument.proportional(),
+        chrome::MUTED,
+    );
+}
+
+fn matrix_column_header(ui: &mut egui::Ui, profile: RasterProfile, selected: bool) {
+    let rect = matrix_header_plate(ui, CELL_WIDTH, selected);
+    let painter = ui.painter().with_clip_rect(rect.shrink(1.0));
+    let _name = painter.text(
+        rect.left_top() + egui::vec2(7.0, 6.0),
+        egui::Align2::LEFT_TOP,
+        profile.name,
+        TypeRole::Caption.proportional(),
+        if selected { chrome::HOT } else { chrome::TEXT },
+    );
+    let _province = painter.text(
+        rect.left_top() + egui::vec2(7.0, 25.0),
+        egui::Align2::LEFT_TOP,
+        profile.province,
+        TypeRole::Instrument.proportional(),
+        chrome::MUTED,
+    );
+}
+
+fn matrix_row_header(ui: &mut egui::Ui, face: Face, selected: bool) {
+    let (rect, _response) = ui.allocate_exact_size(
+        egui::vec2(ROW_LABEL_WIDTH, CELL_HEIGHT),
+        egui::Sense::hover(),
+    );
+    let stroke = if selected {
+        egui::Stroke::new(1.0, chrome::HOT)
+    } else {
+        egui::Stroke::new(1.0, chrome::EDGE_STRONG)
+    };
+    let _plate = ui
+        .painter()
+        .rect(rect, 1.0, chrome::SURFACE, stroke, egui::StrokeKind::Inside);
+    let painter = ui.painter().with_clip_rect(rect.shrink(1.0));
+    let _name = painter.text(
+        rect.left_top() + egui::vec2(8.0, 9.0),
+        egui::Align2::LEFT_TOP,
+        face.name,
+        TypeRole::Caption.proportional(),
+        if selected { chrome::HOT } else { chrome::TEXT },
+    );
+    let _province = painter.text(
+        rect.left_top() + egui::vec2(8.0, 30.0),
+        egui::Align2::LEFT_TOP,
+        face.province,
+        TypeRole::Instrument.proportional(),
+        chrome::MUTED,
+    );
+}
+
+fn matrix_header_plate(ui: &mut egui::Ui, width: f32, selected: bool) -> egui::Rect {
+    let (rect, _response) =
+        ui.allocate_exact_size(egui::vec2(width, HEADER_HEIGHT), egui::Sense::hover());
+    let stroke = if selected {
+        egui::Stroke::new(1.0, chrome::HOT)
+    } else {
+        egui::Stroke::new(1.0, chrome::EDGE_STRONG)
+    };
+    let fill = if selected {
+        chrome::RAISED
+    } else {
+        chrome::SURFACE
+    };
+    let _plate = ui
+        .painter()
+        .rect(rect, 1.0, fill, stroke, egui::StrokeKind::Inside);
+    rect
 }
 
 fn family(face: Face, profile: RasterProfile) -> FontFamily {

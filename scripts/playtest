@@ -19,12 +19,21 @@ case "$gallery" in
 esac
 
 mkdir -p "$out"
-target=$(cargo metadata --format-version 1 --no-deps | jq -r .target_directory)
-app="$target/debug/examples/$gallery"
-if [ "$gallery" = foundry_atelier ]; then
-    cargo build --features foundry-atelier --example "$gallery"
+if [ -n "${BRASS_PLAYTEST_TARGET:-}" ]; then
+    target=$BRASS_PLAYTEST_TARGET
 else
-    cargo build --example "$gallery"
+    target=$(cargo metadata --format-version 1 --no-deps | jq -r .target_directory)
+fi
+app="$target/debug/examples/$gallery"
+if [ "${BRASS_PLAYTEST_SKIP_BUILD:-0}" -ne 1 ]; then
+    if [ "$gallery" = foundry_atelier ]; then
+        cargo build --features foundry-atelier --example "$gallery"
+    else
+        cargo build --example "$gallery"
+    fi
+elif [ ! -x "$app" ]; then
+    printf 'prebuilt gallery is absent: %s\n' "$app" >&2
+    exit 1
 fi
 
 setsid "$app" >"$out/app.log" 2>&1 &
@@ -220,24 +229,30 @@ case "$gallery" in
         import -window "$window" "$out/mandate.png"
         ;;
     font_raster_atelier)
-        xdotool mousemove --sync --window "$window" 540 114
-        sleep 0.10
-        xdotool mousedown 1
+        xdotool mousemove --sync --window "$window" 185 253 click --repeat 2 1
+        sleep 0.12
+        xdotool key --window "$window" ctrl+a
         sleep 0.05
-        xdotool mouseup 1
+        xdotool type --window "$window" --delay 20 -- '16.00'
+        sleep 0.05
+        xdotool key --window "$window" Return
+        xdotool mousemove --sync --window "$window" 8 8
         sleep 0.25
-        import -window "$window" "$out/gamma-65.png"
-        if cmp -s "$out/initial.png" "$out/gamma-65.png"; then
-            printf 'font-transfer selection produced no presented-frame change\n' >&2
+        import -window "$window" "$out/instrument-16pt.png"
+        if cmp -s "$out/initial.png" "$out/instrument-16pt.png"; then
+            printf 'semantic-size entry produced no presented-frame change\n' >&2
             exit 1
         fi
-        xdotool mousemove --sync --window "$window" 220 114
+        xdotool mousemove --sync --window "$window" 540 134 click 1
+        sleep 0.25
+        import -window "$window" "$out/gamma-65.png"
+        xdotool mousemove --sync --window "$window" 220 134
         xdotool mousedown 1
         sleep 0.05
         xdotool mouseup 1
         sleep 0.25
         import -window "$window" "$out/emphasis.png"
-        xdotool mousemove --sync --window "$window" 190 408
+        xdotool mousemove --sync --window "$window" 190 478
         sleep 1.00
         import -window "$window" "$out/tooltip.png"
         ;;
