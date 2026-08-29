@@ -384,10 +384,12 @@ struct SpecimenScale {
     points: [f32; TypeRole::ALL.len()],
 }
 
+const PROSPECTIVE_SCALE: [f32; TypeRole::ALL.len()] = [12.5, 14.5, 17.0, 17.0, 17.75, 21.5];
+
 impl Default for SpecimenScale {
     fn default() -> Self {
         Self {
-            points: TypeRole::ALL.map(|role| role.proportional().size),
+            points: PROSPECTIVE_SCALE,
         }
     }
 }
