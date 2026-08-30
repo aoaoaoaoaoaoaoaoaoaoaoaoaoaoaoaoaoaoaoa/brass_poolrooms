@@ -147,6 +147,21 @@ text specimens: Rust constructs the font atlas and egui meshes, and WGPU draws
 the fixed canvas. Browser compositor and DPR parity still require measurement
 before treating a browser screenshot as proof of native pixels.
 
+Install the Font Raster Atelier as a persistent systemd user service and
+Localhost Bestiary entry:
+
+```sh
+scripts/font-atelier-service install        # http://127.0.0.1:4182
+scripts/font-atelier-service install 8080   # choose another fixed port
+```
+
+The installer builds the authoritative WGPU bundle, installs and enables
+`brass-poolrooms-font-raster-atelier.service`, and registers its controllable
+card at `http://localhost:8245/`. Later atelier builds become visible on browser
+refresh without a service restart. Use `scripts/font-atelier-service status`
+or `scripts/font-atelier-service uninstall` to inspect or remove both
+integration artifacts.
+
 ## Typography
 
 `chrome::install` owns the application type scale as well as the embedded font
