@@ -487,7 +487,7 @@ fn geometry_coupons(ui: &mut egui::Ui, candidate_index: usize) {
             Pos2::new(center, rect.top() + 11.0),
             Align2::CENTER_TOP,
             name,
-            chrome::TypeRole::Instrument.monospace(),
+            chrome::TypeRole::Annotation.monospace(),
             chrome::MUTED,
         );
     }
@@ -538,7 +538,7 @@ fn geometry_coupons(ui: &mut egui::Ui, candidate_index: usize) {
         Pos2::new(rect.center().x, rect.bottom() - 12.0),
         Align2::CENTER_CENTER,
         "same candidate law · actual-size meshes",
-        chrome::TypeRole::Instrument.monospace(),
+        chrome::TypeRole::Annotation.monospace(),
         chrome::MUTED,
     );
 }
@@ -867,9 +867,9 @@ fn paint_material_matrix(painter: &egui::Painter, canvas: Rect) {
     let column_width = (grid_width
         - GUTTER * material_atlas::COLUMN_COUNT.saturating_sub(1) as f32)
         / material_atlas::COLUMN_COUNT as f32;
-    let label_font = chrome::TypeRole::Caption.monospace();
-    let small_font = chrome::TypeRole::Instrument.monospace();
-    let cell_font = chrome::TypeRole::Caption.monospace();
+    let label_font = chrome::TypeRole::Label.monospace();
+    let small_font = chrome::TypeRole::Annotation.monospace();
+    let cell_font = chrome::TypeRole::Label.monospace();
 
     let _contrast = painter.text(
         Pos2::new(canvas.left(), canvas.top() + 12.0),

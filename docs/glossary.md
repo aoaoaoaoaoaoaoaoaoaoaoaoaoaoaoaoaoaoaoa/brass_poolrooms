@@ -51,4 +51,7 @@
   mechanism motion.
 - **Type role**: one semantic rung in the application type scale. The role owns
   its hidden metric; a mechanism's forged inscription remains gauge-owned
-  physical typography rather than an application type role.
+  physical typography rather than an application type role. The closed scale
+  is **Annotation** for nonessential spatial marks, **Label** for terse attached
+  identifiers, **Body** for controls and prose, **Heading** for a local surface,
+  and **Title** for an application or substantial pane.

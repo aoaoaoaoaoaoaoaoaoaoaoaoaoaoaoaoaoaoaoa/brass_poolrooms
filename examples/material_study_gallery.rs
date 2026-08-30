@@ -52,7 +52,7 @@ fn show_study(ui: &mut egui::Ui) {
     let _title = ui.label(chrome::title("DARK-BRONZE MATERIAL FORGE"));
     let production = cell_coordinate(atlas::PRODUCTION_ROW, atlas::PRODUCTION_COLUMN);
     let _law = ui.label(
-        chrome::TypeRole::Supporting.text(format!(
+        chrome::TypeRole::Body.text(format!(
             "FIXED EYE · COMMON 60° KEY · IDENTICAL 32 PT PLUNGER AND PLATE · {production} IS PRODUCTION"
         ))
         .color(chrome::MUTED),
@@ -66,7 +66,7 @@ fn show_study(ui: &mut egui::Ui) {
 
     ui.add_space(8.0);
     let _legend = ui.label(
-        chrome::TypeRole::Caption.text(
+        chrome::TypeRole::Label.text(
             "LEFT: STANDARD CLICK PLUNGER  ·  RIGHT: SHALLOW FORGED PLATE  ·  ROWS TIGHTEN AND AMPLIFY THE REFLECTION; COLUMNS ALTER EXPOSURE ONLY",
         )
         .color(chrome::MUTED),
@@ -83,9 +83,9 @@ fn paint_matrix(painter: &egui::Painter, canvas: Rect) {
     let grid_width = canvas.width() - LABEL_WIDTH;
     let column_width = (grid_width - GUTTER * (atlas::COLUMN_COUNT.saturating_sub(1)) as f32)
         / atlas::COLUMN_COUNT as f32;
-    let label_font = chrome::TypeRole::Caption.monospace();
-    let small_font = chrome::TypeRole::Instrument.monospace();
-    let cell_font = chrome::TypeRole::Caption.monospace();
+    let label_font = chrome::TypeRole::Label.monospace();
+    let small_font = chrome::TypeRole::Annotation.monospace();
+    let cell_font = chrome::TypeRole::Label.monospace();
 
     let _concentration_axis = painter.text(
         Pos2::new(canvas.left(), canvas.top() + 12.0),

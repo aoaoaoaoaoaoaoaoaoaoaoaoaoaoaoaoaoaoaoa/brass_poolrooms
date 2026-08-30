@@ -139,7 +139,7 @@ Courier corpus with egui's useful hinting and fractional-positioning laws.
 Compact face and raster-law selectors drive a complete witness containing every
 semantic type role, real regular/emphasis faces, difficult characters and
 symbols, physical quarter-pixel phases, coverage transfer laws, and the
-production tooltip optical path. Six exact numerical registers tune the
+production tooltip optical path. Five exact numerical registers tune the
 semantic type scale jointly across that witness. Run the native authority with
 `cargo run --example font_raster_atelier`; its browser transport is
 `scripts/web-exhibit font_raster_atelier serve`. The browser contains no HTML
@@ -157,11 +157,19 @@ all. When a caller must state hierarchy explicitly, it chooses a
 
 Use the least prominent role that tells the truth. `Title` names an application
 or substantial pane, `Heading` introduces a surface within it, `Body` carries
-ordinary controls and prose, `Supporting` carries secondary prose and status,
-and `Caption` carries terse metadata or legends. `Instrument` is the sole
-smaller role: it is reserved for supplementary spatial marks in maps, plots,
-and similar canvases. It may never carry an action, fault, instruction, or the
-only statement of a user-visible fact.
+ordinary prose, controls, values, status, faults, and instructions, and `Label`
+carries terse attached identifiers, metadata, field labels, and legends.
+`Annotation` is reserved for supplementary marks embedded in maps, plots,
+diagrams, and instruments. It may never carry prose, an action, a fault, an
+instruction, or the only statement of a user-visible fact.
+
+Typography follows the function of text, not its container. Terse tooltip text
+uses `Label`; substantive hover explanations remain `Body`, regardless of
+length or transience. Poolrooms mechanism responses apply `Label` as the
+fallback style for unstyled `on_hover_text` content while preserving an
+explicit caller-selected role. Plain egui responses have no tooltip-specific
+style hook, so callers must pass role-styled text when the body default is not
+correct.
 
 Do not reduce type to make a layout fit. Shorten the copy, wrap it, disclose it,
 or revise the layout. Raw `RichText::size` and `FontId` construction are

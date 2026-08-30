@@ -384,7 +384,7 @@ struct SpecimenScale {
     points: [f32; TypeRole::ALL.len()],
 }
 
-const PROSPECTIVE_SCALE: [f32; TypeRole::ALL.len()] = [12.5, 14.5, 17.0, 17.0, 17.75, 21.5];
+const PROSPECTIVE_SCALE: [f32; TypeRole::ALL.len()] = [12.5, 14.5, 17.0, 17.75, 21.5];
 
 impl Default for SpecimenScale {
     fn default() -> Self {
@@ -450,16 +450,16 @@ impl Exhibit for FontRasterAtelier {
 impl FontRasterAtelier {
     fn header(&self, ui: &mut egui::Ui) {
         let _title = ui.label(TypeRole::Title.text("FONT RASTER ATELIER"));
-        let _purpose = ui.label(TypeRole::Supporting.text(
+        let _purpose = ui.label(TypeRole::Body.text(
             "Native egui glyph atlas → production tessellator → WGPU. Judge at actual size.",
         ));
-        let _conditions = ui.label(TypeRole::Caption.text(format!(
+        let _conditions = ui.label(TypeRole::Label.text(format!(
             "{} PIXELS PER POINT · {} · {}",
             ui.pixels_per_point(),
             self.transfer.name(),
             if self.wet { "PRODUCTION WATER" } else { "DRY" },
         )));
-        let _optics = ui.label(TypeRole::Instrument.text(
+        let _optics = ui.label(TypeRole::Body.text(
             "Dry isolates raster law. Production Water admits the live tooltip lift and composite.",
         ));
     }
@@ -473,28 +473,28 @@ impl FontRasterAtelier {
             .inner_margin(10)
             .show(ui, |ui| {
                 let _controls = ui.horizontal_wrapped(|ui| {
-                    let _weight_label = ui.label(TypeRole::Caption.text("WEIGHT"));
+                    let _weight_label = ui.label(TypeRole::Label.text("WEIGHT"));
                     for weight in [Weight::Regular, Weight::Emphasis] {
                         let _response = ui.selectable_value(
                             &mut self.weight,
                             weight,
-                            TypeRole::Caption.text(weight.name()),
+                            TypeRole::Label.text(weight.name()),
                         );
                     }
                     let _separator = ui.separator();
-                    let _transfer_label = ui.label(TypeRole::Caption.text("ATLAS TRANSFER"));
+                    let _transfer_label = ui.label(TypeRole::Label.text("ATLAS TRANSFER"));
                     for transfer in Transfer::ALL {
                         let _response = ui.selectable_value(
                             &mut self.transfer,
                             transfer,
-                            TypeRole::Caption.text(transfer.name()),
+                            TypeRole::Label.text(transfer.name()),
                         );
                     }
                     let _separator = ui.separator();
                     let _response = ui.checkbox(&mut self.wet, "PRODUCTION WATER");
                     let _separator = ui.separator();
                     if ui
-                        .button(TypeRole::Caption.text("RESET SEMANTIC SIZES"))
+                        .button(TypeRole::Label.text("RESET SEMANTIC SIZES"))
                         .clicked()
                     {
                         self.scale = SpecimenScale::default();
@@ -522,7 +522,7 @@ impl FontRasterAtelier {
                     let _selection = ui
                         .label(TypeRole::Heading.text(format!("{} × {}", face.name, profile.name)));
                     let _province = ui.label(
-                        TypeRole::Caption.text(format!("{} · {}", face.province, profile.province)),
+                        TypeRole::Label.text(format!("{} · {}", face.province, profile.province)),
                     );
                 });
                 ui.add_space(4.0);
@@ -533,23 +533,7 @@ impl FontRasterAtelier {
                 ui.add_space(6.0);
                 phase_witness(ui, family.clone(), *scale);
                 ui.add_space(4.0);
-                let response = ui.label(
-                    TypeRole::Body
-                        .text("HOVER: production tooltip optical path")
-                        .color(chrome::HOT),
-                );
-                let body = scale.font(TypeRole::Body, family.clone());
-                let supporting = scale.font(TypeRole::Supporting, family.clone());
-                let _response = response.on_hover_ui(move |ui| {
-                    let _primary = ui.label(
-                        RichText::new("Hover help: Ctrl+, opens settings · Il1 0OQ 8B").font(body),
-                    );
-                    let _secondary = ui.label(
-                        RichText::new("Fine strokes, punctuation, and warm low-contrast ink.")
-                            .font(supporting)
-                            .color(chrome::MUTED),
-                    );
-                });
+                tooltip_witness(ui, family, *scale);
             });
     }
 
@@ -560,7 +544,7 @@ impl FontRasterAtelier {
             .inner_margin(10)
             .show(ui, |ui| {
                 let _selectors = ui.horizontal(|ui| {
-                    let _face_label = ui.label(TypeRole::Caption.text("FACE"));
+                    let _face_label = ui.label(TypeRole::Label.text("FACE"));
                     let _face = egui::ComboBox::from_id_salt("font-raster-face")
                         .width(230.0)
                         .height(620.0)
@@ -575,7 +559,7 @@ impl FontRasterAtelier {
                             }
                         });
                     let _separator = ui.separator();
-                    let _profile_label = ui.label(TypeRole::Caption.text("RASTER LAW"));
+                    let _profile_label = ui.label(TypeRole::Label.text("RASTER LAW"));
                     let _profile = egui::ComboBox::from_id_salt("font-raster-profile")
                         .width(190.0)
                         .height(260.0)
@@ -590,12 +574,41 @@ impl FontRasterAtelier {
                             }
                         });
                 });
-                let _selection = ui.label(TypeRole::Instrument.text(format!(
+                let _selection = ui.label(TypeRole::Label.text(format!(
                     "{} · {}",
                     FACES[self.face].province, PROFILES[self.profile].province,
                 )));
             });
     }
+}
+
+fn tooltip_witness(ui: &mut egui::Ui, family: FontFamily, scale: SpecimenScale) {
+    let label = scale.font(TypeRole::Label, family.clone());
+    let body = scale.font(TypeRole::Body, family);
+    let _targets = ui.horizontal_wrapped(|ui| {
+        let terse = ui.label(TypeRole::Label.text("HOVER · TERSE LABEL").color(chrome::HOT));
+        let _terse = terse.on_hover_text(
+            RichText::new("Open settings · Ctrl+, · Il1 0OQ 8B").font(label.clone()),
+        );
+        let prose = ui.label(TypeRole::Label.text("HOVER · SUBSTANTIVE PROSE").color(chrome::HOT));
+        let _prose = prose.on_hover_ui(move |ui| {
+            ui.set_max_width(ui.spacing().tooltip_width);
+            let _heading = ui.label(
+                RichText::new("TAG CONTEXT · sakura_haruno")
+                    .font(label)
+                    .color(chrome::MUTED),
+            );
+            let _body = ui.add(
+                egui::Label::new(
+                    RichText::new(
+                        "Character-tag help may include aliases, implications, and moderation notes. It remains body prose even inside a transient tooltip.",
+                    )
+                    .font(body),
+                )
+                .wrap(),
+            );
+        });
+    });
 }
 
 fn role_witness(
@@ -614,10 +627,9 @@ fn role_witness(
             ui.end_row();
 
             for (index, (role, text)) in [
-                (TypeRole::Instrument, "ridge 1,842 m · 03:17"),
-                (TypeRole::Caption, "CONFIGURATION FILE"),
-                (TypeRole::Supporting, "No matching sessions"),
-                (TypeRole::Body, "Edit trail and save changes"),
+                (TypeRole::Annotation, "ridge 1,842 m · 03:17"),
+                (TypeRole::Label, "CONFIGURATION FILE"),
+                (TypeRole::Body, "No matching sessions · edit and save"),
                 (TypeRole::Heading, "TRAIL CREATOR"),
                 (TypeRole::Title, "CODEX WRANGLER"),
             ]
@@ -640,18 +652,18 @@ fn diagnostic_witness(ui: &mut egui::Ui, family: FontFamily, scale: SpecimenScal
     for (role, text, color) in [
         (TypeRole::Body, "Il1 0OQ 5S 2Z rn m wvw", chrome::TEXT),
         (
-            TypeRole::Supporting,
+            TypeRole::Label,
             "() [] {} <> /\\ | ! ? : ; . ,",
             chrome::TEXT,
         ),
         (TypeRole::Body, "↶ ↷ ↗ ⚙ ♥ ✓ ✕ ⌫ ⏎", chrome::HOT),
-        (TypeRole::Supporting, "∑ ∂ μ π √∞ ≠ ≤ ≥ · ×", chrome::TEXT),
+        (TypeRole::Label, "∑ ∂ μ π √∞ ≠ ≤ ≥ · ×", chrome::TEXT),
+        (TypeRole::Body, "正名 café naïve Ångström", chrome::MUTED),
         (
-            TypeRole::Supporting,
-            "正名 café naïve Ångström",
+            TypeRole::Annotation,
+            "0123456789 +42.75 −1032",
             chrome::MUTED,
         ),
-        (TypeRole::Caption, "0123456789 +42.75 −1032", chrome::MUTED),
     ] {
         let _line = ui.label(
             RichText::new(text)
@@ -663,7 +675,7 @@ fn diagnostic_witness(ui: &mut egui::Ui, family: FontFamily, scale: SpecimenScal
 
 fn phase_witness(ui: &mut egui::Ui, family: FontFamily, scale: SpecimenScale) {
     let _heading =
-        ui.label(TypeRole::Caption.text("PHYSICAL X PHASE · 0.00 / 0.25 / 0.50 / 0.75 PIXEL"));
+        ui.label(TypeRole::Label.text("PHYSICAL X PHASE · 0.00 / 0.25 / 0.50 / 0.75 PIXEL"));
     let ppp = ui.pixels_per_point();
     let (rect, _response) = ui.allocate_exact_size(egui::vec2(1_150.0, 28.0), egui::Sense::hover());
     let painter = ui.painter().with_clip_rect(rect);
@@ -692,19 +704,18 @@ fn semantic_header(ui: &mut egui::Ui, text: &str, width: f32) {
         rect.left_center() + egui::vec2(6.0, 0.0),
         egui::Align2::LEFT_CENTER,
         text,
-        TypeRole::Instrument.proportional(),
+        TypeRole::Label.proportional(),
         chrome::MUTED,
     );
 }
 
 const fn role_index(role: TypeRole) -> usize {
     match role {
-        TypeRole::Instrument => 0,
-        TypeRole::Caption => 1,
-        TypeRole::Supporting => 2,
-        TypeRole::Body => 3,
-        TypeRole::Heading => 4,
-        TypeRole::Title => 5,
+        TypeRole::Annotation => 0,
+        TypeRole::Label => 1,
+        TypeRole::Body => 2,
+        TypeRole::Heading => 3,
+        TypeRole::Title => 4,
     }
 }
 

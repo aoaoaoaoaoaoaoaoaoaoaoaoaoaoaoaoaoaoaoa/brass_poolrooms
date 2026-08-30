@@ -229,35 +229,35 @@ case "$gallery" in
         import -window "$window" "$out/mandate.png"
         ;;
     font_raster_atelier)
-        xdotool mousemove --sync --window "$window" 180 198 click 1
+        xdotool mousemove --sync --window "$window" 180 251 click 1
         sleep 0.25
         import -window "$window" "$out/face-menu.png"
         if cmp -s "$out/initial.png" "$out/face-menu.png"; then
             printf 'face selector did not open\n' >&2
             exit 1
         fi
-        xdotool mousemove --sync --window "$window" 180 256 click 1
+        xdotool mousemove --sync --window "$window" 180 310 click 1
         sleep 0.25
         import -window "$window" "$out/face-selected.png"
         if cmp -s "$out/initial.png" "$out/face-selected.png"; then
             printf 'face selection produced no presented-frame change\n' >&2
             exit 1
         fi
-        xdotool mousemove --sync --window "$window" 475 198 click 1
+        xdotool mousemove --sync --window "$window" 475 251 click 1
         sleep 0.25
         import -window "$window" "$out/raster-menu.png"
         if cmp -s "$out/face-selected.png" "$out/raster-menu.png"; then
             printf 'raster-law selector did not open\n' >&2
             exit 1
         fi
-        xdotool mousemove --sync --window "$window" 475 256 click 1
+        xdotool mousemove --sync --window "$window" 475 310 click 1
         sleep 0.25
         import -window "$window" "$out/raster-selected.png"
         if cmp -s "$out/face-selected.png" "$out/raster-selected.png"; then
             printf 'raster-law selection produced no presented-frame change\n' >&2
             exit 1
         fi
-        xdotool mousemove --sync --window "$window" 185 336 click --repeat 2 1
+        xdotool mousemove --sync --window "$window" 185 414 click --repeat 2 1
         sleep 0.12
         xdotool key --window "$window" ctrl+a
         sleep 0.05
@@ -266,23 +266,34 @@ case "$gallery" in
         xdotool key --window "$window" Return
         xdotool mousemove --sync --window "$window" 8 8
         sleep 0.25
-        import -window "$window" "$out/instrument-16pt.png"
-        if cmp -s "$out/initial.png" "$out/instrument-16pt.png"; then
+        import -window "$window" "$out/annotation-16pt.png"
+        if cmp -s "$out/raster-selected.png" "$out/annotation-16pt.png"; then
             printf 'semantic-size entry produced no presented-frame change\n' >&2
             exit 1
         fi
-        xdotool mousemove --sync --window "$window" 540 134 click 1
+        xdotool mousemove --sync --window "$window" 620 154 click 1
         sleep 0.25
         import -window "$window" "$out/gamma-65.png"
-        xdotool mousemove --sync --window "$window" 220 134
+        xdotool mousemove --sync --window "$window" 280 154
         xdotool mousedown 1
         sleep 0.05
         xdotool mouseup 1
         sleep 0.25
         import -window "$window" "$out/emphasis.png"
-        xdotool mousemove --sync --window "$window" 190 563
+        xdotool mousemove --sync --window "$window" 150 608
         sleep 1.00
-        import -window "$window" "$out/tooltip.png"
+        import -window "$window" "$out/tooltip-label.png"
+        if cmp -s "$out/emphasis.png" "$out/tooltip-label.png"; then
+            printf 'terse tooltip produced no presented-frame change\n' >&2
+            exit 1
+        fi
+        xdotool mousemove --sync --window "$window" 330 608
+        sleep 1.00
+        import -window "$window" "$out/tooltip-prose.png"
+        if cmp -s "$out/tooltip-label.png" "$out/tooltip-prose.png"; then
+            printf 'prose tooltip did not replace the terse tooltip\n' >&2
+            exit 1
+        fi
         ;;
     widget_gallery)
         # The numerical wheel owns its complete smoothed impulse. Its value and

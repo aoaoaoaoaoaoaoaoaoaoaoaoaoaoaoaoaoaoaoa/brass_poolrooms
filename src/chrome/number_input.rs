@@ -670,8 +670,13 @@ impl NumberInputResponse {
     }
 
     /// Attach a tooltip while retaining the mechanism's physical response.
+    ///
+    /// Unstyled text is a terse [`super::TypeRole::Label`]. Pass explicitly
+    /// styled [`super::TypeRole::Body`] text for substantive hover help.
     pub fn on_hover_text(mut self, text: impl Into<egui::WidgetText>) -> Self {
-        self.response = self.response.on_hover_text(text);
+        self.response = self
+            .response
+            .on_hover_text(super::typography::label_hover_text(text));
         self
     }
 

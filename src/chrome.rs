@@ -269,11 +269,7 @@ pub fn exact_activation(ui: &egui::Ui, response: &egui::Response) -> bool {
 }
 
 pub fn section_title(text: impl Into<String>) -> RichText {
-    TypeRole::Body
-        .text(text)
-        .strong()
-        .color(HOT)
-        .text_style(egui::TextStyle::Button)
+    TypeRole::Heading.text(text).strong().color(HOT)
 }
 
 /// How fast tension grips and releases. Short, with a fast-rising ease so
@@ -471,7 +467,7 @@ fn glyph_weight(ch: char) -> f32 {
 }
 
 pub fn eyebrow(text: impl Into<String>) -> RichText {
-    TypeRole::Caption
+    TypeRole::Label
         .text(text)
         .color(MUTED)
         .text_style(egui::TextStyle::Small)
@@ -482,7 +478,7 @@ pub fn title(text: impl Into<String>) -> RichText {
 }
 
 pub fn muted(text: impl Into<String>) -> RichText {
-    TypeRole::Supporting.text(text).color(MUTED)
+    TypeRole::Body.text(text).color(MUTED)
 }
 
 pub fn note(ui: &mut egui::Ui, text: impl Into<String>) -> egui::Response {

@@ -16,7 +16,7 @@ impl Typography {
     pub fn show(&mut self, ui: &mut egui::Ui) {
         let _title = ui.label(chrome::title("APPLICATION TYPE ROLES"));
         let _law = ui.label(chrome::muted(
-            "semantic hierarchy · hidden metrics · caption is the application floor",
+            "semantic hierarchy · hidden metrics · annotation is never prose",
         ));
         ui.add_space(16.0);
         for role in TypeRole::ALL {
@@ -26,10 +26,9 @@ impl Typography {
                     egui::Label::new(chrome::eyebrow(role.name())),
                 );
                 let _sample = ui.label(role.text(match role {
-                    TypeRole::Instrument => "supplementary spatial mark",
-                    TypeRole::Caption => "terse metadata and legends",
-                    TypeRole::Supporting => "secondary prose remains readable",
-                    TypeRole::Body => "ordinary labels, values, controls, and prose",
+                    TypeRole::Annotation => "supplementary spatial mark",
+                    TypeRole::Label => "terse attached identifier or metadata",
+                    TypeRole::Body => "controls, values, status, instructions, and prose",
                     TypeRole::Heading => "A SURFACE WITHIN THE APPLICATION",
                     TypeRole::Title => "A SUBSTANTIAL PANE",
                 }));
