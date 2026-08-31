@@ -2,7 +2,55 @@
 
 #![deny(missing_docs)]
 
-use egui::{FontFamily, FontId, RichText, TextStyle, WidgetText};
+use egui::{Context, FontFamily, FontId, RichText, Style, TextStyle, WidgetText};
+
+/// User-selected multiplier over the canonical Poolrooms type scale.
+///
+/// Scaling is applied while font identifiers and glyph atlases are constructed,
+/// before text layout or rasterization. It is not a framebuffer transform.
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum FontScale {
+    /// The canonical production metrics.
+    #[default]
+    Standard,
+    /// A 125% legibility enlargement.
+    Large,
+    /// A 150% accessibility enlargement and supported layout ceiling.
+    ExtraLarge,
+}
+
+impl FontScale {
+    /// Complete scale menu from least to most enlarged.
+    pub const ALL: [Self; 3] = [Self::Standard, Self::Large, Self::ExtraLarge];
+
+    /// Stable user-facing option label.
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Standard => "STANDARD · 100%",
+            Self::Large => "LARGE · 125%",
+            Self::ExtraLarge => "EXTRA LARGE · 150%",
+        }
+    }
+
+    /// Integer percentage for persistence-neutral projections.
+    pub const fn percentage(self) -> u16 {
+        match self {
+            Self::Standard => 100,
+            Self::Large => 125,
+            Self::ExtraLarge => 150,
+        }
+    }
+
+    const fn factor(self) -> f32 {
+        match self {
+            Self::Standard => 1.0,
+            Self::Large => 1.25,
+            Self::ExtraLarge => 1.5,
+        }
+    }
+}
 
 /// One semantic rung in the Poolrooms application type scale.
 ///
@@ -53,25 +101,17 @@ impl TypeRole {
 
     /// Construct text at this role's canonical metric.
     pub fn text(self, text: impl Into<String>) -> RichText {
-        RichText::new(text).font(self.proportional())
+        RichText::new(text).text_style(self.style())
     }
 
-    /// Construct a proportional font at this role's canonical metric.
-    #[allow(
-        clippy::disallowed_methods,
-        reason = "TypeRole is the sole owner of application font metrics"
-    )]
-    pub fn proportional(self) -> FontId {
-        self.in_family(FontFamily::Proportional)
+    /// Resolve a proportional font through the current semantic scale.
+    pub fn proportional(self, style: &Style) -> FontId {
+        self.in_family(style, FontFamily::Proportional)
     }
 
-    /// Construct a monospace font at this role's canonical metric.
-    #[allow(
-        clippy::disallowed_methods,
-        reason = "TypeRole is the sole owner of application font metrics"
-    )]
-    pub fn monospace(self) -> FontId {
-        self.in_family(FontFamily::Monospace)
+    /// Resolve a monospace font through the current semantic scale.
+    pub fn monospace(self, style: &Style) -> FontId {
+        self.in_family(style, FontFamily::Monospace)
     }
 
     /// Construct a font in a named family at this role's canonical metric.
@@ -79,15 +119,28 @@ impl TypeRole {
     /// This is principally useful to font and rasterization judgment surfaces.
     /// Applications should ordinarily inherit the family installed by
     /// [`crate::chrome::install`].
-    #[allow(
-        clippy::disallowed_methods,
-        reason = "TypeRole remains the sole owner of application font metrics"
-    )]
-    pub fn in_family(self, family: FontFamily) -> FontId {
-        FontId::new(self.points(), family)
+    pub fn in_family(self, style: &Style, family: FontFamily) -> FontId {
+        let mut font = self.style().resolve(style);
+        font.family = family;
+        font
     }
 
-    pub(super) const fn points(self) -> f32 {
+    /// Named egui text style owned by this semantic role.
+    pub fn style(self) -> TextStyle {
+        TextStyle::Name(self.style_name().into())
+    }
+
+    const fn style_name(self) -> &'static str {
+        match self {
+            Self::Annotation => "poolrooms.annotation",
+            Self::Label => "poolrooms.label",
+            Self::Body => "poolrooms.body",
+            Self::Heading => "poolrooms.heading",
+            Self::Title => "poolrooms.title",
+        }
+    }
+
+    const fn points(self) -> f32 {
         match self {
             Self::Annotation => 12.5,
             Self::Label => 14.5,
@@ -98,24 +151,76 @@ impl TypeRole {
     }
 }
 
+/// Resolve a deliberately numerical spatial inscription through the active
+/// font scale.
+///
+/// Prefer [`TypeRole`] for application text. This escape exists for map,
+/// plot, diagram, and mechanism typography whose nominal metric is derived
+/// from physical geometry rather than information hierarchy.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "spatial_font is the governed numerical escape and applies the active font scale"
+)]
+pub fn spatial_font(ctx: &Context, nominal_points: f32, family: FontFamily) -> FontId {
+    let style = ctx.style_of(ctx.theme());
+    spatial_font_in(&style, nominal_points, family)
+}
+
+/// Resolve a numerical spatial inscription against an explicit local style.
+///
+/// This is the local-style counterpart to [`spatial_font`].
+#[allow(
+    clippy::disallowed_methods,
+    reason = "spatial_font_in is the governed numerical escape and applies the active font scale"
+)]
+pub fn spatial_font_in(style: &Style, nominal_points: f32, family: FontFamily) -> FontId {
+    FontId::new(nominal_points * active_scale(style).factor(), family)
+}
+
 pub(super) fn label_hover_text(text: impl Into<WidgetText>) -> WidgetText {
     text.into().fallback_text_style(TextStyle::Small)
 }
 
-pub(super) fn install(style: &mut egui::Style) {
+pub(super) fn install(style: &mut Style, scale: FontScale) {
+    for role in TypeRole::ALL {
+        let _semantic = style.text_styles.insert(
+            role.style(),
+            spatial_font_at(scale, role.points(), FontFamily::Proportional),
+        );
+    }
     let _small = style
         .text_styles
-        .insert(TextStyle::Small, TypeRole::Label.proportional());
+        .insert(TextStyle::Small, TypeRole::Label.proportional(style));
     let _body = style
         .text_styles
-        .insert(TextStyle::Body, TypeRole::Body.proportional());
+        .insert(TextStyle::Body, TypeRole::Body.proportional(style));
     let _button = style
         .text_styles
-        .insert(TextStyle::Button, TypeRole::Body.proportional());
+        .insert(TextStyle::Button, TypeRole::Body.proportional(style));
     let _heading = style
         .text_styles
-        .insert(TextStyle::Heading, TypeRole::Heading.proportional());
+        .insert(TextStyle::Heading, TypeRole::Heading.proportional(style));
     let _monospace = style
         .text_styles
-        .insert(TextStyle::Monospace, TypeRole::Body.monospace());
+        .insert(TextStyle::Monospace, TypeRole::Body.monospace(style));
+}
+
+pub(super) fn active_scale(style: &Style) -> FontScale {
+    let body = TypeRole::Body.style().resolve(style).size;
+    FontScale::ALL
+        .into_iter()
+        .min_by(|left, right| {
+            let left = (body - TypeRole::Body.points() * left.factor()).abs();
+            let right = (body - TypeRole::Body.points() * right.factor()).abs();
+            left.total_cmp(&right)
+        })
+        .unwrap_or_default()
+}
+
+#[allow(
+    clippy::disallowed_methods,
+    reason = "semantic installation is the sole owner of scaled application metrics"
+)]
+fn spatial_font_at(scale: FontScale, points: f32, family: FontFamily) -> FontId {
+    FontId::new(points * scale.factor(), family)
 }

@@ -83,9 +83,11 @@ fn paint_matrix(painter: &egui::Painter, canvas: Rect) {
     let grid_width = canvas.width() - LABEL_WIDTH;
     let column_width = (grid_width - GUTTER * (atlas::COLUMN_COUNT.saturating_sub(1)) as f32)
         / atlas::COLUMN_COUNT as f32;
-    let label_font = chrome::TypeRole::Label.monospace();
-    let small_font = chrome::TypeRole::Annotation.monospace();
-    let cell_font = chrome::TypeRole::Label.monospace();
+    let ctx = painter.ctx();
+    let style = ctx.style_of(ctx.theme());
+    let label_font = chrome::TypeRole::Label.monospace(&style);
+    let small_font = chrome::TypeRole::Annotation.monospace(&style);
+    let cell_font = chrome::TypeRole::Label.monospace(&style);
 
     let _concentration_axis = painter.text(
         Pos2::new(canvas.left(), canvas.top() + 12.0),

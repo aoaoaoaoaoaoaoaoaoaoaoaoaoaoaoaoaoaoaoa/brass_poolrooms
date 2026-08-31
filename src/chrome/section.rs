@@ -303,6 +303,7 @@ mod tests {
     #[test]
     fn lockout_folds_the_section_and_keeps_it_folded_after_release() {
         let ctx = egui::Context::default();
+        crate::chrome::install(&ctx);
         let mut body_runs = 0;
 
         ctx.run_ui(egui::RawInput::default(), |ui| {

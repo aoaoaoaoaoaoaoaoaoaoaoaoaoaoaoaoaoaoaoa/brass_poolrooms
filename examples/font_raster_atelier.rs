@@ -719,7 +719,7 @@ fn semantic_header(ui: &mut egui::Ui, text: &str, width: f32) {
         rect.left_center() + egui::vec2(6.0, 0.0),
         egui::Align2::LEFT_CENTER,
         text,
-        TypeRole::Label.proportional(),
+        TypeRole::Label.proportional(ui.style()),
         chrome::MUTED,
     );
 }

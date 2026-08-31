@@ -166,9 +166,12 @@ integration artifacts.
 
 `chrome::install` owns the application type scale as well as the embedded font
 stack. Ordinary egui body, button, heading, monospace, and small styles are
-mapped onto that scale, so most layout code should make no sizing decision at
-all. When a caller must state hierarchy explicitly, it chooses a
-`chrome::TypeRole`; the role's metric remains private to Poolrooms.
+mapped onto that scale, so most layout code makes no sizing decision at all.
+When a caller must state hierarchy explicitly, it chooses a `chrome::TypeRole`;
+the role's metric remains private to Poolrooms. `chrome::FontScale` admits only
+Standard (100%), Large (125%), and Extra Large (150%). Applying it rebuilds
+semantic font identifiers before layout and glyph rasterization; it never
+rescales rendered pixels. Extra Large is the supported layout ceiling.
 
 The production optical law is Latin Modern Mono 10 with monochrome grid
 hinting, fixed subpixel phase, and raw atlas coverage. The same law governs the
@@ -195,15 +198,16 @@ correct.
 
 Do not reduce type to make a layout fit. Shorten the copy, wrap it, disclose it,
 or revise the layout. Raw `RichText::size` and `FontId` construction are
-production escapes, not an alternate scale; isolate a necessary dynamic
-spatial projection behind one narrowly named boundary and justify it against
-its native-size witness. Typography forged into a mechanism remains governed
-by that mechanism's exact gauge rather than by `TypeRole`.
+forbidden alternate scales. Map, plot, diagram, and mechanism typography whose
+nominal size follows physical geometry descends through `chrome::spatial_font`;
+this governed escape inherits the active accessibility scale. Typography forged
+into a mechanism remains governed by that mechanism's exact gauge rather than
+by `TypeRole`.
 
 The scale is expressed in egui logical points. Diagnose an incorrect platform
-`pixels_per_point` coordinate independently; inflating application roles to
-compensate for a broken monitor scale would merely move the defect between
-displays.
+`pixels_per_point` coordinate independently. The explicit font-size preference
+exists for two displays with equally correct logical scaling but materially
+different physical legibility; it is user intent, not monitor inference.
 
 Install the fixed-address atelier as a systemd user service with:
 
@@ -280,7 +284,7 @@ is deliberately a hardware WebGPU workload.
 
 ```toml
 [dependencies]
-brass_poolrooms = "0.14.5"
+brass_poolrooms = "0.14.6"
 ```
 
 Import egui through the crate to keep its public geometry types aligned with
@@ -296,7 +300,7 @@ chrome::install(&ctx);
 For chrome without GPU water:
 
 ```toml
-brass_poolrooms = { version = "0.14.5", default-features = false }
+brass_poolrooms = { version = "0.14.6", default-features = false }
 ```
 
 ## Forge App Assets
@@ -310,10 +314,10 @@ Poolrooms chrome without moving application-specific dies into Poolrooms.
 
 ```toml
 [dependencies]
-brass_poolrooms = "0.14.5"
+brass_poolrooms = "0.14.6"
 
 [build-dependencies]
-brass_foundry = "0.14.5"
+brass_foundry = "0.14.6"
 ```
 
 The normal build boundary is `forge` followed by `emit_rust` in `build.rs`.

@@ -126,7 +126,7 @@ impl Keycap {
     pub fn show(self, ui: &mut egui::Ui) -> Response {
         let enabled = ui.is_enabled();
         let ink = if enabled { TEXT } else { MUTED };
-        let font = TypeRole::Label.monospace();
+        let font = TypeRole::Label.monospace(ui.style());
         let galley = ui.painter().layout_no_wrap(self.label.clone(), font, ink);
         let padding = Vec2::new(6.0, 3.0);
         let (rect, response) =
@@ -153,7 +153,7 @@ impl Keycap {
     pub fn show_in(self, ui: &mut egui::Ui, button: Button<'_>) -> Response {
         let enabled = ui.is_enabled();
         let ink = if enabled { HOT } else { MUTED };
-        let font = inline_keycap_font();
+        let font = inline_keycap_font(ui.style());
         let galley = ui.painter().layout_no_wrap(self.label, font, ink);
         let size = galley.size() + 2.0 * INLINE_KEYCAP_PADDING;
         let id = ui.next_auto_id().with("inline-keycap");
@@ -180,6 +180,10 @@ impl Keycap {
     clippy::disallowed_methods,
     reason = "the forged inline key well owns one exact inscription gauge"
 )]
-fn inline_keycap_font() -> FontId {
-    FontId::new(INLINE_KEYCAP_FONT_POINTS, egui::FontFamily::Monospace)
+fn inline_keycap_font(style: &egui::Style) -> FontId {
+    super::spatial_font_in(
+        style,
+        INLINE_KEYCAP_FONT_POINTS,
+        egui::FontFamily::Monospace,
+    )
 }

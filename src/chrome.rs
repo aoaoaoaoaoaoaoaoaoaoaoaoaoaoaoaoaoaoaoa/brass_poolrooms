@@ -70,7 +70,7 @@ pub use screw_scroll::ScrewScroll;
 pub use section::{FoldFlux, FoldWake, Section, SectionResponse, section};
 pub use sort_toggle::{SortDetent, SortToggle, SortToggleResponse, SortToggleWake};
 pub use symbol::Symbol;
-pub use typography::TypeRole;
+pub use typography::{FontScale, TypeRole, spatial_font, spatial_font_in};
 pub use wheel::take_control_wheel;
 
 #[cfg(feature = "foundry-atelier")]
@@ -149,7 +149,7 @@ pub fn install(ctx: &egui::Context) {
         widget.corner_radius = egui::CornerRadius::same(1);
     }
     ctx.all_styles_mut(|style| {
-        typography::install(style);
+        typography::install(style, FontScale::Standard);
         style.visuals = visuals.clone();
         style.spacing.item_spacing = Vec2::splat(6.0);
         style.spacing.button_padding = Vec2::new(7.0, 3.0);
@@ -157,6 +157,20 @@ pub fn install(ctx: &egui::Context) {
         style.spacing.menu_margin = egui::Margin::symmetric(8, 8);
         style.spacing.indent = 12.0;
     });
+}
+
+/// Replace every semantic font metric with the selected pre-layout scale.
+///
+/// This rebuilds style-owned font identifiers; egui then lays out and
+/// rasterizes text at the resulting point sizes. Physical pixels are never
+/// resampled after rendering.
+pub fn set_font_scale(ctx: &egui::Context, scale: FontScale) {
+    let style = ctx.style_of(ctx.theme());
+    if typography::active_scale(&style) == scale {
+        return;
+    }
+    ctx.all_styles_mut(|style| typography::install(style, scale));
+    ctx.request_repaint();
 }
 
 fn install_fonts(ctx: &egui::Context) {
@@ -488,10 +502,7 @@ fn glyph_weight(ch: char) -> f32 {
 }
 
 pub fn eyebrow(text: impl Into<String>) -> RichText {
-    TypeRole::Label
-        .text(text)
-        .color(MUTED)
-        .text_style(egui::TextStyle::Small)
+    TypeRole::Label.text(text).color(MUTED)
 }
 
 pub fn title(text: impl Into<String>) -> RichText {

@@ -286,7 +286,7 @@ where
                 register_aperture.center(),
                 egui::Align2::CENTER_CENTER,
                 text,
-                super::TypeRole::Body.monospace(),
+                super::TypeRole::Body.monospace(ui.style()),
                 HOT,
             );
             if enabled
@@ -441,7 +441,7 @@ where
         aperture,
         egui::TextEdit::singleline(&mut text)
             .id(id)
-            .font(super::TypeRole::Body.monospace())
+            .font(super::TypeRole::Body.monospace(ui.style()))
             .text_color(HOT)
             .background_color(Color32::TRANSPARENT)
             .frame(egui::Frame::NONE)
@@ -792,6 +792,7 @@ mod tests {
     #[test]
     fn line_wheel_preserves_fast_detent_magnitude() {
         let ctx = egui::Context::default();
+        crate::chrome::install(&ctx);
         let screen = Rect::from_min_size(Pos2::ZERO, Vec2::new(180.0, 40.0));
         let mut value = 0_i32;
         let mut wheel_center = Pos2::ZERO;
@@ -823,6 +824,7 @@ mod tests {
     #[test]
     fn point_wheel_banks_subdetent_motion() {
         let ctx = egui::Context::default();
+        crate::chrome::install(&ctx);
         let screen = Rect::from_min_size(Pos2::ZERO, Vec2::new(180.0, 40.0));
         let mut value = 0.0_f32;
         let mut wheel_center = Pos2::ZERO;
@@ -875,6 +877,7 @@ mod tests {
         }
 
         let ctx = egui::Context::default();
+        crate::chrome::install(&ctx);
         let screen = Rect::from_min_size(Pos2::ZERO, Vec2::new(180.0, 100.0));
         let mut value = 0_i32;
         let (wheel_center, _) = frame(

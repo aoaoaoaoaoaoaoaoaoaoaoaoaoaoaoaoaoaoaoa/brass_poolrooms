@@ -7,5 +7,5 @@ disallowed-methods = [
   { path = "egui::FontId::new", reason = "choose a Poolrooms TypeRole; a physical or dynamic spatial escape requires a narrow reasoned allow" },
   { path = "egui::FontId::proportional", reason = "choose a Poolrooms TypeRole; a physical or dynamic spatial escape requires a narrow reasoned allow" },
   { path = "egui::RichText::size", reason = "choose a Poolrooms TypeRole instead of a caller-owned point size" },
-  { path = "egui::RichText::small", reason = "choose the semantic Caption role instead of egui's undersized stock Small metric" },
+  { path = "egui::RichText::small", reason = "choose a Poolrooms TypeRole instead of egui's undersized stock Small metric" },
 ]
