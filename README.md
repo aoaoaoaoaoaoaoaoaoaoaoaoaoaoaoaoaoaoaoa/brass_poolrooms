@@ -170,6 +170,13 @@ mapped onto that scale, so most layout code should make no sizing decision at
 all. When a caller must state hierarchy explicitly, it chooses a
 `chrome::TypeRole`; the role's metric remains private to Poolrooms.
 
+The production optical law is Latin Modern Mono 10 with monochrome grid
+hinting, fixed subpixel phase, and raw atlas coverage. The same law governs the
+vendored Noto math and symbol coverage faces. These three embedded files are
+the complete stack; no operating-system or implicit egui font participates.
+The Font Raster Atelier starts at these exact coordinates; its alternatives
+are counterfactual witnesses, not application configuration.
+
 Use the least prominent role that tells the truth. `Title` names an application
 or substantial pane, `Heading` introduces a surface within it, `Body` carries
 ordinary prose, controls, values, status, faults, and instructions, and `Label`

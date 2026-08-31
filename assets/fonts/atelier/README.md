@@ -1,9 +1,10 @@
 # Font Raster Atelier Faces
 
-These are unmodified upstream font binaries embedded only in the
-`font_raster_atelier` example. The production Poolrooms stack remains CMU
-Typewriter Text with the Noto math and symbol fallbacks in the parent font
-directory.
+These are unmodified upstream font binaries embedded in the
+`font_raster_atelier` example. The selected Latin Modern Mono 10 optical master
+has graduated to `../latin-modern/` for shared production and atelier use;
+other files here remain candidates. Production obtains mathematical and symbol
+coverage from the vendored Noto faces in the parent font directory.
 
 The candidate corpus is pinned so a later upstream release cannot silently
 alter a raster judgment:
@@ -12,7 +13,7 @@ alter a raster judgment:
 | --- | --- | --- | --- |
 | CMU Typewriter Text Light/Bold | CM Unicode 0.7.0 | `cmu-typewriter/*.otf` | SIL OFL 1.1; see `../cmu-typewriter/OFL.txt` |
 | Computer Modern Graded Typewriter | CTAN 1.0.0 | `cm-graded/*.otf` | `cm-graded/OFL.txt` |
-| Latin Modern Mono | CTAN 2.005 | `latin-modern/*.otf` | `latin-modern/GUST-FONT-LICENSE.txt` |
+| Latin Modern Mono | CTAN 2.005 | `latin-modern/*.otf`, `../latin-modern/lmmono10-regular.otf` | `latin-modern/GUST-FONT-LICENSE.txt`, `../latin-modern/GUST-FONT-LICENSE.txt` |
 | New Computer Modern Mono | CTAN 8.1.1 | `new-computer-modern/*.otf` | `new-computer-modern/LICENSE.txt` |
 | Courier Prime | `7fd585a2dd4c1612c79b3308e300923d1c13df93` | `courier-prime/*.ttf` | `courier-prime/OFL.txt` |
 | Courier Prime Code | `0fcb44c7bcb7e81079dfa9f0d5ac5a4b3e7bf853` | `courier-prime-code/*.ttf` | `courier-prime-code/LICENSE.md` |

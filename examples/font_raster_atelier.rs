@@ -44,6 +44,9 @@ const CM_GRADE_72: &[u8] = include_bytes!(
 );
 const NOTO_MATH: &[u8] = include_bytes!("../assets/fonts/noto/NotoSansMath-Regular.ttf");
 const NOTO_SYMBOLS: &[u8] = include_bytes!("../assets/fonts/noto/NotoSansSymbols2-Regular.ttf");
+const PRODUCTION_FACE_INDEX: usize = 11;
+const PRODUCTION_PROFILE_INDEX: usize = 5;
+const PRODUCTION_TRANSFER: Transfer = Transfer::Raw;
 
 #[derive(Clone, Copy)]
 struct Face {
@@ -58,7 +61,7 @@ const FACES: &[Face] = &[
     Face {
         slug: "cmu-typewriter",
         name: "CMU TYPEWRITER",
-        province: "current production face",
+        province: "former production face · CM Unicode",
         regular: CMU_REGULAR,
         emphasis: CMU_EMPHASIS,
     },
@@ -135,9 +138,9 @@ const FACES: &[Face] = &[
     Face {
         slug: "latin-modern-mono-10",
         name: "LATIN MODERN MONO 10",
-        province: "direct CM outline descendant",
-        regular: include_bytes!("../assets/fonts/atelier/latin-modern/lmmono10-regular.otf"),
-        emphasis: include_bytes!("../assets/fonts/atelier/latin-modern/lmmono10-regular.otf"),
+        province: "production face · direct CM descendant",
+        regular: include_bytes!("../assets/fonts/latin-modern/lmmono10-regular.otf"),
+        emphasis: include_bytes!("../assets/fonts/latin-modern/lmmono10-regular.otf"),
     },
     Face {
         slug: "latin-modern-mono-12",
@@ -256,8 +259,8 @@ const SMOOTH_LIGHT: HintingTarget = HintingTarget::Smooth(SmoothHinting {
 
 const PROFILES: &[RasterProfile] = &[
     RasterProfile {
-        slug: "production",
-        name: "PRODUCTION",
+        slug: "stable-phases",
+        name: "STABLE PHASES",
         province: "stable hint · 4 phases",
         hinting: true,
         target: SMOOTH_STABLE,
@@ -350,10 +353,10 @@ impl Weight {
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 enum Transfer {
-    #[default]
     Dark,
     Gamma65,
     Gamma80,
+    #[default]
     Raw,
 }
 
@@ -384,12 +387,12 @@ struct SpecimenScale {
     points: [f32; TypeRole::ALL.len()],
 }
 
-const PROSPECTIVE_SCALE: [f32; TypeRole::ALL.len()] = [12.5, 14.5, 17.0, 17.75, 21.5];
+const PRODUCTION_SCALE: [f32; TypeRole::ALL.len()] = [12.5, 14.5, 17.0, 17.75, 21.5];
 
 impl Default for SpecimenScale {
     fn default() -> Self {
         Self {
-            points: PROSPECTIVE_SCALE,
+            points: PRODUCTION_SCALE,
         }
     }
 }
@@ -404,7 +407,6 @@ impl SpecimenScale {
     }
 }
 
-#[derive(Default)]
 struct FontRasterAtelier {
     face: usize,
     profile: usize,
@@ -412,6 +414,19 @@ struct FontRasterAtelier {
     transfer: Transfer,
     wet: bool,
     scale: SpecimenScale,
+}
+
+impl Default for FontRasterAtelier {
+    fn default() -> Self {
+        Self {
+            face: PRODUCTION_FACE_INDEX,
+            profile: PRODUCTION_PROFILE_INDEX,
+            weight: Weight::default(),
+            transfer: PRODUCTION_TRANSFER,
+            wet: false,
+            scale: SpecimenScale::default(),
+        }
+    }
 }
 
 impl Exhibit for FontRasterAtelier {
@@ -494,10 +509,10 @@ impl FontRasterAtelier {
                     let _response = ui.checkbox(&mut self.wet, "PRODUCTION WATER");
                     let _separator = ui.separator();
                     if ui
-                        .button(TypeRole::Label.text("RESET SEMANTIC SIZES"))
+                        .button(TypeRole::Label.text("RESET PRODUCTION"))
                         .clicked()
                     {
-                        self.scale = SpecimenScale::default();
+                        *self = Self::default();
                     }
                 });
             });
@@ -732,7 +747,12 @@ fn family(face: Face, profile: RasterProfile) -> FontFamily {
 }
 
 fn install_fonts(ctx: &egui::Context, weight: Weight) {
-    let mut fonts = FontDefinitions::empty();
+    let mut fonts = chrome::production_font_definitions();
+    let production_proportional = fonts
+        .families
+        .entry(FontFamily::Proportional)
+        .or_default()
+        .clone();
     for profile in PROFILES {
         let fallback_cmu = insert_face(
             &mut fonts,
@@ -765,31 +785,28 @@ fn install_fonts(ctx: &egui::Context, weight: Weight) {
                 },
                 *profile,
             );
-            let mut stack = Vec::with_capacity(4);
-            for candidate in [
-                key,
-                fallback_math.clone(),
-                fallback_symbols.clone(),
-                fallback_cmu.clone(),
-            ] {
-                if !stack.contains(&candidate) {
-                    stack.push(candidate);
+            let stack = if weight == Weight::Regular
+                && face.slug == FACES[PRODUCTION_FACE_INDEX].slug
+                && profile.slug == PROFILES[PRODUCTION_PROFILE_INDEX].slug
+            {
+                production_proportional.clone()
+            } else {
+                let mut stack = Vec::with_capacity(4);
+                for candidate in [
+                    key,
+                    fallback_math.clone(),
+                    fallback_symbols.clone(),
+                    fallback_cmu.clone(),
+                ] {
+                    if !stack.contains(&candidate) {
+                        stack.push(candidate);
+                    }
                 }
-            }
+                stack
+            };
             let _old = fonts.families.insert(family(*face, *profile), stack);
         }
     }
-    let production_stack = vec![
-        "atelier:fallback-cmu:production".to_owned(),
-        "atelier:fallback-math:production".to_owned(),
-        "atelier:fallback-symbols:production".to_owned(),
-    ];
-    let _proportional = fonts
-        .families
-        .insert(FontFamily::Proportional, production_stack.clone());
-    let _monospace = fonts
-        .families
-        .insert(FontFamily::Monospace, production_stack);
     ctx.set_fonts(fonts);
 }
 

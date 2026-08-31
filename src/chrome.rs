@@ -21,7 +21,8 @@
 use std::f32::consts::TAU;
 use std::sync::Arc;
 
-use egui::{Color32, FontData, FontDefinitions, FontFamily, RichText, Stroke, Vec2};
+use egui::epaint::{FontColorTransferFunction, text::HintingTarget};
+use egui::{Color32, FontData, FontDefinitions, FontFamily, FontTweak, RichText, Stroke, Vec2};
 
 mod checkbox;
 mod corner_close;
@@ -77,17 +78,18 @@ pub(crate) use foundry::{DieTopology, StudyEtch, StudyEtchPalette};
 #[cfg(feature = "foundry-atelier")]
 pub(crate) use monoglyph::paint_study_etch;
 
-const CMU_TYPEWRITER: &[u8] = include_bytes!("../assets/fonts/cmu-typewriter/cmuntt.ttf");
+const LATIN_MODERN_MONO_10: &[u8] =
+    include_bytes!("../assets/fonts/latin-modern/lmmono10-regular.otf");
 const NOTO_MATH: &[u8] = include_bytes!("../assets/fonts/noto/NotoSansMath-Regular.ttf");
 const NOTO_SYMBOLS: &[u8] = include_bytes!("../assets/fonts/noto/NotoSansSymbols2-Regular.ttf");
 
-const FACE_TEXT: &str = "cmu-typewriter-text";
+const FACE_TEXT: &str = "latin-modern-mono-10";
 const FACE_MATH: &str = "noto-sans-math";
 const FACE_SYMBOLS: &str = "noto-sans-symbols-2";
 
 // Ink and lamplight: warm charcoal paper, bone text, umber edges, lamplight
 // amber for the accent, typewriter-ribbon red for repulsion — tuned to sit
-// with the CMU Typewriter face instead of fighting it.
+// with the Computer Modern typewriter lineage instead of fighting it.
 pub const INSPECTOR_WIDTH: f32 = 285.0;
 /// Canonical clear span between twin-tied foundry parts.
 ///
@@ -113,6 +115,7 @@ pub const HOT: Color32 = Color32::from_rgb(235, 197, 151);
 pub fn install(ctx: &egui::Context) {
     install_fonts(ctx);
     let mut visuals = egui::Visuals::dark();
+    visuals.text_options.color_transfer_function = FontColorTransferFunction::Off;
     visuals.panel_fill = PAGE;
     visuals.window_fill = SURFACE;
     visuals.faint_bg_color = CONTROL;
@@ -157,20 +160,38 @@ pub fn install(ctx: &egui::Context) {
 }
 
 fn install_fonts(ctx: &egui::Context) {
-    let mut fonts = FontDefinitions::default();
+    ctx.set_fonts(production_font_definitions());
+}
+
+/// Construct the exact production font stack for native renderer witnesses.
+///
+/// Applications must call [`install`] instead. This seam exists so the Font
+/// Raster Atelier can add counterfactual families without approximating the
+/// production definitions that remain responsible for its own interface.
+#[doc(hidden)]
+pub fn production_font_definitions() -> FontDefinitions {
+    let mut fonts = FontDefinitions::empty();
     for (face, bytes) in [
-        (FACE_TEXT, CMU_TYPEWRITER),
+        (FACE_TEXT, LATIN_MODERN_MONO_10),
         (FACE_MATH, NOTO_MATH),
         (FACE_SYMBOLS, NOTO_SYMBOLS),
     ] {
-        let _old = fonts
-            .font_data
-            .insert(face.to_owned(), Arc::new(FontData::from_static(bytes)));
+        let data = FontData::from_static(bytes).tweak(production_font_tweak());
+        let _old = fonts.font_data.insert(face.to_owned(), Arc::new(data));
     }
     for family in [FontFamily::Proportional, FontFamily::Monospace] {
         prepend_faces(&mut fonts, family, &[FACE_TEXT, FACE_MATH, FACE_SYMBOLS]);
     }
-    ctx.set_fonts(fonts);
+    fonts
+}
+
+fn production_font_tweak() -> FontTweak {
+    FontTweak {
+        hinting: Some(true),
+        hinting_target: HintingTarget::Mono,
+        subpixel_binning: Some(false),
+        ..FontTweak::default()
+    }
 }
 
 fn prepend_faces(fonts: &mut FontDefinitions, family: FontFamily, faces: &[&str]) {
