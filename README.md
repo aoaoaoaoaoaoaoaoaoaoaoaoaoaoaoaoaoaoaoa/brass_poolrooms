@@ -171,7 +171,10 @@ When a caller must state hierarchy explicitly, it chooses a `chrome::TypeRole`;
 the role's metric remains private to Poolrooms. `chrome::FontScale` admits only
 Standard (100%), Large (125%), and Extra Large (150%). Applying it rebuilds
 semantic font identifiers before layout and glyph rasterization; it never
-rescales rendered pixels. Extra Large is the supported layout ceiling.
+rescales rendered pixels. Their tabulated reference-gauge factors are 0.8, 1.0,
+and 1.25: Large carries the established reference metric, Extra Large carries
+its 125% enlargement, and Standard supplies the compact desktop metric. Extra
+Large is the supported layout ceiling.
 
 The production optical law is Latin Modern Mono 10 with monochrome grid
 hinting, fixed subpixel phase, and raw atlas coverage. The same law governs the

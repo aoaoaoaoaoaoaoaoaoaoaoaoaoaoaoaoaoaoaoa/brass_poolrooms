@@ -4,20 +4,23 @@
 
 use egui::{Context, FontFamily, FontId, RichText, Style, TextStyle, WidgetText};
 
-/// User-selected multiplier over the canonical Poolrooms type scale.
+/// User-selected preset over the canonical Poolrooms type scale.
 ///
 /// Scaling is applied while font identifiers and glyph atlases are constructed,
-/// before text layout or rasterization. It is not a framebuffer transform.
+/// before text layout or rasterization. The three named percentages are stable
+/// user-facing tiers backed by tabulated optical metrics, not a framebuffer
+/// transform or an arithmetic progression.
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum FontScale {
-    /// The canonical production metrics.
+    /// Compact desktop metrics exposed as the 100% tier.
     #[default]
     Standard,
-    /// A 125% legibility enlargement.
+    /// The established reference metrics exposed as the 125% tier.
     Large,
-    /// A 150% accessibility enlargement and supported layout ceiling.
+    /// A 125% enlargement over the reference metrics, exposed as the 150%
+    /// tier and supported layout ceiling.
     ExtraLarge,
 }
 
@@ -34,7 +37,7 @@ impl FontScale {
         }
     }
 
-    /// Integer percentage for persistence-neutral projections.
+    /// Stable user-facing tier number for persistence-neutral projections.
     pub const fn percentage(self) -> u16 {
         match self {
             Self::Standard => 100,
@@ -43,11 +46,11 @@ impl FontScale {
         }
     }
 
-    const fn factor(self) -> f32 {
+    const fn reference_factor(self) -> f32 {
         match self {
-            Self::Standard => 1.0,
-            Self::Large => 1.25,
-            Self::ExtraLarge => 1.5,
+            Self::Standard => 0.8,
+            Self::Large => 1.0,
+            Self::ExtraLarge => 1.25,
         }
     }
 }
@@ -140,7 +143,7 @@ impl TypeRole {
         }
     }
 
-    const fn points(self) -> f32 {
+    const fn reference_points(self) -> f32 {
         match self {
             Self::Annotation => 12.5,
             Self::Label => 14.5,
@@ -174,7 +177,10 @@ pub fn spatial_font(ctx: &Context, nominal_points: f32, family: FontFamily) -> F
     reason = "spatial_font_in is the governed numerical escape and applies the active font scale"
 )]
 pub fn spatial_font_in(style: &Style, nominal_points: f32, family: FontFamily) -> FontId {
-    FontId::new(nominal_points * active_scale(style).factor(), family)
+    FontId::new(
+        nominal_points * active_scale(style).reference_factor(),
+        family,
+    )
 }
 
 pub(super) fn label_hover_text(text: impl Into<WidgetText>) -> WidgetText {
@@ -185,7 +191,7 @@ pub(super) fn install(style: &mut Style, scale: FontScale) {
     for role in TypeRole::ALL {
         let _semantic = style.text_styles.insert(
             role.style(),
-            spatial_font_at(scale, role.points(), FontFamily::Proportional),
+            spatial_font_at(scale, role.reference_points(), FontFamily::Proportional),
         );
     }
     let _small = style
@@ -210,8 +216,8 @@ pub(super) fn active_scale(style: &Style) -> FontScale {
     FontScale::ALL
         .into_iter()
         .min_by(|left, right| {
-            let left = (body - TypeRole::Body.points() * left.factor()).abs();
-            let right = (body - TypeRole::Body.points() * right.factor()).abs();
+            let left = (body - TypeRole::Body.reference_points() * left.reference_factor()).abs();
+            let right = (body - TypeRole::Body.reference_points() * right.reference_factor()).abs();
             left.total_cmp(&right)
         })
         .unwrap_or_default()
@@ -222,5 +228,5 @@ pub(super) fn active_scale(style: &Style) -> FontScale {
     reason = "semantic installation is the sole owner of scaled application metrics"
 )]
 fn spatial_font_at(scale: FontScale, points: f32, family: FontFamily) -> FontId {
-    FontId::new(points * scale.factor(), family)
+    FontId::new(points * scale.reference_factor(), family)
 }

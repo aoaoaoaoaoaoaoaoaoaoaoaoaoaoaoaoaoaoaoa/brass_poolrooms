@@ -387,7 +387,7 @@ struct SpecimenScale {
     points: [f32; TypeRole::ALL.len()],
 }
 
-const PRODUCTION_SCALE: [f32; TypeRole::ALL.len()] = [12.5, 14.5, 17.0, 17.75, 21.5];
+const PRODUCTION_SCALE: [f32; TypeRole::ALL.len()] = [10.0, 11.6, 13.6, 14.2, 17.2];
 
 impl Default for SpecimenScale {
     fn default() -> Self {
