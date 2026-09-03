@@ -223,7 +223,7 @@ case "$action" in
                 fail 'publication requires the configured Git signing program'
             signing_key=$(git config --get user.signingkey) ||
                 fail 'publication requires the configured Git signing key'
-            [ "$signing_key" = '4BE39752DF2F0639C8C4DC9ACA38C24698462CA3!' ] ||
+            [ "$signing_key" = '847339C53B21580AEF7D0A30446CAD3BC202E76B!' ] ||
                 fail 'publication requires the Eternalist signing subkey'
             signature="$tarball.asc"
             "$signing_program" \
