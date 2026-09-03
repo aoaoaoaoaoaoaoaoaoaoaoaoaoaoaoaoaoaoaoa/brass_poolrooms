@@ -81,11 +81,11 @@ dependencies = [
 
 [[package]]
 name = "brass_foundry"
-version = "0.14.6"
+version = "0.14.7"
 
 [[package]]
 name = "brass_poolrooms"
-version = "0.14.6"
+version = "0.14.7"
 dependencies = [
  "anyhow",
  "brass_foundry",
