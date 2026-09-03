@@ -19,7 +19,7 @@ use egui::epaint::{
 };
 use support::Exhibit;
 
-const CMU_REGULAR: &[u8] = include_bytes!("../assets/fonts/cmu-typewriter/cmuntt.ttf");
+const CMU_REGULAR: &[u8] = include_bytes!("../assets/fonts/atelier/cmu-typewriter/cmuntt.ttf");
 const CMU_EMPHASIS: &[u8] = include_bytes!("../assets/fonts/atelier/cmu-typewriter/cmuntb.otf");
 const CM_GRADE_0: &[u8] = include_bytes!(
     "../assets/fonts/atelier/cm-graded/ComputerModernGradedG0Typewriter10Regular.otf"
@@ -44,9 +44,9 @@ const CM_GRADE_72: &[u8] = include_bytes!(
 );
 const NOTO_MATH: &[u8] = include_bytes!("../assets/fonts/noto/NotoSansMath-Regular.ttf");
 const NOTO_SYMBOLS: &[u8] = include_bytes!("../assets/fonts/noto/NotoSansSymbols2-Regular.ttf");
-const PRODUCTION_FACE_INDEX: usize = 11;
+const PRODUCTION_FACE_INDEX: usize = 1;
 const PRODUCTION_PROFILE_INDEX: usize = 5;
-const PRODUCTION_TRANSFER: Transfer = Transfer::Raw;
+const PRODUCTION_TRANSFER: Transfer = Transfer::Dark;
 
 #[derive(Clone, Copy)]
 struct Face {
@@ -61,15 +61,15 @@ const FACES: &[Face] = &[
     Face {
         slug: "cmu-typewriter",
         name: "CMU TYPEWRITER",
-        province: "former production face · CM Unicode",
+        province: "CM Unicode regular",
         regular: CMU_REGULAR,
         emphasis: CMU_EMPHASIS,
     },
     Face {
         slug: "cmu-typewriter-light",
         name: "CMU TYPEWRITER LIGHT",
-        province: "same CM Unicode family · light / bold",
-        regular: include_bytes!("../assets/fonts/atelier/cmu-typewriter/cmunbtl.otf"),
+        province: "production face · CM Unicode light",
+        regular: include_bytes!("../assets/fonts/cmu-typewriter/cmunbtl.otf"),
         emphasis: CMU_EMPHASIS,
     },
     Face {
@@ -138,9 +138,9 @@ const FACES: &[Face] = &[
     Face {
         slug: "latin-modern-mono-10",
         name: "LATIN MODERN MONO 10",
-        province: "production face · direct CM descendant",
-        regular: include_bytes!("../assets/fonts/latin-modern/lmmono10-regular.otf"),
-        emphasis: include_bytes!("../assets/fonts/latin-modern/lmmono10-regular.otf"),
+        province: "former production face · direct CM descendant",
+        regular: include_bytes!("../assets/fonts/atelier/latin-modern/lmmono10-regular.otf"),
+        emphasis: include_bytes!("../assets/fonts/atelier/latin-modern/lmmono10-regular.otf"),
     },
     Face {
         slug: "latin-modern-mono-12",
@@ -389,15 +389,25 @@ struct SpecimenScale {
 
 const PRODUCTION_SCALES: [SpecimenScale; FontScale::ALL.len()] = [
     SpecimenScale {
-        points: [10.0, 11.6, 13.6, 14.2, 17.2],
+        points: production_points(FontScale::Standard),
     },
     SpecimenScale {
-        points: [12.5, 14.5, 17.0, 17.75, 21.5],
+        points: production_points(FontScale::Large),
     },
     SpecimenScale {
-        points: [15.625, 18.125, 21.25, 22.1875, 26.875],
+        points: production_points(FontScale::ExtraLarge),
     },
 ];
+
+const fn production_points(scale: FontScale) -> [f32; TypeRole::ALL.len()] {
+    [
+        TypeRole::Annotation.production_points(scale),
+        TypeRole::Label.production_points(scale),
+        TypeRole::Body.production_points(scale),
+        TypeRole::Heading.production_points(scale),
+        TypeRole::Title.production_points(scale),
+    ]
+}
 
 const fn scale_index(scale: FontScale) -> usize {
     match scale {
@@ -409,9 +419,9 @@ const fn scale_index(scale: FontScale) -> usize {
 
 const fn atelier_scale_label(scale: FontScale) -> &'static str {
     match scale {
-        FontScale::Standard => "S · 80%",
-        FontScale::Large => "M · 100%",
-        FontScale::ExtraLarge => "L · 125%",
+        FontScale::Standard => "S · ≈80%",
+        FontScale::Large => "M · ≈100%",
+        FontScale::ExtraLarge => "L · ≈125%",
     }
 }
 

@@ -8,8 +8,8 @@ use egui::{Context, FontFamily, FontId, RichText, Style, TextStyle, WidgetText};
 ///
 /// Scaling is applied while font identifiers and glyph atlases are constructed,
 /// before text layout or rasterization. The three named percentages are stable
-/// user-facing tiers backed by tabulated optical metrics, not a framebuffer
-/// transform or an arithmetic progression.
+/// user-facing approximate tiers backed by tabulated optical metrics, not a
+/// framebuffer transform or an arithmetic progression.
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -17,10 +17,9 @@ pub enum FontScale {
     /// Compact desktop metrics exposed as the 100% tier.
     #[default]
     Standard,
-    /// The established reference metrics exposed as the 125% tier.
+    /// Enlarged desktop metrics exposed as the 125% tier.
     Large,
-    /// A 125% enlargement over the reference metrics, exposed as the 150%
-    /// tier and supported layout ceiling.
+    /// Maximum supported desktop metrics exposed as the 150% tier.
     ExtraLarge,
 }
 
@@ -31,13 +30,13 @@ impl FontScale {
     /// Stable user-facing option label.
     pub const fn label(self) -> &'static str {
         match self {
-            Self::Standard => "STANDARD · 100%",
-            Self::Large => "LARGE · 125%",
-            Self::ExtraLarge => "EXTRA LARGE · 150%",
+            Self::Standard => "STANDARD · ≈100%",
+            Self::Large => "LARGE · ≈125%",
+            Self::ExtraLarge => "EXTRA LARGE · ≈150%",
         }
     }
 
-    /// Stable user-facing tier number for persistence-neutral projections.
+    /// Stable nominal tier number for persistence-neutral projections.
     pub const fn percentage(self) -> u16 {
         match self {
             Self::Standard => 100,
@@ -46,7 +45,7 @@ impl FontScale {
         }
     }
 
-    const fn reference_factor(self) -> f32 {
+    const fn spatial_factor(self) -> f32 {
         match self {
             Self::Standard => 0.8,
             Self::Large => 1.0,
@@ -143,13 +142,30 @@ impl TypeRole {
         }
     }
 
-    const fn reference_points(self) -> f32 {
-        match self {
-            Self::Annotation => 12.5,
-            Self::Label => 14.5,
-            Self::Body => 17.0,
-            Self::Heading => 17.75,
-            Self::Title => 21.5,
+    /// Exact production metric for this role and user-facing scale tier.
+    ///
+    /// This is hidden from ordinary documentation because applications must
+    /// choose semantic roles rather than numerical point sizes. It remains
+    /// available to renderer judgment surfaces that must reproduce production
+    /// without a private copy of the scale table.
+    #[doc(hidden)]
+    pub const fn production_points(self, scale: FontScale) -> f32 {
+        match (scale, self) {
+            (FontScale::Standard, Self::Annotation) => 10.10,
+            (FontScale::Standard, Self::Label) => 12.05,
+            (FontScale::Standard, Self::Body) => 12.40,
+            (FontScale::Standard, Self::Heading) => 14.30,
+            (FontScale::Standard, Self::Title) => 17.15,
+            (FontScale::Large, Self::Annotation) => 12.30,
+            (FontScale::Large, Self::Label) => 13.30,
+            (FontScale::Large, Self::Body) => 16.60,
+            (FontScale::Large, Self::Heading) => 17.70,
+            (FontScale::Large, Self::Title) => 21.70,
+            (FontScale::ExtraLarge, Self::Annotation) => 15.625,
+            (FontScale::ExtraLarge, Self::Label) => 18.125,
+            (FontScale::ExtraLarge, Self::Body) => 21.25,
+            (FontScale::ExtraLarge, Self::Heading) => 22.1875,
+            (FontScale::ExtraLarge, Self::Title) => 26.875,
         }
     }
 }
@@ -177,10 +193,7 @@ pub fn spatial_font(ctx: &Context, nominal_points: f32, family: FontFamily) -> F
     reason = "spatial_font_in is the governed numerical escape and applies the active font scale"
 )]
 pub fn spatial_font_in(style: &Style, nominal_points: f32, family: FontFamily) -> FontId {
-    FontId::new(
-        nominal_points * active_scale(style).reference_factor(),
-        family,
-    )
+    spatial_font_at(active_scale(style), nominal_points, family)
 }
 
 pub(super) fn label_hover_text(text: impl Into<WidgetText>) -> WidgetText {
@@ -189,10 +202,9 @@ pub(super) fn label_hover_text(text: impl Into<WidgetText>) -> WidgetText {
 
 pub(super) fn install(style: &mut Style, scale: FontScale) {
     for role in TypeRole::ALL {
-        let _semantic = style.text_styles.insert(
-            role.style(),
-            spatial_font_at(scale, role.reference_points(), FontFamily::Proportional),
-        );
+        let _semantic = style
+            .text_styles
+            .insert(role.style(), semantic_font_at(role, scale));
     }
     let _small = style
         .text_styles
@@ -216,8 +228,8 @@ pub(super) fn active_scale(style: &Style) -> FontScale {
     FontScale::ALL
         .into_iter()
         .min_by(|left, right| {
-            let left = (body - TypeRole::Body.reference_points() * left.reference_factor()).abs();
-            let right = (body - TypeRole::Body.reference_points() * right.reference_factor()).abs();
+            let left = (body - TypeRole::Body.production_points(*left)).abs();
+            let right = (body - TypeRole::Body.production_points(*right)).abs();
             left.total_cmp(&right)
         })
         .unwrap_or_default()
@@ -228,5 +240,13 @@ pub(super) fn active_scale(style: &Style) -> FontScale {
     reason = "semantic installation is the sole owner of scaled application metrics"
 )]
 fn spatial_font_at(scale: FontScale, points: f32, family: FontFamily) -> FontId {
-    FontId::new(points * scale.reference_factor(), family)
+    FontId::new(points * scale.spatial_factor(), family)
+}
+
+#[allow(
+    clippy::disallowed_methods,
+    reason = "semantic installation is the sole owner of tabulated application metrics"
+)]
+fn semantic_font_at(role: TypeRole, scale: FontScale) -> FontId {
+    FontId::new(role.production_points(scale), FontFamily::Proportional)
 }

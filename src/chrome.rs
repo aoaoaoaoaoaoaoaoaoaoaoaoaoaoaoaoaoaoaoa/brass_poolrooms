@@ -78,12 +78,11 @@ pub(crate) use foundry::{DieTopology, StudyEtch, StudyEtchPalette};
 #[cfg(feature = "foundry-atelier")]
 pub(crate) use monoglyph::paint_study_etch;
 
-const LATIN_MODERN_MONO_10: &[u8] =
-    include_bytes!("../assets/fonts/latin-modern/lmmono10-regular.otf");
+const CMU_TYPEWRITER_LIGHT: &[u8] = include_bytes!("../assets/fonts/cmu-typewriter/cmunbtl.otf");
 const NOTO_MATH: &[u8] = include_bytes!("../assets/fonts/noto/NotoSansMath-Regular.ttf");
 const NOTO_SYMBOLS: &[u8] = include_bytes!("../assets/fonts/noto/NotoSansSymbols2-Regular.ttf");
 
-const FACE_TEXT: &str = "latin-modern-mono-10";
+const FACE_TEXT: &str = "cmu-typewriter-light";
 const FACE_MATH: &str = "noto-sans-math";
 const FACE_SYMBOLS: &str = "noto-sans-symbols-2";
 
@@ -115,7 +114,8 @@ pub const HOT: Color32 = Color32::from_rgb(235, 197, 151);
 pub fn install(ctx: &egui::Context) {
     install_fonts(ctx);
     let mut visuals = egui::Visuals::dark();
-    visuals.text_options.color_transfer_function = FontColorTransferFunction::Off;
+    visuals.text_options.color_transfer_function =
+        FontColorTransferFunction::TwoCoverageMinusCoverageSq;
     visuals.panel_fill = PAGE;
     visuals.window_fill = SURFACE;
     visuals.faint_bg_color = CONTROL;
@@ -186,7 +186,7 @@ fn install_fonts(ctx: &egui::Context) {
 pub fn production_font_definitions() -> FontDefinitions {
     let mut fonts = FontDefinitions::empty();
     for (face, bytes) in [
-        (FACE_TEXT, LATIN_MODERN_MONO_10),
+        (FACE_TEXT, CMU_TYPEWRITER_LIGHT),
         (FACE_MATH, NOTO_MATH),
         (FACE_SYMBOLS, NOTO_SYMBOLS),
     ] {

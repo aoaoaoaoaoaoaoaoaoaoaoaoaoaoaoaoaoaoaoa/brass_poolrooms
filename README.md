@@ -169,19 +169,19 @@ stack. Ordinary egui body, button, heading, monospace, and small styles are
 mapped onto that scale, so most layout code makes no sizing decision at all.
 When a caller must state hierarchy explicitly, it chooses a `chrome::TypeRole`;
 the role's metric remains private to Poolrooms. `chrome::FontScale` admits only
-Standard (100%), Large (125%), and Extra Large (150%). Applying it rebuilds
-semantic font identifiers before layout and glyph rasterization; it never
-rescales rendered pixels. Their tabulated reference-gauge factors are 0.8, 1.0,
-and 1.25: Large carries the established reference metric, Extra Large carries
-its 125% enlargement, and Standard supplies the compact desktop metric. Extra
-Large is the supported layout ceiling.
+Standard (nominally 100%), Large (nominally 125%), and Extra Large (nominally
+150%). Applying it rebuilds semantic font identifiers before layout and glyph
+rasterization; it never rescales rendered pixels. The percentages are labels,
+not operators: every tier owns an independently tabulated optical metric for
+every semantic role. Standard supplies the compact desktop metric, and Extra
+Large remains the supported layout ceiling.
 
-The production optical law is Latin Modern Mono 10 with monochrome grid
-hinting, fixed subpixel phase, and raw atlas coverage. The same law governs the
-vendored Noto math and symbol coverage faces. These three embedded files are
-the complete stack; no operating-system or implicit egui font participates.
-The Font Raster Atelier starts at these exact coordinates; its alternatives
-are counterfactual witnesses, not application configuration.
+The production optical law is CMU Typewriter Text Light with monochrome grid
+hinting, fixed subpixel phase, and dark-sharp atlas transfer. The same raster
+law governs the vendored Noto math and symbol coverage faces. These three
+embedded files are the complete stack; no operating-system or implicit egui
+font participates. The Font Raster Atelier starts at these exact coordinates;
+its alternatives are counterfactual witnesses, not application configuration.
 
 Use the least prominent role that tells the truth. `Title` names an application
 or substantial pane, `Heading` introduces a surface within it, `Body` carries
