@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use brass_poolrooms::{
-    chrome::{self, NumberInput, ScrewScroll, TypeRole},
+    chrome::{self, FontScale, NumberInput, ScrewScroll, TypeRole},
     egui::{self, FontData, FontDefinitions, FontFamily, FontId, FontTweak, RichText},
     water::{Surface, Wetness},
 };
@@ -387,13 +387,31 @@ struct SpecimenScale {
     points: [f32; TypeRole::ALL.len()],
 }
 
-const PRODUCTION_SCALE: [f32; TypeRole::ALL.len()] = [10.0, 11.6, 13.6, 14.2, 17.2];
+const PRODUCTION_SCALES: [SpecimenScale; FontScale::ALL.len()] = [
+    SpecimenScale {
+        points: [10.0, 11.6, 13.6, 14.2, 17.2],
+    },
+    SpecimenScale {
+        points: [12.5, 14.5, 17.0, 17.75, 21.5],
+    },
+    SpecimenScale {
+        points: [15.625, 18.125, 21.25, 22.1875, 26.875],
+    },
+];
 
-impl Default for SpecimenScale {
-    fn default() -> Self {
-        Self {
-            points: PRODUCTION_SCALE,
-        }
+const fn scale_index(scale: FontScale) -> usize {
+    match scale {
+        FontScale::Standard => 0,
+        FontScale::Large => 1,
+        FontScale::ExtraLarge => 2,
+    }
+}
+
+const fn atelier_scale_label(scale: FontScale) -> &'static str {
+    match scale {
+        FontScale::Standard => "S · 80%",
+        FontScale::Large => "M · 100%",
+        FontScale::ExtraLarge => "L · 125%",
     }
 }
 
@@ -413,7 +431,8 @@ struct FontRasterAtelier {
     weight: Weight,
     transfer: Transfer,
     wet: bool,
-    scale: SpecimenScale,
+    scale: FontScale,
+    scales: [SpecimenScale; FontScale::ALL.len()],
 }
 
 impl Default for FontRasterAtelier {
@@ -424,7 +443,8 @@ impl Default for FontRasterAtelier {
             weight: Weight::default(),
             transfer: PRODUCTION_TRANSFER,
             wet: false,
-            scale: SpecimenScale::default(),
+            scale: FontScale::default(),
+            scales: PRODUCTION_SCALES,
         }
     }
 }
@@ -469,8 +489,9 @@ impl FontRasterAtelier {
             "Native egui glyph atlas → production tessellator → WGPU. Judge at actual size.",
         ));
         let _conditions = ui.label(TypeRole::Label.text(format!(
-            "{} PIXELS PER POINT · {} · {}",
+            "{} PIXELS PER POINT · {} · {} · {}",
             ui.pixels_per_point(),
+            atelier_scale_label(self.scale),
             self.transfer.name(),
             if self.wet { "PRODUCTION WATER" } else { "DRY" },
         )));
@@ -527,15 +548,20 @@ impl FontRasterAtelier {
         let face = FACES[self.face];
         let profile = PROFILES[self.profile];
         let family = family(face, profile);
-        let scale = &mut self.scale;
+        let scale_tier = self.scale;
+        let scale = &mut self.scales[scale_index(scale_tier)];
         let _frame = egui::Frame::new()
             .fill(chrome::CONTROL)
             .stroke(egui::Stroke::new(1.0, chrome::EDGE))
             .inner_margin(12)
             .show(ui, |ui| {
                 let _heading = ui.horizontal(|ui| {
-                    let _selection = ui
-                        .label(TypeRole::Heading.text(format!("{} × {}", face.name, profile.name)));
+                    let _selection = ui.label(TypeRole::Heading.text(format!(
+                        "{} · {} × {}",
+                        atelier_scale_label(scale_tier),
+                        face.name,
+                        profile.name
+                    )));
                     let _province = ui.label(
                         TypeRole::Label.text(format!("{} · {}", face.province, profile.province)),
                     );
@@ -553,6 +579,7 @@ impl FontRasterAtelier {
     }
 
     fn target_selectors(&mut self, ui: &mut egui::Ui) {
+        let before_scale = self.scale;
         let _frame = egui::Frame::new()
             .fill(chrome::SURFACE)
             .stroke(egui::Stroke::new(1.0, chrome::EDGE_STRONG))
@@ -588,12 +615,24 @@ impl FontRasterAtelier {
                                 );
                             }
                         });
+                    let _separator = ui.separator();
+                    let _tier_label = ui.label(TypeRole::Label.text("TYPE SCALE"));
+                    for scale in FontScale::ALL {
+                        let _choice = ui.selectable_value(
+                            &mut self.scale,
+                            scale,
+                            TypeRole::Label.text(atelier_scale_label(scale)),
+                        );
+                    }
                 });
                 let _selection = ui.label(TypeRole::Label.text(format!(
                     "{} · {}",
                     FACES[self.face].province, PROFILES[self.profile].province,
                 )));
             });
+        if self.scale != before_scale {
+            ui.ctx().request_discard("Font atelier scale tier changed");
+        }
     }
 }
 
@@ -652,10 +691,10 @@ fn role_witness(
             .enumerate()
             {
                 semantic_header(ui, role.name(), 112.0);
-                let register = NumberInput::new(&mut scale.points[index], 8.0..=32.0, 0.25, 2)
+                let register = NumberInput::new(&mut scale.points[index], 8.0..=32.0, 0.05, 2)
                     .register_width(60.0)
                     .show(ui)
-                    .on_hover_text("scroll by 0.25 pt · double-click register for exact entry");
+                    .on_hover_text("scroll by 0.05 pt · double-click register for exact entry");
                 water.number_input(&register);
                 let _witness = ui.label(RichText::new(text).font(scale.font(role, family.clone())));
                 ui.end_row();

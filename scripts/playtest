@@ -229,6 +229,15 @@ case "$gallery" in
         import -window "$window" "$out/mandate.png"
         ;;
     font_raster_atelier)
+        xdotool mousemove --sync --window "$window" 740 201 click 1
+        sleep 0.25
+        import -window "$window" "$out/medium-scale.png"
+        if cmp -s "$out/initial.png" "$out/medium-scale.png"; then
+            printf 'type-scale selector produced no presented-frame change\n' >&2
+            exit 1
+        fi
+        xdotool mousemove --sync --window "$window" 680 201 click 1
+        sleep 0.25
         xdotool mousemove --sync --window "$window" 180 201 click 1
         sleep 0.25
         import -window "$window" "$out/face-menu.png"
