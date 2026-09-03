@@ -122,13 +122,13 @@ egui-winit = { version = "=0.36.1", default-features = false, features = ["x11"]
 pollster = "1.0"
 
 [target.'cfg(target_os = "linux")'.dev-dependencies]
-wgpu = { version = "30.0.0", default-features = false, features = ["std", "vulkan", "wgsl"] }
+wgpu = { version = "30.0.1", default-features = false, features = ["std", "vulkan", "wgsl"] }
 
 [target.'cfg(target_os = "macos")'.dev-dependencies]
-wgpu = { version = "30.0.0", default-features = false, features = ["metal", "std", "wgsl"] }
+wgpu = { version = "30.0.1", default-features = false, features = ["metal", "std", "wgsl"] }
 
 [target.'cfg(target_os = "windows")'.dev-dependencies]
-wgpu = { version = "30.0.0", default-features = false, features = ["dx12", "std", "wgsl"] }
+wgpu = { version = "30.0.1", default-features = false, features = ["dx12", "std", "wgsl"] }
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 console_error_panic_hook = "0.1.7"
@@ -143,7 +143,7 @@ web-sys = { version = "=0.3.104", features = [
   "Window",
   "console",
 ] }
-wgpu = { version = "30.0.0", default-features = false, features = ["std", "webgpu", "wgsl"] }
+wgpu = { version = "30.0.1", default-features = false, features = ["std", "webgpu", "wgsl"] }
 
 [lints]
 workspace = true
