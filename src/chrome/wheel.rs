@@ -2,7 +2,6 @@
 
 const CLAIM: &str = "poolrooms-control-wheel-claim";
 const BANK: &str = "poolrooms-control-wheel-bank";
-const PRECISE_BANK: &str = "poolrooms-control-wheel-precise-bank";
 const POINTS_PER_NOTCH: f32 = 50.0;
 const MAX_NOTCHES_PER_FRAME: i32 = 8;
 
@@ -43,32 +42,19 @@ pub(super) fn notches(ui: &egui::Ui, id: egui::Id) -> i32 {
     })
 }
 
-/// Uncollapsed detent travel for a physical wheel actuator.
+/// Take one direction-only stroke for a precision actuator.
 ///
-/// A line-unit click contributes exactly its reported magnitude, while point
-/// streams bank sub-detent travel. Unlike [`notches`], this preserves a freely
-/// spinning mouse wheel's many clicks in one frame.
-pub(super) fn precise_notches(ui: &egui::Ui, id: egui::Id) -> i32 {
-    let Frame { delta, scrolling } = precise_frame(ui);
+/// Backends disagree about whether one physical mouse detent is one line,
+/// several lines, or dozens of points. Collapsing all vertical travel
+/// delivered in one frame makes the smallest caller-owned quantum invariant
+/// across those encodings.
+pub(super) fn stroke(ui: &egui::Ui) -> i32 {
+    let Frame { delta, scrolling } = frame(ui);
     if !scrolling {
         return 0;
     }
     claim(ui);
-    let Some(delta) = delta else {
-        return 0;
-    };
-    ui.ctx().data_mut(|data| {
-        let id = id.with(PRECISE_BANK);
-        let mut bank = data.get_temp::<f32>(id).unwrap_or_default();
-        if bank != 0.0 && bank.signum() != delta.signum() {
-            bank = 0.0;
-        }
-        bank += delta;
-        let notches = bank.trunc();
-        bank -= notches;
-        let _old = data.insert_temp(id, bank);
-        notches as i32
-    })
+    delta.map_or(0, |delta| delta.signum() as i32)
 }
 
 #[derive(Clone, Copy)]
@@ -107,33 +93,6 @@ fn frame(ui: &egui::Ui) -> Frame {
         let delta = line + point / POINTS_PER_NOTCH;
         Frame {
             delta: (delta.abs() > 1e-4).then_some(delta),
-            scrolling: input.smooth_scroll_delta.y.abs() > f32::EPSILON
-                || input.events.iter().any(vertical_unmodified),
-        }
-    })
-}
-
-fn precise_frame(ui: &egui::Ui) -> Frame {
-    ui.input(|input| {
-        let mut detents = 0.0_f32;
-        for event in &input.events {
-            if let egui::Event::MouseWheel {
-                unit,
-                delta,
-                modifiers,
-                ..
-            } = event
-                && unmodified(*modifiers)
-            {
-                detents += match unit {
-                    egui::MouseWheelUnit::Line => delta.y,
-                    egui::MouseWheelUnit::Point => delta.y / POINTS_PER_NOTCH,
-                    egui::MouseWheelUnit::Page => delta.y * f32::from(MAX_NOTCHES_PER_FRAME as i16),
-                };
-            }
-        }
-        Frame {
-            delta: (detents.abs() > 1e-4).then_some(detents),
             scrolling: input.smooth_scroll_delta.y.abs() > f32::EPSILON
                 || input.events.iter().any(vertical_unmodified),
         }

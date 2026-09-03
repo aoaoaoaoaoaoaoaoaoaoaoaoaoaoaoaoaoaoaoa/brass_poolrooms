@@ -2,8 +2,9 @@
 //!
 //! The actuator is one scalloped oblate solid, forged once in canonical space
 //! and baked in both XZ and YZ planes. Runtime scroll travel advances the
-//! caller's explicit quantum; double-clicking the register admits exact text
-//! entry without changing the surrounding mechanism.
+//! caller's explicit quantum exactly once per wheel stroke; double-clicking
+//! the register admits exact text entry without changing the surrounding
+//! mechanism.
 
 #![deny(missing_docs)]
 
@@ -89,7 +90,7 @@ pub enum NumberBound {
 /// One attempted stroke refused by a numerical limit.
 ///
 /// This event is suitable for future contact sound: `excess_detents` retains
-/// the magnitude of a fast free-spinning wheel rather than reducing it to a
+/// the magnitude of rejected requested travel rather than reducing it to a
 /// boolean limit hit.
 #[derive(Clone, Copy, Debug)]
 pub struct NumberRefusal {
@@ -185,10 +186,11 @@ where
 
     /// Lay out, actuate, edit, and paint the complete numerical mechanism.
     ///
-    /// Hover the wheel and scroll to advance it. Raw line-wheel magnitude is
-    /// retained, so a free-spinning wheel can cross many caller quanta in one
-    /// frame; point streams bank fractional detents. Double-click the black
-    /// register to enter text, then press Enter or leave focus to commit.
+    /// Hover the wheel and scroll to advance it. Every nonzero vertical wheel
+    /// stroke advances exactly one caller quantum, independent of the raw
+    /// line, point, or page magnitude reported by the backend. Double-click
+    /// the black register to enter text, then press Enter or leave focus to
+    /// commit.
     pub fn show(self, ui: &mut egui::Ui) -> NumberInputResponse {
         let Self {
             value,
@@ -241,7 +243,7 @@ where
         }
         let mut requested = 0_i32;
         if enabled && !editing && wheel_response.hovered() {
-            requested += wheel::precise_notches(ui, wheel_id);
+            requested += wheel::stroke(ui);
             if requested != 0 {
                 wheel_response.request_focus();
             }
@@ -299,7 +301,11 @@ where
                     .data_mut(|data| data.insert_temp(editor_id, format_number(*value, precision)));
                 ui.ctx()
                     .memory_mut(|memory| memory.request_focus(editor_id));
-                ui.ctx().request_repaint();
+                // Rebuild the pass while the activating double-click still
+                // exists. On the web this lets eframe bind its hidden text
+                // agent under the browser's user-activation transaction.
+                ui.ctx()
+                    .request_discard("Numerical register entered exact editing");
             }
         }
         paint_index(&painter, register_aperture, wheel_aperture);
@@ -790,68 +796,38 @@ mod tests {
     }
 
     #[test]
-    fn line_wheel_preserves_fast_detent_magnitude() {
-        let ctx = egui::Context::default();
-        crate::chrome::install(&ctx);
+    fn wheel_stroke_ignores_backend_unit_and_magnitude() {
         let screen = Rect::from_min_size(Pos2::ZERO, Vec2::new(180.0, 40.0));
-        let mut value = 0_i32;
-        let mut wheel_center = Pos2::ZERO;
-        ctx.run_ui(
-            egui::RawInput {
-                screen_rect: Some(screen),
-                ..egui::RawInput::default()
-            },
-            |ui| {
-                let response = NumberInput::new(&mut value, -100..=100, 2, 0).show(ui);
-                wheel_center = Pos2::new(
-                    response.rect.right() - baked::SOCKET_SIDE * 0.5,
-                    response.rect.center().y,
-                );
-            },
-        )
-        .drop_without_applying_deltas();
-        ctx.run_ui(
-            wheel_input(screen, wheel_center, egui::MouseWheelUnit::Line, 7.0),
-            |ui| {
-                let _response = NumberInput::new(&mut value, -100..=100, 2, 0).show(ui);
-            },
-        )
-        .drop_without_applying_deltas();
-        assert_eq!(value, 14);
-        assert!(crate::chrome::take_control_wheel(&ctx));
-    }
-
-    #[test]
-    fn point_wheel_banks_subdetent_motion() {
-        let ctx = egui::Context::default();
-        crate::chrome::install(&ctx);
-        let screen = Rect::from_min_size(Pos2::ZERO, Vec2::new(180.0, 40.0));
-        let mut value = 0.0_f32;
-        let mut wheel_center = Pos2::ZERO;
-        ctx.run_ui(
-            egui::RawInput {
-                screen_rect: Some(screen),
-                ..egui::RawInput::default()
-            },
-            |ui| {
-                let response = NumberInput::new(&mut value, -1.0..=1.0, 0.125, 3).show(ui);
-                wheel_center = Pos2::new(
-                    response.rect.right() - baked::SOCKET_SIDE * 0.5,
-                    response.rect.center().y,
-                );
-            },
-        )
-        .drop_without_applying_deltas();
-        for points in [20.0, 30.0] {
+        for (unit, magnitude) in [
+            (egui::MouseWheelUnit::Line, 7.0),
+            (egui::MouseWheelUnit::Point, 100.0),
+            (egui::MouseWheelUnit::Page, 3.0),
+        ] {
+            let ctx = egui::Context::default();
+            crate::chrome::install(&ctx);
+            let mut value = 0_i32;
+            let mut wheel_center = Pos2::ZERO;
             ctx.run_ui(
-                wheel_input(screen, wheel_center, egui::MouseWheelUnit::Point, points),
+                egui::RawInput {
+                    screen_rect: Some(screen),
+                    ..egui::RawInput::default()
+                },
                 |ui| {
-                    let _response = NumberInput::new(&mut value, -1.0..=1.0, 0.125, 3).show(ui);
+                    let response = NumberInput::new(&mut value, -100..=100, 2, 0).show(ui);
+                    wheel_center = Pos2::new(
+                        response.rect.right() - baked::SOCKET_SIDE * 0.5,
+                        response.rect.center().y,
+                    );
                 },
             )
             .drop_without_applying_deltas();
+            ctx.run_ui(wheel_input(screen, wheel_center, unit, magnitude), |ui| {
+                let _response = NumberInput::new(&mut value, -100..=100, 2, 0).show(ui);
+            })
+            .drop_without_applying_deltas();
+            assert_eq!(value, 2, "{unit:?} magnitude {magnitude}");
+            assert!(crate::chrome::take_control_wheel(&ctx));
         }
-        assert_eq!(value, 0.125);
     }
 
     #[test]

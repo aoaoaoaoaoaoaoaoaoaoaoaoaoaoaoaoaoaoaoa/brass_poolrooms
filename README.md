@@ -105,8 +105,8 @@ points and `CouplingGap::TIGHT` is three.
 `NumberInput::new(&mut value, min..=max, quantum, precision)` leaves every
 scalar policy with the caller. The bound primitive type selects integer or
 floating semantics; integer registers require zero decimal places. Scrolling
-one ordinary wheel detent advances one quantum, high-resolution motion retains
-its magnitude, and double-clicking the register admits exact text entry.
+the wheel advances exactly one quantum per input frame regardless of backend
+unit or magnitude, and double-clicking the register admits exact text entry.
 
 ## Try It
 
