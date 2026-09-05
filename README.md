@@ -179,9 +179,9 @@ Large remains the supported layout ceiling.
 
 The production optical law is CMU Typewriter Text Light with monochrome grid
 hinting, fixed subpixel phase, and dark-sharp atlas transfer. The same raster
-law governs the vendored Noto math and symbol coverage faces. These three
-embedded files are the complete stack; no operating-system or implicit egui
-font participates. The Font Raster Atelier starts at these exact coordinates;
+law governs the vendored Noto math and symbol coverage faces, with a one-glyph
+Noto Sans Symbols subset for the Settings gear. This embedded stack uses no
+operating-system or implicit egui font. The Font Raster Atelier starts at these exact coordinates;
 its alternatives are counterfactual witnesses, not application configuration.
 
 Use the least prominent role that tells the truth. `Title` names an application
