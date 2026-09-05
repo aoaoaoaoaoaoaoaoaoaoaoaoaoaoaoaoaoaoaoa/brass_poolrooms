@@ -21,6 +21,8 @@ pub enum Symbol {
     Collapse,
     /// Confirm or accept a pending operation.
     Confirm,
+    /// Copy the targeted value into a clipboard or application copy buffer.
+    Copy,
     /// Decrease a scalar by one application-defined quantum.
     Decrement,
     /// Permanently delete the targeted durable member.
@@ -40,6 +42,8 @@ pub enum Symbol {
     Heart,
     /// Increase a scalar by one application-defined quantum.
     Increment,
+    /// Insert a value from a clipboard or application copy buffer.
+    Paste,
     /// Reapply the next command-history entry withdrawn by an undo.
     Redo,
     /// Remove, clear, or dismiss the targeted member.
@@ -69,11 +73,13 @@ pub enum Symbol {
 
 impl Symbol {
     /// Complete armory in stable presentation order.
-    pub const ALL: [Self; 19] = [
+    pub const ALL: [Self; 21] = [
         Self::Add,
         Self::Remove,
         Self::Delete,
         Self::Duplicate,
+        Self::Copy,
+        Self::Paste,
         Self::Rename,
         Self::Confirm,
         Self::Save,
@@ -94,9 +100,10 @@ impl Symbol {
     /// Canonical Unicode scalar cut for this action.
     pub const fn glyph(self) -> char {
         match self {
-            Self::Add | Self::Increment => '➕',
+            Self::Add | Self::Increment => '✚',
             Self::Collapse => '▾',
             Self::Confirm => '✓',
+            Self::Copy => '🗐',
             Self::Decrement => '−',
             Self::Delete => '🗑',
             Self::Duplicate => '⧉',
@@ -104,12 +111,13 @@ impl Symbol {
             Self::Export => '➚',
             Self::Help => '?',
             Self::Heart => '♥',
+            Self::Paste => '📋',
             Self::Remove => '✖',
             Self::Redo => '↷',
             Self::Rename => '🖉',
             Self::Restore => '↺',
             Self::Save => '🖫',
-            Self::Settings => '⚙',
+            Self::Settings => '🛠',
             Self::Undo => '↶',
             Self::Visibility => '👁',
         }
@@ -127,12 +135,14 @@ impl Symbol {
             Self::Add
             | Self::Collapse
             | Self::Confirm
+            | Self::Copy
             | Self::Decrement
             | Self::Duplicate
             | Self::Expand
             | Self::Export
             | Self::Help
             | Self::Increment
+            | Self::Paste
             | Self::Redo
             | Self::Remove
             | Self::Rename
@@ -150,6 +160,7 @@ impl Symbol {
             Self::Add => "ADD",
             Self::Collapse => "COLLAPSE",
             Self::Confirm => "CONFIRM",
+            Self::Copy => "COPY",
             Self::Decrement => "DECREMENT",
             Self::Delete => "DELETE",
             Self::Duplicate => "DUPLICATE",
@@ -158,6 +169,7 @@ impl Symbol {
             Self::Help => "HELP",
             Self::Heart => "HEART",
             Self::Increment => "INCREMENT",
+            Self::Paste => "PASTE",
             Self::Redo => "REDO",
             Self::Remove => "REMOVE",
             Self::Rename => "RENAME",
@@ -168,4 +180,34 @@ impl Symbol {
             Self::Visibility => "VISIBILITY",
         }
     }
+}
+
+#[cfg(test)]
+#[test]
+fn armory_survives_the_bundled_font_chain() {
+    // A valid Unicode scalar can silently become tofu in the shipped font subset.
+    let ctx = egui::Context::default();
+    crate::chrome::install(&ctx);
+    ctx.run_ui(egui::RawInput::default(), |ui| {
+        let font = crate::chrome::TypeRole::Body.monospace(ui.style());
+        ui.fonts_mut(|fonts| {
+            let mut glyph = |character: char| {
+                fonts
+                    .layout_no_wrap(character.to_string(), font.clone(), egui::Color32::WHITE)
+                    .rows[0]
+                    .glyphs[0]
+                    .uv_rect
+            };
+            let replacement = glyph('\u{e000}');
+            for symbol in Symbol::ALL {
+                assert_ne!(
+                    glyph(symbol.glyph()),
+                    replacement,
+                    "missing {} glyph",
+                    symbol.name()
+                );
+            }
+        });
+    })
+    .drop_without_applying_deltas();
 }

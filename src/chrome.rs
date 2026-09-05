@@ -49,7 +49,7 @@ mod wheel;
 pub use checkbox::{Checkbox, CheckboxResponse, CheckboxWake, LabelSide};
 pub use corner_close::{CornerClose, CornerCloseResponse, CornerCloseWake};
 pub use date_spool::{
-    DateReels, DateSpool, DateSpoolResponse, DateWake, GregorianDay, take_date_spool_wheel,
+    DateReels, DateSpool, GregorianDay, LabelSpool, SpoolResponse, SpoolWake, take_date_spool_wheel,
 };
 pub use drag_handle::{DragHandle, DragHandleResponse, DragHandleWake};
 pub use forge_pin::ForgePin;
@@ -70,6 +70,11 @@ pub use screw_scroll::ScrewScroll;
 pub use section::{FoldFlux, FoldWake, Section, SectionResponse, section};
 pub use sort_toggle::{SortDetent, SortToggle, SortToggleResponse, SortToggleWake};
 pub use symbol::Symbol;
+
+/// Calendar transport response; retained for existing date-spool callers.
+pub type DateSpoolResponse = SpoolResponse;
+/// Calendar transport displacement; retained for existing date-spool callers.
+pub type DateWake = SpoolWake;
 pub use typography::{FontScale, TypeRole, spatial_font, spatial_font_in};
 pub use wheel::take_control_wheel;
 

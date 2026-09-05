@@ -180,12 +180,12 @@ impl BitOrAssign for DateReels {
 
 /// Signed screen-y travel emitted by one moving tape reel.
 #[derive(Clone, Copy, Debug)]
-pub struct DateWake {
+pub struct SpoolWake {
     rect: egui::Rect,
     travel: f32,
 }
 
-impl DateWake {
+impl SpoolWake {
     fn new(rect: egui::Rect, travel: f32) -> Self {
         Self { rect, travel }
     }
@@ -313,7 +313,7 @@ impl<'a, D: GregorianDay> DateSpool<'a, D> {
     /// # Panics
     ///
     /// Panics if the year range is descending.
-    pub fn show(self, ui: &mut egui::Ui, id: impl egui::AsIdSalt) -> DateSpoolResponse {
+    pub fn show(self, ui: &mut egui::Ui, id: impl egui::AsIdSalt) -> SpoolResponse {
         date_spool(
             ui,
             id,
@@ -328,20 +328,20 @@ impl<'a, D: GregorianDay> DateSpool<'a, D> {
 }
 
 #[must_use = "the response carries change state and displaced-water wakes"]
-/// Value-change state and displaced-water geometry from one [`DateSpool`] frame.
-pub struct DateSpoolResponse {
+/// Value-change state and displaced-water geometry from one tape transport frame.
+pub struct SpoolResponse {
     response: egui::Response,
-    wakes: [Option<DateWake>; 2],
+    wakes: [Option<SpoolWake>; 2],
 }
 
-impl DateSpoolResponse {
-    /// Whether the bound date changed during this UI pass.
+impl SpoolResponse {
+    /// Whether the bound value changed during this UI pass.
     pub fn changed(&self) -> bool {
         self.response.changed()
     }
 
     /// Iterate over tape motion emitted during this UI pass.
-    pub fn wakes(&self) -> impl Iterator<Item = DateWake> + '_ {
+    pub fn wakes(&self) -> impl Iterator<Item = SpoolWake> + '_ {
         self.wakes.iter().copied().flatten()
     }
 
@@ -351,7 +351,7 @@ impl DateSpoolResponse {
     }
 }
 
-impl Deref for DateSpoolResponse {
+impl Deref for SpoolResponse {
     type Target = egui::Response;
 
     fn deref(&self) -> &Self::Target {
@@ -446,7 +446,7 @@ fn date_spool<D: GregorianDay>(
     reels: DateReels,
     width: Option<f32>,
     loaded: bool,
-) -> DateSpoolResponse {
+) -> SpoolResponse {
     let years = YearSpan::refine(years);
     let id = ui.make_persistent_id(id);
     let before = *value;
@@ -466,7 +466,7 @@ fn date_spool<D: GregorianDay>(
     if *value != before {
         turn.response.mark_changed();
     }
-    DateSpoolResponse {
+    SpoolResponse {
         response: turn.response,
         wakes: turn.wakes,
     }
@@ -474,7 +474,7 @@ fn date_spool<D: GregorianDay>(
 
 struct Turn {
     response: egui::Response,
-    wakes: [Option<DateWake>; 2],
+    wakes: [Option<SpoolWake>; 2],
 }
 
 /// Take the shared flag indicating that crafted chrome consumed wheel motion.
@@ -530,8 +530,8 @@ fn chronometer<D: GregorianDay>(
     if let Some((reel, slip)) = drag {
         if slip.abs() > 1e-4 {
             let (_, day) = turn_reel(ui, id, &mut parts, reel, Slip::Drag(slip), years, visible);
-            pulse = Some(DateWake::new(reels.required(reel), slip.signum()));
-            couple = day.map(|dir| DateWake::new(reels.required(Reel::Day), dir));
+            pulse = Some(SpoolWake::new(reels.required(reel), slip.signum()));
+            couple = day.map(|dir| SpoolWake::new(reels.required(Reel::Day), dir));
         }
     } else if let Some(reel) = hovered.filter(|_| response.hovered()) {
         // Own every scrap of scroll over a reel — not only the notch frame but
@@ -540,11 +540,11 @@ fn chronometer<D: GregorianDay>(
         let steps = wheel::notches(ui, id.with((reel as u8, "wheel")));
         if steps != 0 {
             let (_, day) = turn_reel(ui, id, &mut parts, reel, Slip::Notch(steps), years, visible);
-            pulse = Some(DateWake::new(
+            pulse = Some(SpoolWake::new(
                 reels.required(reel),
                 -(steps.signum() as f32),
             ));
-            couple = day.map(|dir| DateWake::new(reels.required(Reel::Day), dir));
+            couple = day.map(|dir| SpoolWake::new(reels.required(Reel::Day), dir));
         }
     }
     *value = D::from_ymd(parts.year, parts.month, parts.day);
@@ -835,7 +835,13 @@ fn paint(
     for (reel, window) in reels.iter() {
         let (roll, turns) = with_drum(ui, id, reel, |drum| (drum.roll, drum.turns));
         draw_reel(
-            painter, window, reel, parts, years, roll, turns, lift, loaded,
+            painter,
+            window,
+            |lane| label(reel, parts, years, lane),
+            roll,
+            turns,
+            lift,
+            loaded,
         );
     }
 }
@@ -915,9 +921,7 @@ fn tile_hash(cx: i32, cy: i32) -> (f32, f32) {
 fn draw_reel(
     painter: &egui::Painter,
     window: egui::Rect,
-    reel: Reel,
-    parts: Parts,
-    years: YearSpan,
+    label: impl Fn(i32) -> Option<String>,
     roll: f32,
     turns: f32,
     lift: f32,
@@ -944,7 +948,7 @@ fn draw_reel(
                 if t.abs() > cull {
                     continue;
                 }
-                match label(reel, parts, years, lane) {
+                match label(lane) {
                     Some(text) => print_label(&clip, spool, tape_w, t, &text),
                     // Remember the stop nearest the head on each side; the
                     // hazard occupies one continuous band to the curl.
@@ -977,6 +981,206 @@ fn draw_reel(
 
     index_arrow(painter, window, loaded);
     foundry::socket_rim(painter, window);
+}
+
+/// A bounded labeled tape sharing the date transport's geometry, spring and wheel arbitration.
+///
+/// Selection belongs to the caller. `None` centers the empty-set mark before the
+/// first label; an external selection immediately centers that label.
+pub struct LabelSpool<'a> {
+    labels: &'a [&'a str],
+    selected: &'a mut Option<usize>,
+    width: Option<f32>,
+}
+
+impl<'a> LabelSpool<'a> {
+    /// Bind labels and an optional index. Out-of-range selection is cleared.
+    pub const fn new(labels: &'a [&'a str], selected: &'a mut Option<usize>) -> Self {
+        Self {
+            labels,
+            selected,
+            width: None,
+        }
+    }
+
+    /// Set the faceplate width, subject to the shared rigid minimum.
+    pub fn width(mut self, width: f32) -> Self {
+        assert!(
+            width.is_finite() && width > 0.0,
+            "tape width must be finite and positive"
+        );
+        self.width = Some(width);
+        self
+    }
+
+    /// Present the tape. Arrow keys step; Home and End choose the stops.
+    pub fn show(self, ui: &mut egui::Ui, id: impl egui::AsIdSalt) -> SpoolResponse {
+        #[derive(Clone, Copy, Default)]
+        struct State {
+            drum: Drum,
+            selected: Option<usize>,
+        }
+        let id = ui.make_persistent_id(id);
+        let before = *self.selected;
+        *self.selected = self.selected.filter(|index| *index < self.labels.len());
+        let mut state = ui
+            .ctx()
+            .data_mut(|data| data.get_temp::<State>(id).unwrap_or_default());
+        if state.selected != *self.selected {
+            state = State {
+                selected: *self.selected,
+                ..State::default()
+            };
+        }
+        let width = self
+            .width
+            .unwrap_or(ui.available_width())
+            .min(ui.available_width())
+            .max(80.0);
+        let (rect, mut response) =
+            ui.allocate_exact_size(egui::vec2(width, H), egui::Sense::click_and_drag());
+        let window = rect.shrink2(egui::vec2(10.0, 6.0));
+        let spool = Spool::new(window);
+        let operable = ui.is_enabled() && !self.labels.is_empty();
+        let mut index = self.selected.map_or(0, |index| index + 1);
+        let mut intent = false;
+        let mut travel = 0.0_f32;
+        let shift = |index: &mut usize, drum: &mut Drum, steps: i32| {
+            let next = index
+                .saturating_add_signed(steps as isize)
+                .min(self.labels.len());
+            let delta = next as f32 - *index as f32;
+            *index = next;
+            drum.roll += delta;
+            drum.turns += delta;
+            drum.vel = 0.0;
+            delta
+        };
+        if operable {
+            if response.drag_started() || response.clicked() {
+                response.request_focus();
+            }
+            if response.dragged() {
+                let slip = ui.input(|input| input.pointer.delta().y) / spool.pitch();
+                state.drum.roll += slip;
+                travel = slip;
+                intent = slip.abs() > 1e-4;
+                for _ in 0..32 {
+                    let steps = if state.drum.roll > COMMIT {
+                        -1
+                    } else if state.drum.roll < -COMMIT {
+                        1
+                    } else {
+                        break;
+                    };
+                    if shift(&mut index, &mut state.drum, steps) == 0.0 {
+                        break;
+                    }
+                }
+                let (floor, ceil) = label_stops(index, self.labels.len() + 1);
+                state.drum.roll = state.drum.roll.clamp(floor, ceil);
+            } else if response.hovered() {
+                let steps = wheel::notches(ui, id.with("wheel"));
+                if steps != 0 {
+                    travel = -shift(&mut index, &mut state.drum, steps);
+                    intent = true;
+                }
+            }
+            if response.clicked()
+                && let Some(point) = response.interact_pointer_pos()
+            {
+                let lane = (-6..=6)
+                    .min_by(|a, b| {
+                        let distance = |lane: i32| {
+                            (spool
+                                .sample((lane as f32 + state.drum.roll) * spool.pitch())
+                                .y
+                                - point.y)
+                                .abs()
+                        };
+                        distance(*a).total_cmp(&distance(*b))
+                    })
+                    .unwrap_or(0);
+                travel = -shift(&mut index, &mut state.drum, lane);
+                intent = true;
+            }
+            if response.has_focus() {
+                for (key, steps) in [(egui::Key::ArrowUp, -1), (egui::Key::ArrowDown, 1)] {
+                    if ui.input_mut(|input| input.consume_key(egui::Modifiers::NONE, key)) {
+                        travel = -shift(&mut index, &mut state.drum, steps);
+                        intent = true;
+                    }
+                }
+                for (key, stop) in [(egui::Key::Home, 1), (egui::Key::End, self.labels.len())] {
+                    if ui.input_mut(|input| input.consume_key(egui::Modifiers::NONE, key)) {
+                        index = stop;
+                        state.drum = Drum::default();
+                        intent = true;
+                    }
+                }
+            }
+        }
+        if intent {
+            *self.selected = index.checked_sub(1);
+        }
+        let dt = ui
+            .input(|input| input.stable_dt)
+            .clamp(1.0 / 240.0, 1.0 / 30.0);
+        let (floor, ceil) = label_stops(index, self.labels.len() + 1);
+        if !response.dragged() && state.drum.relax(dt, floor, ceil) {
+            ui.ctx().request_repaint();
+        }
+        facia(ui.painter(), rect);
+        draw_reel(
+            ui.painter(),
+            window,
+            |lane| {
+                index.checked_add_signed(lane as isize).and_then(|index| {
+                    if index == 0 {
+                        Some("∅".to_owned())
+                    } else {
+                        self.labels.get(index - 1).map(|label| (*label).to_owned())
+                    }
+                })
+            },
+            state.drum.roll,
+            state.drum.turns,
+            cassette_lift(ui, id, !self.labels.is_empty(), dt),
+            !self.labels.is_empty(),
+        );
+        state.selected = *self.selected;
+        ui.ctx().data_mut(|data| {
+            let _old = data.insert_temp(id, state);
+        });
+        if *self.selected != before {
+            response.mark_changed();
+        }
+        if let Some(index) = *self.selected {
+            response = response.on_hover_text(self.labels[index]);
+        }
+        SpoolResponse {
+            response,
+            wakes: [
+                (travel.abs() > 1e-4).then(|| SpoolWake::new(window, travel.signum())),
+                None,
+            ],
+        }
+    }
+}
+
+fn label_stops(index: usize, count: usize) -> (f32, f32) {
+    (
+        if index + 1 >= count {
+            -WALL_STRETCH
+        } else {
+            f32::NEG_INFINITY
+        },
+        if index == 0 {
+            WALL_STRETCH
+        } else {
+            f32::INFINITY
+        },
+    )
 }
 
 /// The two ends of one conveyor roller. The roller is a cylinder lying along

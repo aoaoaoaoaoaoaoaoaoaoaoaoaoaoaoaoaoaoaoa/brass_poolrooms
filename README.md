@@ -38,6 +38,7 @@ composition.
 | --- | --- | --- |
 | [`Rail`] | Bounded linear transport with explicit total and admissible spans, detents, focused Left/Right/Home/End input, and hovered wheel input by default | `Surface::rail` |
 | [`DateSpool`] | One-to-three Gregorian tape reels with explicit width and a reel-derived rigid minimum | `Surface::date_spool` |
+| [`LabelSpool`] | Named tape entries with optional selection, an empty reading position, and wheel/drag/keyboard navigation | `Surface::spool` |
 | [`Checkbox`] | Three-gauge latching plunger with an optional side-selectable etched plaque and a state-transparent fixed-stock Lockout Grille | `Surface::checkbox` |
 | [`Monoglyph`] | Three-gauge momentary or boolean-latching square plunger carrying one engraved scalar; [`Symbol`] supplies semantic marks and their default [`MonoglyphFinish`] | `Surface::monoglyph` |
 | [`CornerClose`] | Three-gauge momentary close plunger centered on a pane corner, with a build-time modelled and self-shadowed X trench | `Surface::corner_close` |
@@ -389,6 +390,7 @@ Physical terms are fixed in the [Poolrooms glossary](docs/glossary.md).
 
 [`Rail`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.Rail.html
 [`DateSpool`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.DateSpool.html
+[`LabelSpool`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.LabelSpool.html
 [`Checkbox`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.Checkbox.html
 [`Monoglyph`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.Monoglyph.html
 [`Monoglyph::show_in`]: https://docs.rs/brass_poolrooms/latest/brass_poolrooms/chrome/struct.Monoglyph.html#method.show_in

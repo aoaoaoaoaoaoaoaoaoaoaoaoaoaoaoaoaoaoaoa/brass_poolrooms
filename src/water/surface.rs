@@ -747,6 +747,10 @@ impl Surface {
     }
     /// Couple a date transport's tape displacement into this water world.
     pub fn date_spool(&mut self, spool: &crate::chrome::DateSpoolResponse) {
+        self.spool(spool);
+    }
+    /// Couple a calendar or labeled tape's displacement into this water world.
+    pub fn spool(&mut self, spool: &crate::chrome::SpoolResponse) {
         for wake in spool.wakes() {
             self.drag(wake.rect(), wake.travel());
         }
