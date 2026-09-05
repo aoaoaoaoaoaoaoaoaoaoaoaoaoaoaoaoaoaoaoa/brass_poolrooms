@@ -117,7 +117,7 @@ impl Symbol {
             Self::Rename => '🖉',
             Self::Restore => '↺',
             Self::Save => '🖫',
-            Self::Settings => '🛠',
+            Self::Settings => '⚙',
             Self::Undo => '↶',
             Self::Visibility => '👁',
         }

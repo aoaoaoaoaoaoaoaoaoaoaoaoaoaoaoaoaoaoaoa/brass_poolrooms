@@ -86,6 +86,7 @@ pub(crate) use monoglyph::paint_study_etch;
 const CMU_TYPEWRITER_LIGHT: &[u8] = include_bytes!("../assets/fonts/cmu-typewriter/cmunbtl.otf");
 const NOTO_MATH: &[u8] = include_bytes!("../assets/fonts/noto/NotoSansMath-Regular.ttf");
 const NOTO_SYMBOLS: &[u8] = include_bytes!("../assets/fonts/noto/NotoSansSymbols2-Regular.ttf");
+const NOTO_GEAR: &[u8] = include_bytes!("../assets/fonts/noto/NotoSansSymbols-Gear.ttf");
 
 const FACE_TEXT: &str = "cmu-typewriter-light";
 const FACE_MATH: &str = "noto-sans-math";
@@ -194,12 +195,17 @@ pub fn production_font_definitions() -> FontDefinitions {
         (FACE_TEXT, CMU_TYPEWRITER_LIGHT),
         (FACE_MATH, NOTO_MATH),
         (FACE_SYMBOLS, NOTO_SYMBOLS),
+        ("noto-gear", NOTO_GEAR),
     ] {
         let data = FontData::from_static(bytes).tweak(production_font_tweak());
         let _old = fonts.font_data.insert(face.to_owned(), Arc::new(data));
     }
     for family in [FontFamily::Proportional, FontFamily::Monospace] {
-        prepend_faces(&mut fonts, family, &[FACE_TEXT, FACE_MATH, FACE_SYMBOLS]);
+        prepend_faces(
+            &mut fonts,
+            family,
+            &[FACE_TEXT, FACE_MATH, FACE_SYMBOLS, "noto-gear"],
+        );
     }
     fonts
 }

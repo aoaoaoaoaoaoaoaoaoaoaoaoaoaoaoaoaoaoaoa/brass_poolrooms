@@ -1,0 +1,9 @@
+Noto Sans Symbols 2.003, Copyright 2022 The Noto Project Authors.
+Licensed under the adjacent NotoSansSymbols-OFL.txt.
+
+Modified by subsetting NotoSansSymbols-Regular.ttf to U+2699 (gear):
+
+pyftsubset NotoSansSymbols-Regular.ttf --unicodes=U+2699 --name-IDs='*' --name-languages='*' --output-file=NotoSansSymbols-Gear.ttf
+
+This fallback supplies the canonical Settings monoglyph without admitting an
+additional general-purpose text face.
