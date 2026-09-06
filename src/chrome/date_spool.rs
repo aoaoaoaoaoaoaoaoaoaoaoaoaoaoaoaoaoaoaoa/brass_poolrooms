@@ -826,7 +826,11 @@ fn paint(
         draw_reel(
             painter,
             window,
-            |lane| label(reel, parts, years, lane),
+            |lane| match label(reel, parts, years, lane) {
+                Some(text) => TapeMark::Label(text),
+                None if lane < 0 => TapeMark::Leading,
+                None => TapeMark::Trailing,
+            },
             roll,
             turns,
             lift,
@@ -907,10 +911,16 @@ fn tile_hash(cx: i32, cy: i32) -> (f32, f32) {
     (n, m)
 }
 
+enum TapeMark {
+    Label(String),
+    Leading,
+    Trailing,
+}
+
 fn draw_reel(
     painter: &egui::Painter,
     window: egui::Rect,
-    label: impl Fn(i32) -> Option<String>,
+    label: impl Fn(i32) -> TapeMark,
     roll: f32,
     turns: f32,
     lift: f32,
@@ -938,13 +948,15 @@ fn draw_reel(
                     continue;
                 }
                 match label(lane) {
-                    Some(text) => print_label(&clip, spool, tape_w, t, &text),
+                    TapeMark::Label(text) => print_label(&clip, spool, tape_w, t, &text),
                     // Remember the stop nearest the head on each side; the
                     // hazard occupies one continuous band to the curl.
-                    None if t < 0.0 => {
+                    TapeMark::Leading => {
                         top_stop = Some(top_stop.map_or(lane, |l: i32| l.max(lane)));
                     }
-                    None => bot_stop = Some(bot_stop.map_or(lane, |l: i32| l.min(lane))),
+                    TapeMark::Trailing => {
+                        bot_stop = Some(bot_stop.map_or(lane, |l: i32| l.min(lane)));
+                    }
                 }
             }
             if let Some(lane) = top_stop {
@@ -974,22 +986,31 @@ fn draw_reel(
 
 /// A bounded labeled tape sharing the date transport's geometry, spring and wheel arbitration.
 ///
-/// Selection belongs to the caller. `None` centers the empty-set mark before the
-/// first label; an external selection immediately centers that label.
+/// Selection belongs to the caller. Optional null detents lie one pitch into
+/// the hatching at either end; external selection immediately centers its label.
 pub struct LabelSpool<'a> {
     labels: &'a [&'a str],
     selected: &'a mut Option<usize>,
     width: Option<f32>,
+    allow_none: bool,
 }
 
 impl<'a> LabelSpool<'a> {
-    /// Bind labels and an optional index. Out-of-range selection is cleared.
+    /// Bind labels and selection. Unless null selection is enabled, missing or
+    /// out-of-range selection chooses the first label. Empty tapes remain null.
     pub const fn new(labels: &'a [&'a str], selected: &'a mut Option<usize>) -> Self {
         Self {
             labels,
             selected,
             width: None,
+            allow_none: false,
         }
+    }
+
+    /// Permit one unselected detent beyond each end of the labels.
+    pub const fn allow_none(mut self, allow: bool) -> Self {
+        self.allow_none = allow;
+        self
     }
 
     /// Set the faceplate width, subject to the shared rigid minimum.
@@ -1002,22 +1023,32 @@ impl<'a> LabelSpool<'a> {
         self
     }
 
-    /// Present the tape. Arrow keys step; Home and End choose the stops.
+    /// Present the tape. Arrow keys step; Home and End choose the first and last labels.
     pub fn show(self, ui: &mut egui::Ui, id: impl egui::AsIdSalt) -> SpoolResponse {
         #[derive(Clone, Copy, Default)]
         struct State {
             drum: Drum,
             selected: Option<usize>,
+            index: usize,
+            domain: (usize, bool),
         }
         let id = ui.make_persistent_id(id);
         let before = *self.selected;
         *self.selected = self.selected.filter(|index| *index < self.labels.len());
+        if !self.allow_none && self.selected.is_none() && !self.labels.is_empty() {
+            *self.selected = Some(0);
+        }
+        let offset = usize::from(self.allow_none);
+        let count = (self.labels.len() + 2 * offset).max(1);
+        let domain = (self.labels.len(), self.allow_none);
         let mut state = ui
             .ctx()
             .data_mut(|data| data.get_temp::<State>(id).unwrap_or_default());
-        if state.selected != *self.selected {
+        if state.selected != *self.selected || state.domain != domain {
             state = State {
                 selected: *self.selected,
+                index: self.selected.map_or(0, |index| index + offset),
+                domain,
                 ..State::default()
             };
         }
@@ -1031,13 +1062,12 @@ impl<'a> LabelSpool<'a> {
         let window = rect.shrink2(egui::vec2(10.0, 6.0));
         let spool = Spool::new(window);
         let operable = ui.is_enabled() && !self.labels.is_empty();
-        let mut index = self.selected.map_or(0, |index| index + 1);
+        // Both end detents map to None; retain which end the transport reached.
+        let mut index = state.index;
         let mut intent = false;
         let mut travel = 0.0_f32;
         let shift = |index: &mut usize, drum: &mut Drum, steps: i32| {
-            let next = index
-                .saturating_add_signed(steps as isize)
-                .min(self.labels.len());
+            let next = index.saturating_add_signed(steps as isize).min(count - 1);
             let delta = next as f32 - *index as f32;
             *index = next;
             drum.roll += delta;
@@ -1066,7 +1096,7 @@ impl<'a> LabelSpool<'a> {
                         break;
                     }
                 }
-                let (floor, ceil) = label_stops(index, self.labels.len() + 1);
+                let (floor, ceil) = label_stops(index, count);
                 state.drum.roll = state.drum.roll.clamp(floor, ceil);
             } else if response.hovered() {
                 let steps = wheel::notches(ui, id.with("wheel"));
@@ -1103,7 +1133,10 @@ impl<'a> LabelSpool<'a> {
                         intent = true;
                     }
                 }
-                for (key, stop) in [(egui::Key::Home, 1), (egui::Key::End, self.labels.len())] {
+                for (key, stop) in [
+                    (egui::Key::Home, offset),
+                    (egui::Key::End, self.labels.len() - 1 + offset),
+                ] {
                     if ui.input_mut(|input| input.consume_key(egui::Modifiers::NONE, key)) {
                         index = stop;
                         state.drum = Drum::default();
@@ -1113,12 +1146,14 @@ impl<'a> LabelSpool<'a> {
             }
         }
         if intent {
-            *self.selected = index.checked_sub(1);
+            *self.selected = index
+                .checked_sub(offset)
+                .filter(|index| *index < self.labels.len());
         }
         let dt = ui
             .input(|input| input.stable_dt)
             .clamp(1.0 / 240.0, 1.0 / 30.0);
-        let (floor, ceil) = label_stops(index, self.labels.len() + 1);
+        let (floor, ceil) = label_stops(index, count);
         if !response.dragged() && state.drum.relax(dt, floor, ceil) {
             ui.ctx().request_repaint();
         }
@@ -1126,14 +1161,14 @@ impl<'a> LabelSpool<'a> {
         draw_reel(
             ui.painter(),
             window,
-            |lane| {
-                index.checked_add_signed(lane as isize).and_then(|index| {
-                    if index == 0 {
-                        Some("∅".to_owned())
-                    } else {
-                        self.labels.get(index - 1).map(|label| (*label).to_owned())
-                    }
-                })
+            |lane| match index
+                .checked_add_signed(lane as isize)
+                .and_then(|index| index.checked_sub(offset))
+            {
+                None => TapeMark::Leading,
+                Some(index) => self.labels.get(index).map_or(TapeMark::Trailing, |label| {
+                    TapeMark::Label((*label).to_owned())
+                }),
             },
             state.drum.roll,
             state.drum.turns,
@@ -1141,6 +1176,7 @@ impl<'a> LabelSpool<'a> {
             !self.labels.is_empty(),
         );
         state.selected = *self.selected;
+        state.index = index;
         ui.ctx().data_mut(|data| {
             let _old = data.insert_temp(id, state);
         });
@@ -1470,10 +1506,14 @@ fn hazard(
     toward_rim: f32,
 ) {
     let pitch = spool.pitch();
-    let last_valid = lane as f32 - toward_rim; // the printed year the hatch trails
+    let last_valid = lane as f32 - toward_rim; // the printed label the hatch trails
     let t_edge = (last_valid + roll + toward_rim * HAZARD_GAP) * pitch;
-    let t_rim = toward_rim * spool.rim();
-    let (t_lo, t_hi) = (t_edge.min(t_rim), t_edge.max(t_rim));
+    let rim = spool.rim();
+    let (t_lo, t_hi) = if toward_rim < 0.0 {
+        (-rim, t_edge.min(rim))
+    } else {
+        (t_edge.max(-rim), rim)
+    };
     if t_hi - t_lo < 1.0 {
         return;
     }
