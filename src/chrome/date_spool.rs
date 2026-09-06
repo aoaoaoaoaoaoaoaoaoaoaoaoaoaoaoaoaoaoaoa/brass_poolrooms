@@ -1127,6 +1127,15 @@ impl<'a> LabelSpool<'a> {
                 intent = true;
             }
             if response.has_focus() {
+                ui.memory_mut(|memory| {
+                    memory.set_focus_lock_filter(
+                        response.id,
+                        egui::EventFilter {
+                            vertical_arrows: true,
+                            ..egui::EventFilter::default()
+                        },
+                    );
+                });
                 for (key, steps) in [(egui::Key::ArrowUp, -1), (egui::Key::ArrowDown, 1)] {
                     if ui.input_mut(|input| input.consume_key(egui::Modifiers::NONE, key)) {
                         travel = -shift(&mut index, &mut state.drum, steps);
