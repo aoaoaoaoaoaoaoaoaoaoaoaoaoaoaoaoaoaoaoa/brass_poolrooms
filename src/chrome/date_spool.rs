@@ -2,7 +2,7 @@
 //! poolroom fitting. One to three black recesses are sunk into a dim tiled faceplate;
 //! down in each runs a strip of near-black magnetic tape that lies flat across
 //! a reading head and vanishes over a conveyor roller at either end (a
-//! cassette/conveyor profile, seen through a perspective eye), the labels
+//! cassette/conveyor profile, projected with its cylindrical stock), the labels
 //! *printed* on the tape and bending over the rollers exactly as in a 3D scene.
 //! Only the rollers' capped, spindled ends show past the ribbon, their welded
 //! notch turning in lockstep with the tape; a brass index arrow welded to each
@@ -27,26 +27,12 @@ const MIN_RECESS_TILES: f32 = 2.0;
 const OUTER_TILES: f32 = 2.0;
 
 // --- The tape path, as a 3D scene --------------------------------------------
-// Not a circular dial: a cassette ribbon seen edge-on. The middle of the strip
-// lies on a gentle arc (radius R_FLAT — labels nearly full size, readable),
-// and past the surface angle BETA_F it wraps a *tight* roller (radius R_ROLL)
-// that races the angle to BETA_MAX and curls out of sight, bunching labels.
-// All lengths are in aperture half-heights, so the profile scales with the
-// reel; a perspective eye CAM_D back folds width as the tape recedes.
-const R_FLAT: f32 = 3.8; // flat-run radius (nearly straight) / aperture half-height
-const R_ROLL: f32 = 0.50; // roller radius — a tight pulley the tape wraps 180°
-const BETA_F: f32 = 0.19; // surface angle where the flat hands off to the roller
-// The tape wraps the roller and disappears: we render the front of the wrap,
-// curling to edge-on, then the black recess swallows the far side.
-const BETA_MAX: f32 = 1.46;
-// The ribbon's *print* dissolves over the last stretch of curl before the apex:
-// past readability the perspective fold barely shrinks a glyph (fold ≈ 0.83 even
-// at the rim), so without this every label beyond the rim collapses to near-full
-// width at the apex and consecutive ones pile into a ghost just below the roller.
+// A taut belt: parallel straight spans tangent to equal cylindrical rollers.
+// Only the front span and its two quarter-circle wraps are visible. Tape and
+// exposed stock share the foundry's orthographic cylinder projection.
+const BETA_MAX: f32 = std::f32::consts::FRAC_PI_2;
 const CURL_FADE: f32 = 0.55; // radians of curl over which the print fades to nothing
-const CAM_D: f32 = 2.4; // eye distance
 const PITCH: f32 = 0.46; // label spacing along the tape
-const ROLL_GAIN: f32 = PITCH / R_ROLL; // roller turn per pitch of tape (no slip)
 
 // --- Shared foundry light + tape response -----------------------------------
 // Direction and half-vector belong to `foundry`; tape, rollers, indices, and
@@ -69,7 +55,7 @@ const TILE_CAST: f32 = 5.0; // per-tile warm/cool tint scatter (±, r vs b)
 const GROUT: egui::Color32 = egui::Color32::from_rgb(17, 13, 8); // tile seam
 const TILE: f32 = 15.6; // pool-tile pitch (px)
 const CAP_W: f32 = 3.0; // roller end-cap width — the cylinder end seen edge-on
-const TAPE_THK: f32 = 1.0; // tape thickness: gap from the tape's top to the cap's
+const TAPE_THK: f32 = 1.0; // printed surface's radial offset from the roller stock
 
 // --- Spring + stops ----------------------------------------------------------
 const SPRING_K: f32 = 560.0; // stiffness (ω≈23.7 rad/s, ~0.26s settle)
@@ -722,22 +708,20 @@ fn with_drum<R>(ui: &egui::Ui, id: egui::Id, reel: Reel, edit: impl FnOnce(&mut 
 // --- The tape path -----------------------------------------------------------
 
 /// One sampled point on the tape: its screen height `y`, the surface-normal
-/// angle `beta` (0 = facing the eye) that drives shading, and the perspective
-/// `fold` that narrows width as the strip recedes over a roller.
+/// angle `beta` (0 = facing the eye) that drives shading.
 #[derive(Clone, Copy)]
 struct Sample {
     y: f32,
     beta: f32,
-    fold: f32,
 }
 
-/// The tape transport: a gentle flat run that wraps a tight roller at each end.
-/// Distances ride in aperture half-heights so the whole profile scales.
+/// Orthographic extrusion of the belt's stadium-shaped cross section.
 #[derive(Clone, Copy)]
 struct Spool {
     cx: f32,
     cy: f32,
     a: f32,
+    scale: f32,
 }
 
 impl Spool {
@@ -746,32 +730,37 @@ impl Spool {
             cx: window.center().x,
             cy: window.center().y,
             a: window.height() * 0.5,
+            scale: 1.0,
         }
     }
 
-    /// Carry a signed arc-length `t` (px from the head) onto the cassette curve:
-    /// the gentle `R_FLAT` arc until the surface tilts to `BETA_F`, then the
-    /// tight `R_ROLL` roller racing to `BETA_MAX`. Height and width both fold
-    /// through the perspective eye as the tape recedes.
+    fn withdraw(self, scale: f32) -> Self {
+        Self {
+            a: self.a * scale,
+            scale,
+            ..self
+        }
+    }
+
+    fn radius(self) -> f32 {
+        (foundry::CONTROL_STOCK_DIAMETER * 0.5 + TAPE_THK) * self.scale
+    }
+
+    /// Half the straight span, also the distance from the head to either axle.
+    fn span(self) -> f32 {
+        self.a - self.radius() - 2.0 * self.scale
+    }
+
+    /// Arc length along a flat span followed by a tangent circular wrap.
+    /// The hidden return is clamped at the silhouette; its print has zero ink.
     fn sample(self, t: f32) -> Sample {
-        let (flat_r, roll_r, eye) = (R_FLAT * self.a, R_ROLL * self.a, CAM_D * self.a);
-        let sgn = if t < 0.0 { -1.0 } else { 1.0 };
         let arc = t.abs();
-        let flat_arc = flat_r * BETA_F;
-        let (beta, height, depth) = if arc <= flat_arc {
-            let beta = arc / flat_r;
-            (beta, flat_r * beta.sin(), flat_r * (1.0 - beta.cos()))
-        } else {
-            let beta = (BETA_F + (arc - flat_arc) / roll_r).min(BETA_MAX);
-            let height = flat_r * BETA_F.sin() + roll_r * (beta.sin() - BETA_F.sin());
-            let depth = flat_r * (1.0 - BETA_F.cos()) + roll_r * (BETA_F.cos() - beta.cos());
-            (beta, height, depth)
-        };
-        let fold = eye / (eye + depth);
+        let span = self.span();
+        let beta = ((arc - span) / self.radius()).clamp(0.0, BETA_MAX);
+        let height = arc.min(span) + self.radius() * beta.sin();
         Sample {
-            y: self.cy + sgn * height * fold,
-            beta: sgn * beta,
-            fold,
+            y: self.cy + height.copysign(t),
+            beta: beta.copysign(t),
         }
     }
 
@@ -782,7 +771,7 @@ impl Spool {
 
     /// Arc-length past which the tape has curled edge-on; labels beyond cull.
     fn rim(self) -> f32 {
-        self.a * (R_FLAT * BETA_F + R_ROLL * (BETA_MAX - BETA_F))
+        self.span() + self.radius() * BETA_MAX
     }
 }
 
@@ -933,7 +922,7 @@ fn draw_reel(
         // than sliding down-screen or dissolving as generic disabled chrome.
         let scale = (0.2 + 0.8 * lift).min(1.0);
         let content = egui::Rect::from_center_size(window.center(), window.size() * scale);
-        let spool = Spool::new(content);
+        let spool = Spool::new(window).withdraw(scale);
         let tape_w = (window.width() - 12.0) * scale;
         let clip = painter.with_clip_rect(window);
         let gain = if loaded { 1.0 } else { 0.5 };
@@ -968,7 +957,7 @@ fn draw_reel(
 
         // The roller grips the tape with no slip, so its surface tracks the
         // ribbon's travel — `roll - turns`, not its negative.
-        let phase = (roll - turns) * ROLL_GAIN;
+        let phase = (roll - turns) * spool.pitch() / spool.radius();
         roller(&clip, spool, content, window, true, phase);
         roller(&clip, spool, content, window, false, phase);
 
@@ -1090,6 +1079,9 @@ impl<'a> LabelSpool<'a> {
                 && let Some(point) = response.interact_pointer_pos()
             {
                 let lane = (-6..=6)
+                    .filter(|lane| {
+                        ((*lane as f32 + state.drum.roll) * spool.pitch()).abs() <= spool.rim()
+                    })
                     .min_by(|a, b| {
                         let distance = |lane: i32| {
                             (spool
@@ -1186,8 +1178,8 @@ fn label_stops(index: usize, count: usize) -> (f32, f32) {
 /// The two ends of one conveyor roller. The roller is a cylinder lying along
 /// screen-x with the tape wrapped over its front, so each end reads edge-on as
 /// a **thin vertical sliver** — the cap — poking past the ribbon, on a spindle
-/// pinned to the recess wall. The cap's top sits one tape-thickness past where
-/// the ribbon goes vertical. The welded longitudinal seam projects onto the
+/// pinned to the recess wall. The ribbon wraps one tape-thickness outside the
+/// stock, tangent to the flat span at the axle's y coordinate. The seam projects onto the
 /// sliver as a mark that circles with the drum — riding up and down (`r·sinθ`)
 /// across the near face and hidden once it rounds to the far side (`cosθ < 0`).
 fn roller(
@@ -1198,15 +1190,13 @@ fn roller(
     top: bool,
     phase: f32,
 ) {
-    let rim = spool.rim();
-    let apex = spool.sample(if top { -rim } else { rim }).y;
-    let scale = content.height() / window.height();
+    let scale = spool.scale;
     let cap_h = foundry::CONTROL_STOCK_DIAMETER * scale;
     let r = cap_h * 0.5;
     let cap_cy = if top {
-        apex + TAPE_THK + r
+        spool.cy - spool.span()
     } else {
-        apex - TAPE_THK - r
+        spool.cy + spool.span()
     };
     for side in [-1.0_f32, 1.0] {
         let edge = if side < 0.0 {
@@ -1214,7 +1204,8 @@ fn roller(
         } else {
             content.right()
         };
-        let cap_x = edge - side * (CAP_W * 0.5 + 2.4);
+        let cap_w = CAP_W * scale;
+        let cap_x = edge - side * (CAP_W * 0.5 + 2.4) * scale;
         // The spindle journals into the real recess wall, so it lengthens as the
         // transport rests inset and shortens as the lever pops up to fill.
         let wall_x = if side < 0.0 {
@@ -1225,7 +1216,7 @@ fn roller(
         let _spindle = painter.add(egui::Shape::line_segment(
             [
                 egui::pos2(wall_x, cap_cy),
-                egui::pos2(cap_x + side * CAP_W * 0.5, cap_cy),
+                egui::pos2(cap_x + side * cap_w * 0.5, cap_cy),
             ],
             egui::Stroke::new(1.2_f32, bronze(0.4)),
         ));
@@ -1233,7 +1224,7 @@ fn roller(
         // rotated onto screen-x. Global light, alloy, and section are shared.
         foundry::cylinder(
             painter,
-            egui::Rect::from_center_size(egui::pos2(cap_x, cap_cy), egui::vec2(CAP_W, cap_h)),
+            egui::Rect::from_center_size(egui::pos2(cap_x, cap_cy), egui::vec2(cap_w, cap_h)),
             StockAxis::ScreenX,
         );
         // the welded seam, edge-on: a mark riding up and down with the rotation
@@ -1242,12 +1233,12 @@ fn roller(
         // sliding back retrograde.
         let face = phase.cos();
         if face > 0.0 {
-            let ny = cap_cy + (r - 0.6) * phase.sin();
+            let ny = cap_cy + (r - 0.6 * scale) * phase.sin();
             let fade = ((face / 0.3).min(1.0) * 255.0) as u8;
             let _notch = painter.add(egui::Shape::line_segment(
                 [
-                    egui::pos2(cap_x - CAP_W * 0.5, ny),
-                    egui::pos2(cap_x + CAP_W * 0.5, ny),
+                    egui::pos2(cap_x - cap_w * 0.5, ny),
+                    egui::pos2(cap_x + cap_w * 0.5, ny),
                 ],
                 egui::Stroke::new(
                     1.0_f32,
@@ -1298,8 +1289,7 @@ fn index_arrow(painter: &egui::Painter, window: egui::Rect, loaded: bool) {
     );
 }
 
-/// The glossy ribbon, as a per-scanline-shaded mesh whose width and height fold
-/// with perspective as the tape lies flat then curls over its rollers.
+/// Constant-width ribbon, lit by the normals of its flat span and circular wraps.
 fn tape_mesh(spool: Spool, tape_w: f32, gain: f32) -> egui::Shape {
     const ROWS: usize = 44;
     let half = tape_w * 0.5;
@@ -1309,8 +1299,8 @@ fn tape_mesh(spool: Spool, tape_w: f32, gain: f32) -> egui::Shape {
         let t = rim * (2.0 * row as f32 / ROWS as f32 - 1.0);
         let s = spool.sample(t);
         let color = tape_rgb(s.beta, gain);
-        mesh.colored_vertex(egui::pos2(spool.cx - half * s.fold, s.y), color);
-        mesh.colored_vertex(egui::pos2(spool.cx + half * s.fold, s.y), color);
+        mesh.colored_vertex(egui::pos2(spool.cx - half, s.y), color);
+        mesh.colored_vertex(egui::pos2(spool.cx + half, s.y), color);
         if row > 0 {
             let base = (row as u32 - 1) * 2;
             mesh.add_triangle(base, base + 1, base + 2);
@@ -1320,24 +1310,24 @@ fn tape_mesh(spool: Spool, tape_w: f32, gain: f32) -> egui::Shape {
     egui::Shape::mesh(mesh)
 }
 
-/// The two recessed tape edges, darkened and curving with the surface.
+/// Orthographic extrusion leaves both tape edges straight.
 fn tape_edges(painter: &egui::Painter, spool: Spool, tape_w: f32, gain: f32) {
-    const ROWS: usize = 28;
     let half = tape_w * 0.5;
     let rim = spool.rim();
     for side in [-1.0_f32, 1.0] {
-        let pts: Vec<egui::Pos2> = (0..=ROWS)
-            .map(|row| {
-                let s = spool.sample(rim * (2.0 * row as f32 / ROWS as f32 - 1.0));
-                egui::pos2(spool.cx + side * half * s.fold, s.y)
-            })
-            .collect();
+        let x = spool.cx + side * half;
         let edge = egui::Color32::from_rgb(
             (16.0 * gain) as u8,
             (22.0 * gain) as u8,
             (34.0 * gain) as u8,
         );
-        let _edge = painter.add(egui::Shape::line(pts, egui::Stroke::new(1.0_f32, edge)));
+        let _edge = painter.line_segment(
+            [
+                egui::pos2(x, spool.sample(-rim).y),
+                egui::pos2(x, spool.sample(rim).y),
+            ],
+            egui::Stroke::new(1.0_f32, edge),
+        );
     }
 }
 
@@ -1381,19 +1371,57 @@ fn lay_out(
 
 /// Project a flat-laid galley onto the tape at arc-length `t_center`: each
 /// vertex's flat height becomes an arc offset along the profile, folding
-/// through perspective and dimming by the surface light.
+/// onto the cylindrical wrap and dimming by the surface light.
 fn warp(spool: Spool, shape: &mut egui::epaint::TextShape, t_center: f32, shade: bool) {
     let galley = std::sync::Arc::make_mut(&mut shape.galley);
     galley.mesh_bounds = egui::Rect::NOTHING;
     galley.rect = egui::Rect::NOTHING;
+    galley.num_vertices = 0;
+    galley.num_indices = 0;
     for placed in &mut galley.rows {
         let row_pos = placed.pos;
         let row = std::sync::Arc::make_mut(&mut placed.row);
+        // `lay_out` produces unstyled glyph quads. Split their curved portions
+        // into ≤1pt arc strips: warping only a glyph's four corners would draw
+        // a chord across the roller and misplace ink at the tangent join.
+        let original = std::mem::take(&mut row.visuals.mesh);
+        let mesh = &mut row.visuals.mesh;
+        mesh.texture_id = original.texture_id;
+        let (quads, remainder) = original.vertices.as_chunks::<4>();
+        assert!(remainder.is_empty(), "tape printing requires glyph quads");
+        for [a, _, _, d] in quads {
+            let rect = egui::Rect::from_min_max(a.pos, d.pos);
+            let uv = egui::Rect::from_min_max(a.uv, d.uv);
+            let offset = t_center + shape.pos.y + row_pos.y - spool.cy;
+            let top_join = -spool.span() - offset;
+            let bottom_join = spool.span() - offset;
+            let mut y = rect.top();
+            while y < rect.bottom() {
+                let next = if y < top_join {
+                    (y + 1.0).min(top_join)
+                } else if y < bottom_join {
+                    bottom_join
+                } else {
+                    y + 1.0
+                }
+                .min(rect.bottom());
+                let v = |y| egui::lerp(uv.y_range(), (y - rect.top()) / rect.height());
+                mesh.add_rect_with_uv(
+                    egui::Rect::from_x_y_ranges(rect.x_range(), y..=next),
+                    egui::Rect::from_x_y_ranges(uv.x_range(), v(y)..=v(next)),
+                    a.color,
+                );
+                y = next;
+            }
+        }
+        row.visuals.glyph_vertex_range = 0..mesh.vertices.len();
+        galley.num_vertices += mesh.vertices.len();
+        galley.num_indices += mesh.indices.len();
         let mut bounds = egui::Rect::NOTHING;
         for vertex in &mut row.visuals.mesh.vertices {
             let flat = shape.pos + row_pos.to_vec2() + vertex.pos.to_vec2();
             let s = spool.sample(t_center + (flat.y - spool.cy));
-            let world = egui::pos2(spool.cx + (flat.x - spool.cx) * s.fold, s.y);
+            let world = egui::pos2(flat.x, s.y);
             vertex.pos = world - shape.pos.to_vec2() - row_pos.to_vec2();
             if shade {
                 // Dissolve the print as it rounds the curl, so a label vanishes
@@ -1428,8 +1456,7 @@ fn warp(spool: Spool, shape: &mut egui::epaint::TextShape, t_center: f32, shade:
 /// The end of tape: hazard hatching *printed on the ribbon* past the last
 /// admissible year. The hatch is a flat diagonal field (`across + arc = c`), but
 /// each stripe is sampled along the arc and projected through the same
-/// perspective fold as the printed labels — so it bows and crowds over the
-/// rollers like a true 3-D print, and tapers to the tape's real silhouette
+/// cylindrical wrap as the printed labels, crowding toward the silhouette
 /// instead of standing as a flat screen-space grate. Bounded to the invalid
 /// arc-run [gap, curl] so it can't float past the edge-on rim, and slid by the
 /// roll so the whole field rides with the tape. `toward_rim` is the screen-y
@@ -1468,7 +1495,7 @@ fn hazard(
             .map(|i| {
                 let a = a_start + (a_end - a_start) * i as f32 / steps as f32;
                 let s = spool.sample(a);
-                egui::pos2(spool.cx + (c - a) * s.fold, s.y)
+                egui::pos2(spool.cx + c - a, s.y)
             })
             .collect();
         let _stripe = painter.add(egui::Shape::line(pts, egui::Stroke::new(1.4_f32, ink)));
