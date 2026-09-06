@@ -128,9 +128,10 @@ impl Keycap {
         let ink = if enabled { TEXT } else { MUTED };
         let font = TypeRole::Label.monospace(ui.style());
         let galley = ui.painter().layout_no_wrap(self.label.clone(), font, ink);
-        let padding = Vec2::new(6.0, 3.0);
+        let bounds = super::typography::ink_bounds(&galley);
+        let padding = Vec2::new(6.0, 2.0);
         let (rect, response) =
-            ui.allocate_exact_size(galley.size() + 2.0 * padding, Sense::hover());
+            ui.allocate_exact_size(bounds.size() + 2.0 * padding, Sense::hover());
         let painter = ui.painter();
         let _face = painter.rect_filled(rect, 1.0, CONTROL);
         let _edge = painter.rect_stroke(
@@ -139,7 +140,7 @@ impl Keycap {
             Stroke::new(1.0_f32, if enabled { EDGE_STRONG } else { EDGE }),
             egui::StrokeKind::Inside,
         );
-        painter.galley(rect.center() - galley.size() * 0.5, galley, ink);
+        painter.galley(rect.center() - bounds.center().to_vec2(), galley, ink);
         response
             .widget_info(|| WidgetInfo::labeled(WidgetType::Label, enabled, self.label.clone()));
         response
@@ -155,7 +156,8 @@ impl Keycap {
         let ink = if enabled { HOT } else { MUTED };
         let font = inline_keycap_font(ui.style());
         let galley = ui.painter().layout_no_wrap(self.label, font, ink);
-        let size = galley.size() + 2.0 * INLINE_KEYCAP_PADDING;
+        let bounds = super::typography::ink_bounds(&galley);
+        let size = bounds.size() + 2.0 * INLINE_KEYCAP_PADDING;
         let id = ui.next_auto_id().with("inline-keycap");
         let layout = button
             .right_text(Atom::custom(id, size))
@@ -170,7 +172,7 @@ impl Keycap {
                 Stroke::new(1.0_f32, EDGE),
                 egui::StrokeKind::Inside,
             );
-            painter.galley(rect.center() - galley.size() * 0.5, galley, ink);
+            painter.galley(rect.center() - bounds.center().to_vec2(), galley, ink);
         }
         layout.response
     }

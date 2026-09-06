@@ -156,7 +156,7 @@ pub fn install(ctx: &egui::Context) {
         typography::install(style, FontScale::Standard);
         style.visuals = visuals.clone();
         style.spacing.item_spacing = Vec2::splat(6.0);
-        style.spacing.button_padding = Vec2::new(7.0, 3.0);
+        style.spacing.button_padding = Vec2::new(7.0, 1.0);
         style.spacing.window_margin = egui::Margin::symmetric(8, 8);
         style.spacing.menu_margin = egui::Margin::symmetric(8, 8);
         style.spacing.indent = 12.0;

@@ -14,6 +14,11 @@ keyboard marks, empty set, mathematical operators, and subscripts. The SFD
 owns the exact Unicode mappings. The typeface does not claim CJK coverage;
 the font atelier's sample prose stays within the supported scripts.
 
+Encased inscriptions use ink bounds, not inline line boxes. Monoglyphs fit the
+longer ink dimension to 68% of their projected crown and rasterize at that final
+size. Key wells fit the visible inscription; plaques center its ink. These
+control metrics do not change the face's outlines or prose line spacing.
+
 ## Design Loop
 
 Open the master in FontForge, or edit it with FontForge's Python API. Preserve

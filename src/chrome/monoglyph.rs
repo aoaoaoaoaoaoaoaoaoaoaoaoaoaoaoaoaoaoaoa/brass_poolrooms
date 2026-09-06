@@ -20,7 +20,7 @@ use super::plunger::{
     PlungerWake, SpringLaw,
 };
 
-const ETCH_EM_PER_CROWN: f32 = 13.5 / (8.9 * 2.0);
+const ETCH_INK_PER_CROWN: f32 = 0.68;
 const BRIGHT_CUT_DEPTH: f32 = 0.72;
 const FLAT_CUT_DEPTH: f32 = 0.96;
 const SPRING_LAW: SpringLaw = SpringLaw {
@@ -506,10 +506,6 @@ impl CouplingTarget for MonoglyphResponse {
 /// Signed swept volume from a monoglyph plunger.
 pub type MonoglyphWake = PlungerWake;
 
-#[allow(
-    clippy::disallowed_methods,
-    reason = "a monoglyph's point size is derived from its exact physical crown gauge and perspective depth"
-)]
 fn etch(
     painter: &egui::Painter,
     clip: Rect,
@@ -523,8 +519,7 @@ fn etch(
     let depth = finish.depth();
     let exposure = finish.exposure(elevation);
     let floor_scale = foundry::perspective_scale(elevation - depth);
-    let font = FontId::monospace(top_half * 2.0 * ETCH_EM_PER_CROWN * floor_scale);
-    let galley = painter.layout_no_wrap(glyph.to_string(), font, egui::Color32::PLACEHOLDER);
+    let galley = inscription(painter, glyph, top_half * 2.0 * floor_scale);
     let pos = origin - galley.mesh_bounds.center().to_vec2();
     match finish {
         MonoglyphFinish::BrightCut => {
@@ -582,10 +577,6 @@ fn etch(
 }
 
 #[cfg(feature = "foundry-atelier")]
-#[allow(
-    clippy::disallowed_methods,
-    reason = "the atelier study must retain the production monoglyph's crown-derived typographic projection"
-)]
 pub(crate) fn paint_study_etch(
     painter: &egui::Painter,
     clip: Rect,
@@ -598,8 +589,7 @@ pub(crate) fn paint_study_etch(
 ) {
     let depth = finish.depth();
     let floor_scale = foundry::perspective_scale(elevation - depth);
-    let font = FontId::monospace(top_half * 2.0 * ETCH_EM_PER_CROWN * floor_scale);
-    let galley = painter.layout_no_wrap(glyph.to_string(), font, egui::Color32::PLACEHOLDER);
+    let galley = inscription(painter, glyph, top_half * 2.0 * floor_scale);
     let pos = origin - galley.mesh_bounds.center().to_vec2();
     let floor = match finish {
         MonoglyphFinish::BrightCut => foundry::StudyFloor::Bright,
@@ -608,4 +598,25 @@ pub(crate) fn paint_study_etch(
         MonoglyphFinish::Love => foundry::StudyFloor::Love(glyph as u32),
     };
     foundry::study_etch(painter, clip, pos, galley, treatment, floor);
+}
+
+#[allow(
+    clippy::disallowed_methods,
+    reason = "the crown fits visible ink, independently of a face's inline em and sidebearings"
+)]
+fn inscription(painter: &egui::Painter, glyph: char, crown: f32) -> std::sync::Arc<egui::Galley> {
+    // The fixed-size measurement is cached by egui. Rasterize again at the
+    // final physical size; never stretch a small glyph's texture or mesh.
+    const PROBE_EM: f32 = 64.0;
+    let ink = painter.layout_no_wrap(
+        glyph.to_string(),
+        FontId::monospace(PROBE_EM),
+        egui::Color32::PLACEHOLDER,
+    );
+    let extent = ink.mesh_bounds.size().max_elem().max(1.0);
+    painter.layout_no_wrap(
+        glyph.to_string(),
+        FontId::monospace(PROBE_EM * crown * ETCH_INK_PER_CROWN / extent),
+        egui::Color32::PLACEHOLDER,
+    )
 }

@@ -709,7 +709,10 @@ impl Plaque {
         plaque_engraving(
             painter,
             crown,
-            crown.center() - self.galley.size() * 0.5,
+            crown.center()
+                - super::typography::ink_bounds(&self.galley)
+                    .center()
+                    .to_vec2(),
             self.galley.clone(),
             PLAQUE_RISE,
             PLAQUE_ETCH_DEPTH,

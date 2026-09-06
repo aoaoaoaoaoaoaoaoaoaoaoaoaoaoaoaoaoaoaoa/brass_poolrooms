@@ -200,6 +200,14 @@ pub(super) fn label_hover_text(text: impl Into<WidgetText>) -> WidgetText {
     text.into().fallback_text_style(TextStyle::Small)
 }
 
+pub(super) fn ink_bounds(galley: &egui::Galley) -> egui::Rect {
+    if galley.mesh_bounds.is_finite() {
+        galley.mesh_bounds
+    } else {
+        galley.rect
+    }
+}
+
 pub(super) fn install(style: &mut Style, scale: FontScale) {
     for role in TypeRole::ALL {
         let _semantic = style
