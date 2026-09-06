@@ -1625,6 +1625,7 @@ mod tests {
     #[test]
     fn hidden_year_remains_the_month_day_banks_leap_context() {
         let ctx = egui::Context::default();
+        chrome::install(&ctx);
         let mut day = Day(1904, 2, 29);
         ctx.run_ui(egui::RawInput::default(), |ui| {
             let _spool = DateSpool::new(&mut day, 2005..=2027)

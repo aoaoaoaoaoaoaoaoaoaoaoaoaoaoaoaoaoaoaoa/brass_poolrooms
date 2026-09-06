@@ -42,8 +42,6 @@ const CM_GRADE_57: &[u8] = include_bytes!(
 const CM_GRADE_72: &[u8] = include_bytes!(
     "../assets/fonts/atelier/cm-graded/ComputerModernGradedG72Typewriter10Regular.otf"
 );
-const NOTO_MATH: &[u8] = include_bytes!("../assets/fonts/noto/NotoSansMath-Regular.ttf");
-const NOTO_SYMBOLS: &[u8] = include_bytes!("../assets/fonts/noto/NotoSansSymbols2-Regular.ttf");
 const PRODUCTION_FACE_INDEX: usize = 1;
 const PRODUCTION_PROFILE_INDEX: usize = 5;
 const PRODUCTION_TRANSFER: Transfer = Transfer::Dark;
@@ -66,10 +64,10 @@ const FACES: &[Face] = &[
         emphasis: CMU_EMPHASIS,
     },
     Face {
-        slug: "cmu-typewriter-light",
-        name: "CMU TYPEWRITER LIGHT",
-        province: "production face · CM Unicode light",
-        regular: include_bytes!("../assets/fonts/cmu-typewriter/cmunbtl.otf"),
+        slug: "poolrooms-typewriter-light",
+        name: "POOLROOMS TYPEWRITER LIGHT",
+        province: "production face · CMU light + owned glyph map",
+        regular: include_bytes!("../assets/fonts/poolrooms/PoolroomsTypewriter-Light.otf"),
         emphasis: CMU_EMPHASIS,
     },
     Face {
@@ -722,7 +720,7 @@ fn diagnostic_witness(ui: &mut egui::Ui, family: FontFamily, scale: SpecimenScal
         ),
         (TypeRole::Body, "↶ ↷ ↗ ⚙ ♥ ✓ ✕ ⌫ ⏎", chrome::HOT),
         (TypeRole::Label, "∑ ∂ μ π √∞ ≠ ≤ ≥ · ×", chrome::TEXT),
-        (TypeRole::Body, "正名 café naïve Ångström", chrome::MUTED),
+        (TypeRole::Body, "café naïve Ångström", chrome::MUTED),
         (
             TypeRole::Annotation,
             "0123456789 +42.75 −1032",
@@ -803,27 +801,6 @@ fn install_fonts(ctx: &egui::Context, weight: Weight) {
         .or_default()
         .clone();
     for profile in PROFILES {
-        let fallback_cmu = insert_face(
-            &mut fonts,
-            &format!("atelier:fallback-cmu:{}", profile.slug),
-            match weight {
-                Weight::Regular => CMU_REGULAR,
-                Weight::Emphasis => CMU_EMPHASIS,
-            },
-            *profile,
-        );
-        let fallback_math = insert_face(
-            &mut fonts,
-            &format!("atelier:fallback-math:{}", profile.slug),
-            NOTO_MATH,
-            *profile,
-        );
-        let fallback_symbols = insert_face(
-            &mut fonts,
-            &format!("atelier:fallback-symbols:{}", profile.slug),
-            NOTO_SYMBOLS,
-            *profile,
-        );
         for face in FACES {
             let key = insert_face(
                 &mut fonts,
@@ -840,18 +817,7 @@ fn install_fonts(ctx: &egui::Context, weight: Weight) {
             {
                 production_proportional.clone()
             } else {
-                let mut stack = Vec::with_capacity(4);
-                for candidate in [
-                    key,
-                    fallback_math.clone(),
-                    fallback_symbols.clone(),
-                    fallback_cmu.clone(),
-                ] {
-                    if !stack.contains(&candidate) {
-                        stack.push(candidate);
-                    }
-                }
-                stack
+                vec![key]
             };
             let _old = fonts.families.insert(family(*face, *profile), stack);
         }

@@ -177,12 +177,19 @@ not operators: every tier owns an independently tabulated optical metric for
 every semantic role. Standard supplies the compact desktop metric, and Extra
 Large remains the supported layout ceiling.
 
-The production optical law is CMU Typewriter Text Light with monochrome grid
-hinting, fixed subpixel phase, and dark-sharp atlas transfer. The same raster
-law governs the vendored Noto math and symbol coverage faces, with a one-glyph
-Noto Sans Symbols subset for the Settings gear. This embedded stack uses no
-operating-system or implicit egui font. The Font Raster Atelier starts at these exact coordinates;
-its alternatives are counterfactual witnesses, not application configuration.
+The production face is [Poolrooms Typewriter Light](assets/fonts/poolrooms/README.md):
+CMU Typewriter Text Light with original, editable symbol outlines. Its raster
+law uses monochrome grid hinting, fixed subpixel phase, and dark-sharp atlas
+transfer. There is one embedded face and no font fallback. The `glyph-audit`
+development feature refuses egui's default font bundle and gates authored Rust
+literals against the production cmap. Disable egui's default features throughout
+the dependency graph, including instrumentation. The font gate covers this
+crate's source, examples, and build tools;
+consuming applications should run `chrome::glyph_audit::check_tree` over their
+source in their normal gate. Missing symbols require a deliberate substitution
+or an addition to the owned glyph map. The Font Raster Atelier starts at the
+production coordinates; its alternatives are counterfactual witnesses, not
+application configuration.
 
 Use the least prominent role that tells the truth. `Title` names an application
 or substantial pane, `Heading` introduces a surface within it, `Body` carries

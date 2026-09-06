@@ -777,6 +777,7 @@ mod tests {
     #[test]
     fn wheel_is_canonical_banked_and_stopped_by_the_allowed_span() {
         let ctx = egui::Context::default();
+        crate::chrome::install(&ctx);
         let mut value = 4_u16;
         let screen = Rect::from_min_size(Pos2::ZERO, Vec2::new(320.0, H));
         let input = |unit, y| egui::RawInput {
@@ -849,6 +850,7 @@ mod tests {
     fn focused_keyboard_adjustment_owns_only_exact_arrows() {
         let stroke = |modifiers| {
             let ctx = egui::Context::default();
+            crate::chrome::install(&ctx);
             let mut value = 4_u16;
             let screen = Rect::from_min_size(Pos2::ZERO, Vec2::new(320.0, H));
             ctx.run_ui(

@@ -3,8 +3,9 @@
 These are unmodified upstream font binaries embedded in the
 `font_raster_atelier` example. The selected CMU Typewriter Text Light cut has
 graduated to `../cmu-typewriter/` for shared production and atelier use; other
-files here remain candidates. Production obtains mathematical and symbol
-coverage from the vendored Noto faces in the parent font directory.
+files here remain candidates. Production is now the derived
+[Poolrooms Typewriter Light](../poolrooms/README.md), with original symbols.
+Neither production nor counterfactual faces borrow fallback glyphs.
 
 The candidate corpus is pinned so a later upstream release cannot silently
 alter a raster judgment:

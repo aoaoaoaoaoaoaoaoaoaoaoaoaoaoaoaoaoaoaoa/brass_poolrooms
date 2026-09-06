@@ -83,14 +83,12 @@ pub(crate) use foundry::{DieTopology, StudyEtch, StudyEtchPalette};
 #[cfg(feature = "foundry-atelier")]
 pub(crate) use monoglyph::paint_study_etch;
 
-const CMU_TYPEWRITER_LIGHT: &[u8] = include_bytes!("../assets/fonts/cmu-typewriter/cmunbtl.otf");
-const NOTO_MATH: &[u8] = include_bytes!("../assets/fonts/noto/NotoSansMath-Regular.ttf");
-const NOTO_SYMBOLS: &[u8] = include_bytes!("../assets/fonts/noto/NotoSansSymbols2-Regular.ttf");
-const NOTO_GEAR: &[u8] = include_bytes!("../assets/fonts/noto/NotoSansSymbols-Gear.ttf");
+const TYPEFACE: &[u8] = include_bytes!("../assets/fonts/poolrooms/PoolroomsTypewriter-Light.otf");
 
-const FACE_TEXT: &str = "cmu-typewriter-light";
-const FACE_MATH: &str = "noto-sans-math";
-const FACE_SYMBOLS: &str = "noto-sans-symbols-2";
+const FACE_TEXT: &str = "poolrooms-typewriter-light";
+
+#[cfg(feature = "glyph-audit")]
+pub mod glyph_audit;
 
 // Ink and lamplight: warm charcoal paper, bone text, umber edges, lamplight
 // amber for the accent, typewriter-ribbon red for repulsion — tuned to sit
@@ -191,21 +189,10 @@ fn install_fonts(ctx: &egui::Context) {
 #[doc(hidden)]
 pub fn production_font_definitions() -> FontDefinitions {
     let mut fonts = FontDefinitions::empty();
-    for (face, bytes) in [
-        (FACE_TEXT, CMU_TYPEWRITER_LIGHT),
-        (FACE_MATH, NOTO_MATH),
-        (FACE_SYMBOLS, NOTO_SYMBOLS),
-        ("noto-gear", NOTO_GEAR),
-    ] {
-        let data = FontData::from_static(bytes).tweak(production_font_tweak());
-        let _old = fonts.font_data.insert(face.to_owned(), Arc::new(data));
-    }
+    let data = FontData::from_static(TYPEFACE).tweak(production_font_tweak());
+    let _old = fonts.font_data.insert(FACE_TEXT.to_owned(), Arc::new(data));
     for family in [FontFamily::Proportional, FontFamily::Monospace] {
-        prepend_faces(
-            &mut fonts,
-            family,
-            &[FACE_TEXT, FACE_MATH, FACE_SYMBOLS, "noto-gear"],
-        );
+        let _old = fonts.families.insert(family, vec![FACE_TEXT.to_owned()]);
     }
     fonts
 }
@@ -216,14 +203,6 @@ fn production_font_tweak() -> FontTweak {
         hinting_target: HintingTarget::Mono,
         subpixel_binning: Some(false),
         ..FontTweak::default()
-    }
-}
-
-fn prepend_faces(fonts: &mut FontDefinitions, family: FontFamily, faces: &[&str]) {
-    let stack = fonts.families.entry(family).or_default();
-    for face in faces.iter().rev() {
-        stack.retain(|name| name != face);
-        stack.insert(0, (*face).to_owned());
     }
 }
 
@@ -536,6 +515,7 @@ mod tests {
     fn activation_owns_only_fresh_unmodified_enter_or_space() {
         let stroke = |key, modifiers| {
             let ctx = egui::Context::default();
+            install(&ctx);
             ctx.run_ui(egui::RawInput::default(), |ui| {
                 ui.button("command").request_focus();
             })
@@ -578,6 +558,7 @@ mod tests {
         };
         let repeat = |key| {
             let ctx = egui::Context::default();
+            install(&ctx);
             ctx.run_ui(egui::RawInput::default(), |ui| {
                 ui.button("command").request_focus();
             })
@@ -619,6 +600,7 @@ mod tests {
     #[test]
     fn accessibility_click_survives_an_unrelated_modified_activation_key() {
         let ctx = egui::Context::default();
+        install(&ctx);
         let mut id = egui::Id::NULL;
         ctx.run_ui(egui::RawInput::default(), |ui| {
             id = ui.button("command").id;
@@ -658,6 +640,7 @@ mod tests {
     #[test]
     fn background_accessibility_click_cannot_pierce_a_modal_layer() {
         let ctx = egui::Context::default();
+        install(&ctx);
         let modal = || egui::Modal::new(egui::Id::new("activation-barrier"));
         let mut id = egui::Id::NULL;
         ctx.run_ui(egui::RawInput::default(), |ui| {

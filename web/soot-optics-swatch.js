@@ -448,7 +448,7 @@ function centeredGlyphMask(glyph) {
   const context = scratch.getContext("2d", { willReadFrequently: true });
   context.clearRect(0, 0, SDF_TILE, SDF_TILE);
   context.fillStyle = "white";
-  context.font = `${12.27 * SDF_SUPERSAMPLE}px "CMU Typewriter", "Noto Math", "Noto Symbols", sans-serif`;
+  context.font = `${12.27 * SDF_SUPERSAMPLE}px "Poolrooms Typewriter"`;
   context.textAlign = "center";
   context.textBaseline = "middle";
   context.fillText(glyph, SDF_TILE * 0.5, SDF_TILE * 0.5);

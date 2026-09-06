@@ -181,33 +181,3 @@ impl Symbol {
         }
     }
 }
-
-#[cfg(test)]
-#[test]
-fn armory_survives_the_bundled_font_chain() {
-    // A valid Unicode scalar can silently become tofu in the shipped font subset.
-    let ctx = egui::Context::default();
-    crate::chrome::install(&ctx);
-    ctx.run_ui(egui::RawInput::default(), |ui| {
-        let font = crate::chrome::TypeRole::Body.monospace(ui.style());
-        ui.fonts_mut(|fonts| {
-            let mut glyph = |character: char| {
-                fonts
-                    .layout_no_wrap(character.to_string(), font.clone(), egui::Color32::WHITE)
-                    .rows[0]
-                    .glyphs[0]
-                    .uv_rect
-            };
-            let replacement = glyph('\u{e000}');
-            for symbol in Symbol::ALL {
-                assert_ne!(
-                    glyph(symbol.glyph()),
-                    replacement,
-                    "missing {} glyph",
-                    symbol.name()
-                );
-            }
-        });
-    })
-    .drop_without_applying_deltas();
-}
