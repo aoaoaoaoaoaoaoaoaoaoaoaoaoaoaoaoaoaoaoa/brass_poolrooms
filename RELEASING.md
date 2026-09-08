@@ -3,22 +3,23 @@
 A Poolrooms version identifies one reconstructible source commit. Releases are
 cut only from `main` after the complete native and WebGPU gate passes.
 
-1. Set the shared `brass_foundry`/`brass_poolrooms` workspace version and README
-   dependency examples to the new version.
-2. Run `./check.py verify`.
-3. Commit every intended source, documentation, gallery, and lockfile change,
-   then package both crates from that clean commit.
-4. Push `main`, create the annotated `v<version>` tag on that exact commit, and
-   push the tag.
-5. Run `scripts/release <version>` to repeat the crate gate and assemble the
-   exact-version Web Kit without publication.
-6. Run `scripts/release <version> publish` to publish `brass_foundry`, wait for
-   that registry boundary, publish `brass_poolrooms`, and publish the signed Web
-   Kit GitHub Release assets from the already tagged source.
-7. Verify the registry version and release assets, then advance Eternalist Apps
-   and application lockfiles in dependency order.
+Releases are cut by the Poolrooms line's release engine from the line root:
 
-The release command rejects a dirty checkout, a detached or non-`main` branch,
-an unpushed commit, a missing or misplaced tag, and a manifest-version
-mismatch. Its publication steps are restartable after a partial registry
+```sh
+scripts/release brass_poolrooms <version>            # gate only, tree restored
+scripts/release brass_poolrooms <version> --publish  # bump, gate, tag, publish, push
+```
+
+The engine sets the shared `brass_foundry`/`brass_poolrooms` version and the
+README dependency examples, locks the Web Chrome forge to it, ratifies only the
+lockfile line of `web-kit/projection.sources` (a stale source digest must be
+inspected and ratified by hand first), runs every Foundry proof this host can
+prove, assembles the exact-version Web Kit, signs the tag, publishes
+`brass_foundry`, waits for that registry boundary, publishes `brass_poolrooms`,
+pushes `main` and the tag, publishes the signed Web Kit GitHub Release assets,
+and holds one Vigil wait on the tag's hosted run.
+
+The engine rejects a dirty checkout, a non-`main` branch, an unpushed
+`origin/main`, an existing tag, a `[patch]` section, and a version that does
+not advance. Its publication steps are restartable after a partial registry
 crossing. `cargo publish --allow-dirty` is forbidden.
