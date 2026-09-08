@@ -8,4 +8,8 @@ command -v cargo-audit >/dev/null 2>&1 || {
     printf '%s\n' 'cargo-audit is required: cargo install cargo-audit --version 0.22.2 --locked' >&2
     exit 1
 }
-cargo audit --deny warnings
+# ttf-parser 0.25 backs only the build-time glyph audit behind the glyph-audit
+# feature and never ships in a product binary. RUSTSEC-2026-0192 is maintenance
+# status, not a vulnerability; keep the exact exception visible until the audit
+# moves to a maintained font parser.
+cargo audit --deny warnings --ignore RUSTSEC-2026-0192
