@@ -52,8 +52,8 @@ pub struct Chemistry {
     pub source_gain: f32,
     pub height_retention: f32,
     pub tilt_gain: f32,
-    pub t_panel: f32,
-    pub r_panel: f32,
+    pub t_floor: f32,
+    pub r_floor: f32,
     pub r_wall: f32,
     pub shore_feather: f32,
 }
@@ -81,8 +81,8 @@ impl Default for Chemistry {
             source_gain: 44.0,
             height_retention: 0.99965,
             tilt_gain: 120.0,
-            t_panel: 0.12,
-            r_panel: 0.35,
+            t_floor: 0.12,
+            r_floor: 0.35,
             r_wall: 0.6,
             shore_feather: 12.0,
         }

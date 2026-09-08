@@ -70,7 +70,7 @@ fn crossing(shore_px: f32, src_x: f32) -> f32 {
     }
     let src_water = step(forcing.domain.x, src_x);
     let same = 1.0 - abs(shore_px - src_water);
-    return mix(forcing.chemistry.t_panel, 1.0, same);
+    return mix(forcing.chemistry.t_floor, 1.0, same);
 }
 
 fn prism(flow: vec2f) -> mat3x2f {

@@ -271,7 +271,7 @@ fn step(@builtin(global_invocation_id) gid: vec3u) {
         1.0,
         forcing.motion.y,
     );
-    let shelf_speed = clamp((1.0 - forcing.chemistry.r_panel) / (1.0 + forcing.chemistry.r_panel), 0.2, 1.0);
+    let shelf_speed = clamp((1.0 - forcing.chemistry.r_floor) / (1.0 + forcing.chemistry.r_floor), 0.2, 1.0);
     let cfl = 0.66 * SIM_SCALE / DT;
     let c = min(forcing.chemistry.wave_v * mix(shelf_speed, 1.0, shelf), cfl);
     let kick = soft_limiter(source(px) * forcing.chemistry.source_gain * IMPULSE_GAIN, SOURCE_KICK_CEIL);

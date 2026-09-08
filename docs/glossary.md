@@ -5,6 +5,9 @@
 - **Casing**: the rigid foundry-made body embedded in the substrate; it
   encloses and locates a mechanism but does not move with that mechanism.
 - **Detent**: one discrete stable position of a mechanism.
+- **Font scale**: the closed Standard (100%), Large (125%), or Extra Large
+  (150%) preset applied to semantic application type before layout and
+  rasterization. Extra Large is the desktop compatibility ceiling.
 - **Danger paint**: the bright vermilion, rough coating confined to the flat
   floor of a steep engraving. Its soot keyline exposes the underlying primer.
 - **Hollow casing**: a bronze casing and rim around visible black interior,

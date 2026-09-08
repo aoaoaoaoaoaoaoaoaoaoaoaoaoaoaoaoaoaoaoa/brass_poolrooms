@@ -20,8 +20,8 @@ struct Chemistry {
     source_gain: f32,
     height_retention: f32,
     tilt_gain: f32,
-    t_panel: f32,
-    r_panel: f32,
+    t_floor: f32,
+    r_floor: f32,
     r_wall: f32,
     shore_feather: f32,
 }

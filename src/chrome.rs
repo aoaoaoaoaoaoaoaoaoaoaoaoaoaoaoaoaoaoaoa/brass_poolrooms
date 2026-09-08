@@ -93,7 +93,6 @@ pub mod glyph_audit;
 // Ink and lamplight: warm charcoal paper, bone text, umber edges, lamplight
 // amber for the accent, typewriter-ribbon red for repulsion — tuned to sit
 // with the Computer Modern typewriter lineage instead of fighting it.
-pub const INSPECTOR_WIDTH: f32 = 285.0;
 /// Canonical clear span between twin-tied foundry parts.
 ///
 /// Six points is twice the checkbox crown's nominal resting clearance inside
