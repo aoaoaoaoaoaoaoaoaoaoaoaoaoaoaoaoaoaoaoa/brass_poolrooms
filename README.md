@@ -295,7 +295,7 @@ is deliberately a hardware WebGPU workload.
 
 ```toml
 [dependencies]
-brass_poolrooms = "0.15.0"
+brass_poolrooms = "0.15.1"
 ```
 
 Import egui through the crate to keep its public geometry types aligned with
@@ -311,7 +311,7 @@ chrome::install(&ctx);
 For chrome without GPU water:
 
 ```toml
-brass_poolrooms = { version = "0.15.0", default-features = false }
+brass_poolrooms = { version = "0.15.1", default-features = false }
 ```
 
 ## Forge App Assets
@@ -325,10 +325,10 @@ Poolrooms chrome without moving application-specific dies into Poolrooms.
 
 ```toml
 [dependencies]
-brass_poolrooms = "0.15.0"
+brass_poolrooms = "0.15.1"
 
 [build-dependencies]
-brass_foundry = "0.15.0"
+brass_foundry = "0.15.1"
 ```
 
 The normal build boundary is `forge` followed by `emit_rust` in `build.rs`.
