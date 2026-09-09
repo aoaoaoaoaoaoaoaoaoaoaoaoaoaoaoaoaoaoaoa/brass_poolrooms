@@ -149,11 +149,11 @@ dependencies = [
 
 [[package]]
 name = "brass_foundry"
-version = "0.15.1"
+version = "0.15.3"
 
 [[package]]
 name = "brass_poolrooms"
-version = "0.15.1"
+version = "0.15.3"
 dependencies = [
  "anyhow",
  "brass_foundry",
@@ -2522,19 +2522,3 @@ dependencies = [
  "quote",
  "syn 2.0.119",
 ]
-
-[[patch.unused]]
-name = "egui-demo"
-version = "0.9.13"
-
-[[patch.unused]]
-name = "egui-tester"
-version = "0.9.13"
-
-[[patch.unused]]
-name = "egui-tester-witness"
-version = "0.9.13"
-
-[[patch.unused]]
-name = "eternalist-apps"
-version = "0.10.0"
