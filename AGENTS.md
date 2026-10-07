@@ -1,59 +1,22 @@
-# AGENTS.md
+brass_poolrooms: Brass Poolrooms low-level visual language and water physics; independently usable physical GUI for native or WebGPU apps
 
-Before meaningful Rust edits, read the [Rust Style Doctrine](/home/main/programming/projects/rust_starter/docs/rust-style-doctrine.md).
-It intentionally rejects several pieces of conventional Rust advice; preserve
-those inversions instead of translating them back into generic approachable code.
+## gate
+- `./check.py check` after edits; `./check.py verify` for non-mutating gate
 
-Run `./check.py check` after meaningful local edits. Use `./check.py verify`
-when you need a non-mutating CI-style gate.
+## invariants
+- Logical app concepts stay out: consumers describe geometry and forcing; crate owns embodiment, simulation, optics, timing, GPU representation
+- Poolrooms owns physical things, incl. menu actuator; Eternalist Apps composes them into managers, menus, storage surfaces, app state machines
+- Eternalist may depend on Poolrooms; Poolrooms never depends on Eternalist or assumes its left-panel grammar
+- Widget gallery may publish one Foundry `demonstration` archive for `eternalist.moe/demos/`; product evidence, not another product or host-support claim
+- Authored widgets: miniature mechanisms submerged with the water; geometry, constraints, inertia, contact, displacement from one physical model
+- Hidden machinery may be omitted, material response compressed; visible motion never contradicts its mechanism; no reskinned stock controls in menagerie
+- One foundry for all hardware: screen x-y assembly plane, +y down-screen, viewer on +z; key light fixed 60° above top horizon, L=(0, −½, √3/2)
+- Bronze palette, specular law, cylindrical stock, stamped facets, black recesses, machined rim gauges: shared parts, never widget-local copies
+- Fixed-camera 3D interface, not shaded 2D: every visible 3D part is coherent geometry in common x-y-z space with meaningful normals
+- Foundry owns projection, visibility, material response, shadows; never fake volume with painted gradients, arbitrary tapers, loose highlight lines
+- Fixed camera, light, material, topology, bounded DOF → bake geometry into 2D vector poses at build time; runtime owns only dynamics and pose selection
+- Egui owns placement and compositing; mechanism allocates its whole painted and interactive envelope, never trespasses on sibling allocation
+- Foundry gauges impose rigid minima; only physically valid spans stretch; whole-interface zoom scales assembly, never widget-local deformation
 
-This crate owns the Brass Poolrooms low-level visual language and water
-physics. It supplies independently usable physical GUI elements for native or
-WebGPU applications, including applications that do not use Eternalist Apps or
-its left-panel grammar. Keep logical application concepts out of it: consumers
-describe geometry and forcing; this crate owns embodiment, simulation, optics,
-timing, and GPU representation.
-
-The boundary follows the governing invariant rather than the everyday noun.
-Poolrooms owns physical things such as buttons, rollers, sliders, tiles, frames,
-and the actuator of a menu. Eternalist Apps may compose those mechanisms into
-logical managers, menus, storage surfaces, and other application-scale state
-machines. Eternalist may depend on Poolrooms; Poolrooms must never depend on
-Eternalist.
-
-The widget gallery may publish one Foundry `demonstration` archive for permanent
-hosting beneath `eternalist.moe/demos/`. It remains evidence of this product,
-not another product or a host-support claim.
-
-[`docs/glossary.md`](docs/glossary.md) owns the rectified names of visible
-Poolrooms objects. Reuse those nouns exactly; do not mint near-synonyms for an
-existing physical kind.
-
-## Physical chrome
-
-Authored widgets are miniature mechanisms submerged in the same world as the
-water. Their geometry, constraints, inertia, contact, and displacement must
-come from one coherent physical model. Hidden machinery may be omitted and
-material response may be artistically compressed, but visible motion must not
-contradict the mechanism that would produce it. Reskins of stock controls do
-not belong in the crafted-widget menagerie.
-
-All authored hardware comes from one foundry. Screen x-y is the assembly plane,
-+y points down-screen, and the viewer lies on +z. Its distant key is fixed in
-the y-z plane at 60° above the top-of-screen horizon: L=(0, −½, √3/2). Bronze
-palette, specular law, cylindrical stock, stamped facets, black recesses, and
-machined rim gauges are shared parts, never widget-local approximations.
-
-This is a fixed-camera 3D interface, not shaded 2D illustration. Every visible
-three-dimensional part must originate as coherent geometry in the common x-y-z
-space, with physically meaningful surface normals. The foundry owns projection,
-visibility, material response, and shadows; a widget may not counterfeit volume
-with hand-painted gradients, arbitrary tapers, or disconnected highlight lines.
-When camera, light, material, topology, and bounded degrees of freedom are fixed,
-bake that geometry into 2D vector poses at build time. Runtime owns dynamics and
-pose selection, not redundant 3D evaluation.
-
-Egui owns placement and compositing. A mechanism allocates its entire painted
-and interactive envelope and never trespasses across a sibling allocation.
-Foundry gauges impose explicit rigid minima; only physically lawful spans may
-stretch. Whole-interface zoom, not widget-local deformation, scales the assembly.
+## routes
+- Naming visible Poolrooms objects → `docs/glossary.md`; reuse its nouns exactly, never near-synonyms
