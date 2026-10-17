@@ -292,6 +292,31 @@ pub fn exact_activation(ui: &egui::Ui, response: &egui::Response) -> bool {
     })
 }
 
+/// Lay out one plate held in its pressed pose while a strike settles.
+///
+/// A strike reaches a plate from outside its own sensing, such as the keyboard
+/// shortcut of the command it presents. `struck` arms the synthetic press that
+/// keyboard activation drives through a [`Monoglyph`], keyed by `id`; until it
+/// releases, `add` lays out its plate in egui's active pose. Disabled plates
+/// keep their inert pose.
+pub fn struck_plate<R>(
+    ui: &mut egui::Ui,
+    id: egui::Id,
+    struck: bool,
+    add: impl FnOnce(&mut egui::Ui) -> R,
+) -> R {
+    if !plunger::synthetic_pressure(ui, id, struck, plunger::frame_dt(ui)) {
+        return add(ui);
+    }
+    let resting = ui.style().clone();
+    let widgets = &mut ui.visuals_mut().widgets;
+    widgets.inactive = widgets.active;
+    widgets.hovered = widgets.active;
+    let laid = add(ui);
+    ui.set_style(resting);
+    laid
+}
+
 pub fn section_title(text: impl Into<String>) -> RichText {
     TypeRole::Heading.text(text).strong().color(HOT)
 }

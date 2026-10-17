@@ -108,6 +108,8 @@ impl MonoglyphFinish {
 /// [`Monoglyph::show_latched`] binds the same mechanism to a boolean state: the
 /// selected state rests at a lower latch while pointer pressure retains a
 /// deeper overtravel stroke.
+/// [`Monoglyph::struck`] drives the same crown through a strike it did not
+/// sense itself, such as the keyboard shortcut of the command it presents.
 /// A locked-out mechanism retains its live mark and crown position beneath a
 /// fixed-stock Lockout Grille.
 /// [`Monoglyph::size`] selects one of the exact gauges admitted by
@@ -129,6 +131,7 @@ pub struct Monoglyph {
     finish: MonoglyphFinish,
     symbol: Option<Symbol>,
     focusable: bool,
+    struck: bool,
     soot_keyline: foundry::SootKeyline,
 }
 
@@ -141,6 +144,7 @@ impl Monoglyph {
             finish: MonoglyphFinish::BrightCut,
             symbol: None,
             focusable: true,
+            struck: false,
             soot_keyline: foundry::SootKeyline::PRODUCTION,
         }
     }
@@ -158,6 +162,7 @@ impl Monoglyph {
             finish: symbol.default_finish(),
             symbol: Some(symbol),
             focusable: true,
+            struck: false,
             soot_keyline: foundry::SootKeyline::PRODUCTION,
         }
     }
@@ -186,6 +191,18 @@ impl Monoglyph {
     /// navigation.
     pub const fn focusable(mut self, focusable: bool) -> Self {
         self.focusable = focusable;
+        self
+    }
+
+    /// Plunge through one synthetic press for a strike this frame.
+    ///
+    /// A strike reaches the mechanism from outside its own sensing, such as the
+    /// keyboard shortcut of the command it presents. The crown moves exactly as
+    /// it does for keyboard activation; the response never reports the strike as
+    /// a click, because its owner has already dispatched it. A locked-out
+    /// mechanism does not move.
+    pub const fn struck(mut self, struck: bool) -> Self {
+        self.struck = struck;
         self
     }
 
@@ -222,6 +239,7 @@ impl Monoglyph {
             response = response.on_hover_cursor(CursorIcon::PointingHand);
         }
         let activated = super::exact_activation(ui, &response);
+        let actuated = activated || (self.struck && enabled);
         let label = self
             .symbol
             .map_or_else(|| self.glyph.to_string(), |symbol| symbol.name().to_owned());
@@ -237,7 +255,7 @@ impl Monoglyph {
                 ui,
                 &response,
                 enabled,
-                activated,
+                actuated,
                 *latched,
                 baked::REST,
                 baked::LATCH,
@@ -252,7 +270,7 @@ impl Monoglyph {
                 ui,
                 &response,
                 enabled,
-                activated,
+                actuated,
                 baked::REST,
                 baked::PRESS,
                 SPRING_LAW,

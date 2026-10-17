@@ -34,6 +34,9 @@
   the corresponding baked projection a gauge.
 - **Monoglyph finish**: the cutter, floor, and tabulated depth-dependent
   exposure of a monoglyph's mark: bright cut, void, danger, or love.
+- **Plate**: a flat push button whose face carries text rather than an
+  engraved mark. Its pressed pose is egui's active widget pose; an inline
+  monoglyph or key well may terminate its trailing edge as an inert legend.
 - **Plunger**: the translating actuator seated in a casing. Its **crown** is the
   visible moving face presented to the hand.
 - **Radiator**: a held local source that emits periodic waves into the water
@@ -45,6 +48,10 @@
 - **Soot keyline**: one physical pixel of recessed black material exposed around
   every nonblack monoglyph face. Painted floors expose primer; a bright cut
   exposes its groove floor around the illuminated bronze wall.
+- **Strike**: an actuation that reaches a control from outside its own
+  sensing, such as the keyboard shortcut of the command it presents. A struck
+  plunger or plate shows the brief synthetic press of keyboard activation; a
+  strike never reports a click.
 - **Symbol**: one stable semantic action mark admitted by the shared closed
   catalog. A
   monoglyph engraves the symbol's glyph as a physical **mark**; arbitrary text

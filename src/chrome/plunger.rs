@@ -184,6 +184,12 @@ pub(super) struct Motion {
     pub(super) travel: f32,
 }
 
+/// One presented frame's integration interval, bounded against stalls and floods.
+pub(super) fn frame_dt(ui: &egui::Ui) -> f32 {
+    ui.input(|input| input.stable_dt)
+        .clamp(1.0 / 240.0, 1.0 / 30.0)
+}
+
 /// Drive the shared stiff-spring law for a momentary foundry plunger.
 pub(super) fn momentary_motion(
     ui: &egui::Ui,
@@ -194,9 +200,7 @@ pub(super) fn momentary_motion(
     press: f32,
     law: SpringLaw,
 ) -> Motion {
-    let dt = ui
-        .input(|input| input.stable_dt)
-        .clamp(1.0 / 240.0, 1.0 / 30.0);
+    let dt = frame_dt(ui);
     let synthetic = enabled && activated && !response.clicked_by(egui::PointerButton::Primary);
     // Egui assigns click ownership after the press frame. Observe that frame
     // directly so a sleeping host sees the first stroke before button-up.
@@ -238,9 +242,7 @@ pub(super) fn latching_motion(
     } else {
         raised
     };
-    let dt = ui
-        .input(|input| input.stable_dt)
-        .clamp(1.0 / 240.0, 1.0 / 30.0);
+    let dt = frame_dt(ui);
     motion(
         ui,
         response.id,
@@ -252,7 +254,7 @@ pub(super) fn latching_motion(
     )
 }
 
-fn synthetic_pressure(ui: &egui::Ui, id: egui::Id, fire: bool, dt: f32) -> bool {
+pub(super) fn synthetic_pressure(ui: &egui::Ui, id: egui::Id, fire: bool, dt: f32) -> bool {
     let held = ui.ctx().data_mut(|data| {
         let key = id.with("synthetic-pressure");
         let mut remaining = data.get_temp::<f32>(key).unwrap_or(0.0);

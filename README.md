@@ -72,8 +72,11 @@ a further overtravel stop.
 `chrome::exact_activation` refines button-like egui responses to pointer,
 accessibility, or fresh unmodified Enter/Space activation and leaves modified
 chords for their exact owner. Disabled controls and controls behind a modal
-layer cannot activate. These parts state a common physical interaction language
-without introducing commands, menus, or navigation policy.
+layer cannot activate. A strike reaches a control from outside its own sensing,
+such as its command's keyboard shortcut: `Monoglyph::struck` and
+`chrome::struck_plate` answer it with the same brief synthetic press as keyboard
+activation and never report it as a click. These parts state a common physical
+interaction language without introducing commands, menus, or navigation policy.
 
 [`MechanismSize`] gives compatible `Checkbox`, `Monoglyph`, `CornerClose`,
 `DragHandle`, `ForgePin`, and `SortToggle` dies three named gauges. Cased
