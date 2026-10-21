@@ -1,5 +1,11 @@
 #!/bin/sh
 set -eu
+if command -v rustup >/dev/null 2>&1; then
+    rustup target add wasm32-unknown-unknown
+elif [ ! -d "$(rustc --print target-libdir --target wasm32-unknown-unknown)" ]; then
+    printf '%s\n' 'wasm32-unknown-unknown is absent and rustup is unavailable' >&2
+    exit 1
+fi
 
 # The pinned wasm-bindgen CLI lives in the chamber's own tool prefix and
 # leads PATH, so a distribution's newer package can never shadow it.
