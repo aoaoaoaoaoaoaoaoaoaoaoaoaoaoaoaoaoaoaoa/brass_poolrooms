@@ -186,6 +186,7 @@ impl<'a> SortToggle<'a> {
 
         SortToggleResponse {
             wake: SortToggleWake::new(socket, motion.travel, gauge.pointer_area),
+            #[cfg(feature = "water")]
             shear: matches!(transition, Some(SortTransition::Turn)).then_some(socket),
             response,
             activated: enabled && activated,
@@ -198,6 +199,7 @@ impl<'a> SortToggle<'a> {
 pub struct SortToggleResponse {
     response: egui::Response,
     wake: Option<SortToggleWake>,
+    #[cfg(feature = "water")]
     shear: Option<Rect>,
     activated: bool,
 }
@@ -213,6 +215,7 @@ impl SortToggleResponse {
         self.wake
     }
 
+    #[cfg(feature = "water")]
     pub(crate) const fn shear(&self) -> Option<Rect> {
         self.shear
     }
