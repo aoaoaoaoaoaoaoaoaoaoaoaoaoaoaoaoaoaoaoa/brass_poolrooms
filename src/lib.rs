@@ -25,12 +25,18 @@ pub use egui;
 #[cfg(feature = "water")]
 pub use egui_wgpu;
 
-/// Register a named widget rectangle for an external deterministic UI driver.
-/// The entire expression disappears when instrumentation is disabled.
+/// Register a widget rectangle for an external deterministic UI driver under
+/// a semantic path and, optionally, the raw runtime identity of one repeated
+/// mechanism. The entire expression disappears when the invoking crate's
+/// `instrumentation` feature is disabled.
 #[macro_export]
 macro_rules! poolroom_anchor {
-    ($ui:expr, $name:expr, $rect:expr) => {{
+    ($ui:expr, $path:expr, $rect:expr) => {{
         #[cfg(feature = "instrumentation")]
-        $crate::instrumentation::record($ui, $name, $rect);
+        $crate::instrumentation::record($ui, $path, None, $rect);
+    }};
+    ($ui:expr, $path:expr, $identity:expr, $rect:expr) => {{
+        #[cfg(feature = "instrumentation")]
+        $crate::instrumentation::record($ui, $path, Some($identity), $rect);
     }};
 }

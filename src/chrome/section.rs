@@ -185,7 +185,12 @@ impl Section {
                 header.response
             });
         let rect = frame.response.rect;
-        crate::poolroom_anchor!(ui, format!("recess:{title}"), frame.inner.rect);
+        crate::poolroom_anchor!(
+            ui,
+            "poolrooms.section.header",
+            title.to_owned(),
+            frame.inner.rect
+        );
         if flux.is_some() {
             ui.ctx().request_repaint();
         }

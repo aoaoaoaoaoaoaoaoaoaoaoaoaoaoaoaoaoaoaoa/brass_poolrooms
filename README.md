@@ -365,7 +365,9 @@ is re-exported so consumers use the exact wgpu type universe expected by the
 engine.
 
 The default `water` feature contains the simulator and compositor.
-`instrumentation` adds semantic chrome anchors for deterministic UI driving.
+`instrumentation` adds semantic chrome anchors for deterministic UI driving:
+each names a semantic path and, for a repeated mechanism such as a Section
+header, its raw runtime identity, leaving the wire spelling to the driver.
 Poolrooms deliberately selects no native wgpu backend for a consuming
 application. The application host owns that policy and should enable only its
 target's backend: Vulkan on Linux, Metal on macOS, or DX12 on Windows. The
