@@ -3,6 +3,7 @@ set -eu
 
 gallery=${1:?usage: scripts/playtest GALLERY OUTPUT_DIR}
 out=${2:?usage: scripts/playtest GALLERY OUTPUT_DIR}
+example=$gallery
 case "$gallery" in
     slider_gallery) ;;
     date_spool_gallery) ;;
@@ -15,6 +16,12 @@ case "$gallery" in
     font_raster_atelier) ;;
     longinus_cursor_gallery) ;;
     widget_gallery) ;;
+    # The portfolio still: the menagerie in a 1440x920 frame, at a scale whose
+    # mechanisms still read when the site shows it at half size.
+    frontispiece)
+        example=widget_gallery
+        export WINIT_X11_SCALE_FACTOR=1.75
+        ;;
     *) printf 'unknown gallery: %s\n' "$gallery" >&2; exit 2 ;;
 esac
 
@@ -24,12 +31,12 @@ if [ -n "${BRASS_PLAYTEST_TARGET:-}" ]; then
 else
     target=$(cargo metadata --format-version 1 --no-deps | jq -r .target_directory)
 fi
-app="$target/debug/examples/$gallery"
+app="$target/debug/examples/$example"
 if [ "${BRASS_PLAYTEST_SKIP_BUILD:-0}" -ne 1 ]; then
     if [ "$gallery" = foundry_atelier ]; then
-        cargo build --features foundry-atelier --example "$gallery"
+        cargo build --features foundry-atelier --example "$example"
     else
-        cargo build --example "$gallery"
+        cargo build --example "$example"
     fi
 elif [ ! -x "$app" ]; then
     printf 'prebuilt gallery is absent: %s\n' "$app" >&2
@@ -53,6 +60,9 @@ trap cleanup EXIT HUP INT TERM
 window=$(timeout 60 xdotool search --sync --onlyvisible --pid "$leader")
 xdotool windowmap --sync "$window"
 xdotool windowfocus --sync "$window"
+if [ "$gallery" = frontispiece ]; then
+    xdotool windowsize --sync "$window" 1440 920
+fi
 xwininfo -id "$window" >"$out/window.txt"
 ready=0
 attempt=0
@@ -346,6 +356,14 @@ case "$gallery" in
             printf 'menagerie scroll produced no presented-frame change\n' >&2
             exit 1
         fi
+        ;;
+    frontispiece)
+        # Wind the menagerie down to its corner closures and drag handles. The
+        # pointer rests on open water right of every exhibit on that path, so
+        # no control claims the wheel.
+        xdotool mousemove --window "$window" 1320 460 click --repeat 6 --delay 40 5
+        sleep 1.2
+        import -window "$window" "$out/frontispiece.png"
         ;;
 esac
 sleep 0.5
