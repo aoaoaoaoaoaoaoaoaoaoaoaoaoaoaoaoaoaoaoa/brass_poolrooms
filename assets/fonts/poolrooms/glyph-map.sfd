@@ -20,7 +20,7 @@ OS2Version: 0
 OS2_WeightWidthSlopeOnly: 0
 OS2_UseTypoMetrics: 1
 CreationTime: 1788651776
-ModificationTime: 1788651776
+ModificationTime: 1792732253
 OS2TypoAscent: 0
 OS2TypoAOffset: 1
 OS2TypoDescent: 0
@@ -43,7 +43,7 @@ DisplaySize: -48
 AntiAlias: 1
 FitToEm: 0
 OnlyBitmaps: 1
-BeginChars: 1114112 46
+BeginChars: 1114112 53
 
 StartChar: uni271A
 Encoding: 10010 10010 0
@@ -1490,6 +1490,187 @@ SplineSet
  234 46 198 34 164 34 c 0
  128 34 99 46 72 75 c 0
  47 101 36 128 36 164 c 0
+EndSplineSet
+Validated: 1
+EndChar
+
+StartChar: arrowboth
+Encoding: 8596 8596 46
+Width: 525
+Flags: W
+LayerCount: 2
+Fore
+SplineSet
+29 306 m 0
+ 29 321 42 328 48 334 c 0
+ 134 414 86 477 141 477 c 0
+ 165 477 171 463 171 451 c 0
+ 171 428 157 378 130 336 c 1
+ 394 336 l 1
+ 367 378 353 428 353 451 c 0
+ 353 463 359 477 383 477 c 0
+ 438 477 390 414 476 334 c 0
+ 482 328 495 321 495 306 c 0
+ 495 284 475 285 446 242 c 0
+ 398 169 430 135 385 134 c 0
+ 374 134 353 136 353 161 c 0
+ 353 184 368 236 394 275 c 1
+ 130 275 l 1
+ 156 236 171 184 171 161 c 0
+ 171 136 150 134 139 134 c 0
+ 94 135 126 169 78 242 c 0
+ 49 285 29 284 29 306 c 0
+EndSplineSet
+Validated: 1
+EndChar
+
+StartChar: arrowupdn
+Encoding: 8597 8597 47
+Width: 525
+Flags: W
+LayerCount: 2
+Fore
+SplineSet
+62 170 m 0
+ 62 191 73 200 89 200 c 0
+ 93 200 157 196 231 131 c 1
+ 231 479 l 1
+ 157 414 93 410 89 410 c 0
+ 73 410 62 419 62 440 c 0
+ 62 469 83 470 96 473 c 0
+ 116 478 194 499 235 588 c 0
+ 239 597 246 610 262 610 c 0
+ 279 610 284 596 290 583 c 0
+ 314 533 363 487 429 472 c 0
+ 447 468 461 467 461 439 c 0
+ 461 416 448 410 436 410 c 0
+ 420 410 358 421 292 479 c 1
+ 292 131 l 1
+ 358 189 420 200 436 200 c 0
+ 448 200 461 194 461 171 c 0
+ 461 143 447 142 429 138 c 0
+ 363 123 314 77 290 27 c 0
+ 284 14 279 0 262 0 c 0
+ 246 0 239 13 235 22 c 0
+ 194 111 116 132 96 137 c 0
+ 83 140 62 141 62 170 c 0
+EndSplineSet
+Validated: 1
+EndChar
+
+StartChar: logicaland
+Encoding: 8743 8743 48
+Width: 525
+Flags: W
+LayerCount: 2
+Fore
+SplineSet
+62 119 m 0
+ 62 123 63 127 65 131 c 2
+ 236 503 l 2
+ 240 513 251 520 262 520 c 0
+ 273 520 284 513 288 503 c 2
+ 459 131 l 2
+ 461 127 462 123 462 119 c 0
+ 462 103 449 90 433 90 c 0
+ 422 90 411 97 407 107 c 2
+ 262 422 l 1
+ 117 107 l 2
+ 113 97 102 90 91 90 c 0
+ 75 90 62 103 62 119 c 0
+EndSplineSet
+Validated: 1
+EndChar
+
+StartChar: logicalor
+Encoding: 8744 8744 49
+Width: 525
+Flags: W
+LayerCount: 2
+Fore
+SplineSet
+62 491 m 0
+ 62 507 75 520 91 520 c 0
+ 102 520 113 513 117 503 c 2
+ 262 188 l 1
+ 407 503 l 2
+ 411 513 422 520 433 520 c 0
+ 449 520 462 507 462 491 c 0
+ 462 487 461 483 459 479 c 2
+ 288 107 l 2
+ 284 97 273 90 262 90 c 0
+ 251 90 240 97 236 107 c 2
+ 65 479 l 2
+ 63 483 62 487 62 491 c 0
+EndSplineSet
+Validated: 1
+EndChar
+
+StartChar: circleplus
+Encoding: 8853 8853 50
+Width: 525
+Flags: W
+LayerCount: 2
+Fore
+SplineSet
+52 305 m 0
+ 52 421 146 515 262 515 c 0
+ 378 515 472 421 472 305 c 0
+ 472 189 378 95 262 95 c 0
+ 146 95 52 189 52 305 c 0
+115 279 m 1
+ 125 214 174 161 236 150 c 1
+ 236 279 l 1
+ 115 279 l 1
+115 332 m 1
+ 236 332 l 1
+ 236 460 l 1
+ 174 449 126 397 115 332 c 1
+289 151 m 1
+ 350 163 399 214 409 279 c 1
+ 289 279 l 1
+ 289 151 l 1
+289 332 m 1
+ 409 332 l 1
+ 398 397 350 447 289 459 c 1
+ 289 332 l 1
+EndSplineSet
+Validated: 1
+EndChar
+
+StartChar: uni25C6
+Encoding: 9670 9670 51
+Width: 525
+Flags: W
+LayerCount: 2
+Fore
+SplineSet
+62 305 m 1
+ 262 505 l 1
+ 462 305 l 1
+ 262 105 l 1
+ 62 305 l 1
+EndSplineSet
+Validated: 1
+EndChar
+
+StartChar: uni25C7
+Encoding: 9671 9671 52
+Width: 525
+Flags: W
+LayerCount: 2
+Fore
+SplineSet
+62 305 m 1
+ 262 505 l 1
+ 462 305 l 1
+ 262 105 l 1
+ 62 305 l 1
+141 305 m 1
+ 262 184 l 1
+ 383 305 l 1
+ 262 426 l 1
+ 141 305 l 1
 EndSplineSet
 Validated: 1
 EndChar

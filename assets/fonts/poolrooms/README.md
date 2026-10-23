@@ -4,13 +4,14 @@ One production face, with no fallback. The text comes from CMU Typewriter Text
 Light; its unchanged glyph programs, mappings, metrics, and hinting survive
 assembly byte-for-byte. New marks are original FontForge drawings, not outlines
 imported from another symbol font. The empty-set mark and subscripts reuse the
-base face's own letters and digits.
+base face's own letters and digits; the double arrows rejoin its own arrowheads.
 
 `glyph-map.sfd` is the editable master for additions. `PoolroomsTypewriter-Light.otf`
 is the generated production face. The master uses a 1000-unit em, a 611-unit cap
 height, a 525-unit normal advance, and strokes tuned for small engraved controls.
 Its repertoire covers the action armory, disclosure triangles, selection dot,
-keyboard marks, empty set, mathematical operators, and subscripts. The SFD
+keyboard marks, empty set, mathematical and logical operators, group diamonds,
+double arrows, and subscripts. The SFD
 owns the exact Unicode mappings. The typeface does not claim CJK coverage;
 the font atelier's sample prose stays within the supported scripts.
 

@@ -718,8 +718,12 @@ fn diagnostic_witness(ui: &mut egui::Ui, family: FontFamily, scale: SpecimenScal
             "() [] {} <> /\\ | ! ? : ; . ,",
             chrome::TEXT,
         ),
-        (TypeRole::Body, "↶ ↷ ↗ ⚙ ♥ ✓ ✕ ⌫ ⏎", chrome::HOT),
-        (TypeRole::Label, "∑ ∂ μ π √∞ ≠ ≤ ≥ · ×", chrome::TEXT),
+        (TypeRole::Body, "↶ ↷ ↗ ↔ ↕ ⚙ ♥ ✓ ✕ ⌫ ⏎ ◆ ◇", chrome::HOT),
+        (
+            TypeRole::Label,
+            "∑ ∂ μ π √∞ ≠ ≤ ≥ · × ¬ ∧ ∨ ⊕",
+            chrome::TEXT,
+        ),
         (TypeRole::Body, "café naïve Ångström", chrome::MUTED),
         (
             TypeRole::Annotation,
