@@ -24,7 +24,19 @@ pub struct Section {
 
 impl Section {
     /// Forge a section with application-owned identity and contents.
+    ///
+    /// The title labels the header and names it to accessibility and
+    /// instrumentation.
+    ///
+    /// # Panics
+    ///
+    /// Panics when `title` is blank: an unlabeled header names nothing.
+    #[track_caller]
     pub const fn new(title: &'static str) -> Self {
+        assert!(
+            !title.trim_ascii().is_empty(),
+            "a section requires a title to name its header"
+        );
         Self {
             title,
             default_open: false,
