@@ -50,6 +50,11 @@ pub enum Symbol {
     Heart,
     /// Increase a scalar by one application-defined quantum.
     Increment,
+    /// Hold the targeted member fixed until it is released.
+    ///
+    /// Its padlock shares the armory's 44-unit pen and square corners. A
+    /// latched monoglyph shows the hold engaged, so no open shackle is cut.
+    Lock,
     /// Insert a value from a clipboard or application copy buffer.
     Paste,
     /// Reapply the next command-history entry withdrawn by an undo.
@@ -81,7 +86,7 @@ pub enum Symbol {
 
 impl Symbol {
     /// Complete armory in stable presentation order.
-    pub const ALL: [Self; 25] = [
+    pub const ALL: [Self; 26] = [
         Self::Add,
         Self::ArrowLeft,
         Self::ArrowRight,
@@ -101,6 +106,7 @@ impl Symbol {
         Self::Collapse,
         Self::Export,
         Self::Visibility,
+        Self::Lock,
         Self::Help,
         Self::Heart,
         Self::Restore,
@@ -127,6 +133,7 @@ impl Symbol {
             Self::Export => '➚',
             Self::Help => '?',
             Self::Heart => '♥',
+            Self::Lock => '🔒',
             Self::Paste => '📋',
             Self::Remove => '✖',
             Self::Redo => '↷',
@@ -162,6 +169,7 @@ impl Symbol {
             | Self::Export
             | Self::Help
             | Self::Increment
+            | Self::Lock
             | Self::Paste
             | Self::Redo
             | Self::Remove
@@ -193,6 +201,7 @@ impl Symbol {
             Self::Help => "HELP",
             Self::Heart => "HEART",
             Self::Increment => "INCREMENT",
+            Self::Lock => "LOCK",
             Self::Paste => "PASTE",
             Self::Redo => "REDO",
             Self::Remove => "REMOVE",
