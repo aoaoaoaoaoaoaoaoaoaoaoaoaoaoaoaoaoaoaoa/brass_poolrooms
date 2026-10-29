@@ -77,7 +77,8 @@ void main() {
   vec2 document_px = screen_px + origin;
   vec2 flow = vec2(0.0);
   for (int i = 0; i < WAKE_SLOTS; ++i) flow += touch_flow(document_px, wakes[i]);
-  color = vec4(submerged(document_px, flow), 1.0);
+  if (flow == vec2(0.0)) discard;
+  color = vec4(submerged(document_px, flow), min(1.0, 4.0 * REFRACT_PX * length(flow)));
 }`;
 
 class Riptide {
@@ -87,7 +88,7 @@ class Riptide {
     const canvas = document.createElement("canvas");
     canvas.className = "riptide";
     canvas.setAttribute("aria-hidden", "true");
-    canvas.style.cssText = "position:absolute;z-index:0;opacity:0;pointer-events:none";
+    canvas.style.cssText = "position:absolute;z-index:0;pointer-events:none";
     canvas.width = canvas.height = 1;
     const hush = event => event.preventDefault();
     canvas.addEventListener("webglcontextcreationerror", hush);
@@ -95,7 +96,6 @@ class Riptide {
       alpha: true,
       antialias: false,
       depth: false,
-      desynchronized: true,
       failIfMajorPerformanceCaveat: true,
       powerPreference: "low-power",
       premultipliedAlpha: false,
@@ -185,26 +185,27 @@ class Riptide {
     };
     this._listen(self, "pointerdown", event => strike(event, 1.6), { passive: true });
     this._listen(self, "pointermove", event => this._trail(event), { passive: true });
-    this._listen(self, "pointerover", event => {
-      const target = wetted(event.target);
-      if (target && !target.contains(event.relatedTarget)) strike(event, 0.9);
-    }, { passive: true });
-    this._listen(self, "pointerout", event => {
-      const target = wetted(event.target);
-      if (target && !target.contains(event.relatedTarget)) strike(event, 0.42);
-    }, { passive: true });
+    // Scrolling also carries rims beneath a resting pointer; only a pointer
+    // that has moved since the last scroll may cross one.
+    const brush = impulse => event => {
+      const target = this._motion && wetted(event.target);
+      if (target && !target.contains(event.relatedTarget)) strike(event, impulse);
+    };
+    this._listen(self, "pointerover", brush(0.9), { passive: true });
+    this._listen(self, "pointerout", brush(0.42), { passive: true });
     this._listen(self, "focusin", event => {
       const target = wetted(event.target);
       if (!target) return;
       const rect = target.getBoundingClientRect();
       this._strike(rect.left + rect.width / 2 + scrollX, rect.top + rect.height / 2 + scrollY, 0.9 * DELUGE);
     });
-    const retreat = () => {
+    // A live slice survives both: every frame re-moors it, and a frame whose
+    // viewport no longer matches its allocation stills it.
+    const unmoor = () => {
       this._motion = null;
-      if (this._canvas.parentNode || this._frame) this._still("ready");
     };
-    this._listen(self, "scroll", retreat, { passive: true });
-    this._listen(self, "resize", retreat, { passive: true });
+    this._listen(self, "scroll", unmoor, { passive: true });
+    this._listen(self, "resize", unmoor, { passive: true });
     this._listen(document, "visibilitychange", () => {
       if (!document.hidden) return;
       this._still("ready");
@@ -317,18 +318,13 @@ class Riptide {
     if (pw * ph > FIELD_LIMIT || pw > edge || ph > edge ||
         pw > viewport[0] || ph > viewport[1]) return false;
 
-    const ox = scrollX;
-    const oy = scrollY;
-    this._field = [density, ox, oy];
-    this._canvas.style.left = `${ox}px`;
-    this._canvas.style.top = `${oy}px`;
+    this._field = density;
     this._canvas.style.width = `${width}px`;
     this._canvas.style.height = `${height}px`;
     this._canvas.width = pw;
     this._canvas.height = ph;
     if (this._gl.drawingBufferWidth !== pw || this._gl.drawingBufferHeight !== ph) return false;
     this._gl.viewport(0, 0, pw, ph);
-    this._excavate(width, height, density);
     document.body.prepend(this._canvas);
     return true;
   }
@@ -349,7 +345,6 @@ class Riptide {
     if (this._frame) cancelAnimationFrame(this._frame);
     this._frame = 0;
     this._wakes.fill(0);
-    this._canvas.style.opacity = 0;
     this._canvas.remove();
     this._canvas.width = this._canvas.height = 1;
     this._field = null;
@@ -415,7 +410,7 @@ class Riptide {
 
   _render(now) {
     this._frame = 0;
-    const [density, ox, oy] = this._field;
+    const density = this._field;
     const width = innerWidth;
     const height = innerHeight;
     const pw = this._canvas.width;
@@ -433,6 +428,15 @@ class Riptide {
       if (this._wakes[slot + 1] > 0 && tide - this._wakes[slot] < life) alive = true;
       else this._wakes[slot + 1] = 0;
     }
+    // Moor the slice beneath this frame's viewport. As a document-plane layer
+    // it scrolls in the compositor with the DOM, and its placement, plate
+    // excavation, and wakes commit in one frame, so live water rides through
+    // scrolling instead of being quenched by it.
+    const ox = scrollX;
+    const oy = scrollY;
+    this._excavate(width, height, density);
+    this._canvas.style.left = `${ox}px`;
+    this._canvas.style.top = `${oy}px`;
     this._gl.uniform1f(this._uniforms[0], density);
     this._gl.uniform2f(this._uniforms[1], ox, oy);
     this._gl.uniform1f(this._uniforms[2], tide);
@@ -446,7 +450,6 @@ class Riptide {
       this._gl.scissor(...this._flood[field]);
       this._gl.drawArrays(this._gl.TRIANGLES, 0, 3);
     }
-    this._canvas.style.opacity = 1;
     document.documentElement.setAttribute("data-riptide", "live");
 
     if (alive) this._summon();
